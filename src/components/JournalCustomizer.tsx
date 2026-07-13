@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CoverStep } from "@/components/steps/CoverStep";
 import { CordStep } from "@/components/steps/CordStep";
 import { PenHolderStep } from "@/components/steps/PenHolderStep";
@@ -42,6 +42,27 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct }: J
     charms: [],
     notebooks: {},
   });
+
+  // When embedded in an iframe (e.g. the Shopify storefront), tell the parent
+  // page our actual content height so it can resize the iframe instead of
+  // showing a fixed-height scrollbar. No-op when viewed standalone.
+  useEffect(() => {
+    if (window.parent === window) return;
+
+    function postHeight() {
+      const height = document.documentElement.scrollHeight;
+      window.parent.postMessage({ type: "sanaya-journal-resize", height }, "*");
+    }
+
+    postHeight();
+    const observer = new ResizeObserver(postHeight);
+    observer.observe(document.documentElement);
+    window.addEventListener("resize", postHeight);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", postHeight);
+    };
+  }, [step]);
 
   const product = useMemo(
     () => products.find((p) => p.handle === selection.cover) ?? products[0],
@@ -112,7 +133,7 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct }: J
   const showNotebookPreview = step === NOTEBOOKS_STEP || step === PREVIEW_STEP;
 
   return (
-    <div className="min-h-screen bg-[#0f3d34] p-4 sm:p-8 flex items-center justify-center">
+    <div className="min-h-[600px] bg-[#0f3d34] p-4 sm:p-8 flex items-center justify-center">
       <div className="w-full max-w-6xl rounded-3xl bg-white shadow-2xl overflow-hidden">
         {/* header / stepper */}
         <header className="flex items-center justify-between gap-6 border-b border-[#eae7de] px-6 sm:px-10 py-5">
