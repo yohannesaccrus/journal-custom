@@ -31,6 +31,7 @@ function newBundleId(): string {
 export function buildCartItems(
   variant: ShopifyVariant,
   charmProduct: ShopifyJournalProduct,
+  patchProduct: ShopifyJournalProduct,
   selection: JournalSelection,
   designPageOrigin: string
 ): CartLineItem[] {
@@ -38,6 +39,9 @@ export function buildCartItems(
 
   const properties: Record<string, string> = {};
   if (selection.cord !== "none") properties["Cord"] = selection.cord;
+  if (selection.patch !== "none") {
+    properties["Patch"] = selection.patch.charAt(0).toUpperCase() + selection.patch.slice(1);
+  }
   if (selection.penHolder !== "none") {
     properties["Pen Holder"] = selection.penHolder === "black" ? "Black" : "Brown";
     properties["Corner Edge"] = selection.edge ? "Yes" : "No";
@@ -52,6 +56,19 @@ export function buildCartItems(
   properties["_bundle_id"] = bundleId;
 
   const items: CartLineItem[] = [{ id: toLegacyId(variant.id), quantity: 1, properties }];
+
+  if (selection.patch !== "none") {
+    const patchVariant = patchProduct.variants.find(
+      (v) => v.title.toLowerCase() === selection.patch
+    );
+    if (patchVariant) {
+      items.push({
+        id: toLegacyId(patchVariant.id),
+        quantity: 1,
+        properties: { _for_journal: bundleId },
+      });
+    }
+  }
 
   const charmGroups = new Map<string, { variantId: string; side: string; count: number }>();
   for (const c of selection.charms) {

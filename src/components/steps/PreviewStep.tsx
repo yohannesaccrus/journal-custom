@@ -1,6 +1,6 @@
 "use client";
 
-import { buildCoverEntries, charmsTotal, resolveVariant } from "@/lib/catalog";
+import { buildCoverEntries, charmsTotal, patchPrice, resolveVariant } from "@/lib/catalog";
 import type { ShopifyJournalProduct } from "@/lib/shopify-admin";
 import { formatIDR } from "@/lib/pricing";
 import type { JournalSelection } from "@/lib/types";
@@ -9,17 +9,18 @@ interface PreviewStepProps {
   products: ShopifyJournalProduct[];
   product: ShopifyJournalProduct;
   charmProduct: ShopifyJournalProduct;
+  patchProduct: ShopifyJournalProduct;
   selection: JournalSelection;
   onAddToCart: () => void;
   adding?: boolean;
   error?: string | null;
 }
 
-export function PreviewStep({ products, product, charmProduct, selection, onAddToCart, adding, error }: PreviewStepProps) {
+export function PreviewStep({ products, product, charmProduct, patchProduct, selection, onAddToCart, adding, error }: PreviewStepProps) {
   const cover = buildCoverEntries(products).find((c) => c.handle === product.handle);
   const variant = resolveVariant(product, selection);
   const charmsPrice = charmsTotal(charmProduct, selection.charms);
-  const total = Number(variant.price) + charmsPrice;
+  const total = Number(variant.price) + charmsPrice + patchPrice(patchProduct, selection.patch);
 
   const frontCharms = selection.charms.filter((c) => c.side === "front").length;
   const backCharms = selection.charms.filter((c) => c.side === "back").length;
@@ -45,6 +46,7 @@ export function PreviewStep({ products, product, charmProduct, selection, onAddT
   const rows = [
     { label: "Cover", value: cover?.label ?? product.title },
     { label: "Cord", value: selection.cord !== "none" ? selection.cord : "None" },
+    { label: "Patch", value: selection.patch === "none" ? "None" : selection.patch.charAt(0).toUpperCase() + selection.patch.slice(1) },
     { label: "Pen holder", value: selection.penHolder === "none" ? "None" : selection.penHolder === "black" ? "Black" : "Brown" },
     { label: "Corner edge", value: selection.edge && selection.penHolder !== "none" ? "Yes" : "No" },
     { label: "Charms", value: charmSummary },

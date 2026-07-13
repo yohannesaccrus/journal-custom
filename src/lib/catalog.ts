@@ -143,13 +143,24 @@ const CORD_SLUG: Record<string, string> = {
  * cord + edge selection (pen holder is irrelevant to these views). These are
  * stand-in renders — no back/side photography exists — uploaded as extra
  * product media tagged e.g. "back-cord-red-edge" / "side-cord-none".
+ *
+ * On the back view specifically, a chosen patch takes priority over edge
+ * (falls back to the plain cord image if that patch+cord combo has no
+ * dedicated render) since patch and edge weren't both generated together.
  */
 export function resolveSideImage(
   product: ShopifyJournalProduct,
   view: "back" | "side",
-  selection: Pick<JournalSelection, "cord" | "edge">
+  selection: Pick<JournalSelection, "cord" | "edge" | "patch">
 ): string | undefined {
   const cordSlug = selection.cord === "none" ? "none" : (CORD_SLUG[selection.cord] ?? "none");
+
+  if (view === "back" && selection.patch !== "none" && selection.cord !== "none") {
+    const patchAlt = `back-cord-${cordSlug}-patch-${selection.patch}`;
+    const patchMedia = product.media.find((m) => m.alt === patchAlt);
+    if (patchMedia) return patchMedia.url;
+  }
+
   const edgeSuffix = selection.edge && selection.cord !== "none" ? "-edge" : "";
   const alt = `${view}-cord-${cordSlug}${edgeSuffix}`;
   return product.media.find((m) => m.alt === alt)?.url;
@@ -175,4 +186,47 @@ export function buildNotebookEntries(notebookProduct: ShopifyJournalProduct): No
 
 export function notebookCount(notebooks: Record<string, number>): number {
   return Object.values(notebooks).reduce((sum, n) => sum + n, 0);
+}
+
+export interface PatchEntry {
+  variantId: string;
+  shape: "star" | "heart";
+  price: number;
+}
+
+export function buildPatchEntries(patchProduct: ShopifyJournalProduct): PatchEntry[] {
+  return patchProduct.variants.map((v) => ({
+    variantId: v.id,
+    shape: (optionValue(v, "Shape") ?? v.title).toLowerCase() as "star" | "heart",
+    price: Number(v.price),
+  }));
+}
+
+export function patchPrice(patchProduct: ShopifyJournalProduct, patch: JournalSelection["patch"]): number {
+  if (patch === "none") return 0;
+  return buildPatchEntries(patchProduct).find((p) => p.shape === patch)?.price ?? 0;
+}
+
+/**
+ * Resolves the front-cover image for the current selection. When a patch is
+ * chosen, the cord must be re-rendered with the patch layered underneath it
+ * (the cord visibly crosses over the patch), which can't be done as a simple
+ * overlay on the existing variant photo — so we swap in a pre-composited
+ * "front-cord-{color}-patch-{shape}" media image instead. That composite
+ * doesn't include pen holder/edge, so once those are also chosen the preview
+ * falls back to the normal variant photo (patch omitted) rather than showing
+ * a mismatched combination.
+ */
+export function resolveFrontImage(
+  product: ShopifyJournalProduct,
+  variant: ShopifyVariant,
+  selection: Pick<JournalSelection, "cord" | "patch" | "penHolder" | "edge">
+): string {
+  if (selection.patch !== "none" && selection.cord !== "none" && selection.penHolder === "none") {
+    const cordSlug = CORD_SLUG[selection.cord] ?? "none";
+    const alt = `front-cord-${cordSlug}-patch-${selection.patch}`;
+    const media = product.media.find((m) => m.alt === alt);
+    if (media) return media.url;
+  }
+  return variant.image?.url ?? "";
 }

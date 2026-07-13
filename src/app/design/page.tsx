@@ -3,6 +3,7 @@ import {
   buildCharmEntries,
   buildCoverEntries,
   NOTEBOOKS_PER_JOURNAL,
+  resolveFrontImage,
   resolveSideImage,
   resolveVariant,
 } from "@/lib/catalog";
@@ -45,7 +46,7 @@ export default async function DesignPage({ searchParams }: DesignPageProps) {
   const cover = buildCoverEntries(products).find((c) => c.handle === product.handle);
   const variant = resolveVariant(product, selection);
   const charmEntries = buildCharmEntries(charmProduct);
-  const frontImage = variant.image?.url ?? "";
+  const frontImage = resolveFrontImage(product, variant, selection);
   const backImage = resolveSideImage(product, "back", selection);
   const sideImage = resolveSideImage(product, "side", selection);
   const frontCharms = selection.charms.filter((c) => c.side === "front");
@@ -60,6 +61,7 @@ export default async function DesignPage({ searchParams }: DesignPageProps) {
   const rows = [
     { label: "Cover", value: cover?.label ?? product.title },
     { label: "Cord", value: selection.cord !== "none" ? selection.cord : "None" },
+    { label: "Patch", value: selection.patch === "none" ? "None" : selection.patch.charAt(0).toUpperCase() + selection.patch.slice(1) },
     {
       label: "Pen holder",
       value: selection.penHolder === "none" ? "None" : selection.penHolder === "black" ? "Black" : "Brown",

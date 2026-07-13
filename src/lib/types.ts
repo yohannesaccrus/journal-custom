@@ -21,6 +21,8 @@ export interface JournalSelection {
   cord: string | "none";
   penHolder: "none" | "black" | "brown";
   edge: boolean;
+  /** Patch sitting at the cord's knot — only meaningful when a cord is chosen. */
+  patch: "none" | "star" | "heart";
   charms: PlacedCharm[];
   /** Notebook Type (Shopify option value) -> quantity chosen. Must total exactly 3. */
   notebooks: Record<string, number>;

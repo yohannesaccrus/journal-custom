@@ -46,7 +46,7 @@ const PRODUCTS_QUERY = `
             selectedOptions { name value }
           }
         }
-        media(first: 100) {
+        media(first: 150) {
           nodes {
             alt
             ... on MediaImage { image { url } }
@@ -106,5 +106,10 @@ export async function fetchCharmProduct(): Promise<ShopifyJournalProduct | undef
 
 export async function fetchNotebookProduct(): Promise<ShopifyJournalProduct | undefined> {
   const products = await fetchProducts("tag:notebook");
+  return products[0];
+}
+
+export async function fetchPatchProduct(): Promise<ShopifyJournalProduct | undefined> {
+  const products = await fetchProducts("tag:patch");
   return products[0];
 }

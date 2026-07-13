@@ -14,6 +14,8 @@ import {
   charmsTotal,
   NOTEBOOKS_PER_JOURNAL,
   notebookCount,
+  patchPrice,
+  resolveFrontImage,
   resolveSideImage,
   resolveVariant,
 } from "@/lib/catalog";
@@ -30,9 +32,10 @@ interface JournalCustomizerProps {
   products: ShopifyJournalProduct[];
   charmProduct: ShopifyJournalProduct;
   notebookProduct: ShopifyJournalProduct;
+  patchProduct: ShopifyJournalProduct;
 }
 
-export function JournalCustomizer({ products, charmProduct, notebookProduct }: JournalCustomizerProps) {
+export function JournalCustomizer({ products, charmProduct, notebookProduct, patchProduct }: JournalCustomizerProps) {
   const [step, setStep] = useState(0);
   const [category, setCategory] = useState<CoverCategory>("classic");
   const [selection, setSelection] = useState<JournalSelection>({
@@ -40,6 +43,7 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct }: J
     cord: "none",
     penHolder: "none",
     edge: false,
+    patch: "none",
     charms: [],
     notebooks: {},
   });
@@ -86,9 +90,10 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct }: J
     [products, selection.cover]
   );
   const variant = useMemo(() => resolveVariant(product, selection), [product, selection]);
-  const imageSrc = variant.image?.url ?? "";
+  const imageSrc = resolveFrontImage(product, variant, selection);
   const charmEntries = useMemo(() => buildCharmEntries(charmProduct), [charmProduct]);
-  const total = Number(variant.price) + charmsTotal(charmProduct, selection.charms);
+  const total =
+    Number(variant.price) + charmsTotal(charmProduct, selection.charms) + patchPrice(patchProduct, selection.patch);
   const frontCharms = selection.charms.filter((c) => c.side === "front");
   const backCharms = selection.charms.filter((c) => c.side === "back");
   const sideCharms = selection.charms.filter((c) => c.side === "side");
@@ -101,8 +106,8 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct }: J
   ];
   while (notebookSlots.length < NOTEBOOKS_PER_JOURNAL) notebookSlots.push(null);
 
-  function updateSelection(patch: Partial<JournalSelection>) {
-    setSelection((prev) => ({ ...prev, ...patch }));
+  function updateSelection(updates: Partial<JournalSelection>) {
+    setSelection((prev) => ({ ...prev, ...updates }));
   }
 
   function handleCategoryChange(next: CoverCategory) {
@@ -113,7 +118,7 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct }: J
 
   function handleCordChange(cord: string) {
     if (cord === "none") {
-      updateSelection({ cord, penHolder: "none", edge: false });
+      updateSelection({ cord, penHolder: "none", edge: false, patch: "none" });
     } else {
       updateSelection({ cord });
     }
@@ -135,7 +140,7 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct }: J
   }
 
   function handleAddToCart() {
-    const items = buildCartItems(variant, charmProduct, selection, window.location.origin);
+    const items = buildCartItems(variant, charmProduct, patchProduct, selection, window.location.origin);
 
     if (window.parent === window) {
       // Standalone (not embedded) — no shop origin to submit the cart to.
@@ -294,7 +299,16 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct }: J
                 onCoverChange={(cover) => updateSelection({ cover })}
               />
             )}
-            {step === 1 && <CordStep products={products} cord={selection.cord} onChange={handleCordChange} />}
+            {step === 1 && (
+              <CordStep
+                products={products}
+                patchProduct={patchProduct}
+                cord={selection.cord}
+                patch={selection.patch}
+                onCordChange={handleCordChange}
+                onPatchChange={(patch) => updateSelection({ patch })}
+              />
+            )}
             {step === 2 && (
               <PenHolderStep
                 product={product}
@@ -324,6 +338,7 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct }: J
                 products={products}
                 product={product}
                 charmProduct={charmProduct}
+                patchProduct={patchProduct}
                 selection={selection}
                 onAddToCart={handleAddToCart}
                 adding={addingToCart}

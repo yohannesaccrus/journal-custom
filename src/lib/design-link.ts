@@ -13,6 +13,7 @@ export function encodeDesign(selection: JournalSelection): string {
     cd: selection.cord,
     p: selection.penHolder,
     e: selection.edge,
+    pa: selection.patch,
     ch: selection.charms.map((c) => [c.variantId, c.design, c.side, Math.round(c.x * 10) / 10, Math.round(c.y * 10) / 10]),
     nb: selection.notebooks,
   };
@@ -27,6 +28,7 @@ export function decodeDesign(encoded: string): JournalSelection | null {
       cord: compact.cd,
       penHolder: compact.p,
       edge: compact.e,
+      patch: compact.pa ?? "none",
       charms: (compact.ch as [string, string, CharmSide, number, number][]).map(([variantId, design, side, x, y]) => ({
         instanceId: `${variantId}-${side}-${x}-${y}`,
         variantId,
