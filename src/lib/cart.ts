@@ -1,5 +1,6 @@
 import type { ShopifyJournalProduct, ShopifyVariant } from "./shopify-admin";
 import type { JournalSelection } from "./types";
+import { buildDesignUrl } from "./design-link";
 
 export interface CartLineItem {
   id: number;
@@ -30,7 +31,8 @@ function newBundleId(): string {
 export function buildCartItems(
   variant: ShopifyVariant,
   charmProduct: ShopifyJournalProduct,
-  selection: JournalSelection
+  selection: JournalSelection,
+  designPageOrigin: string
 ): CartLineItem[] {
   const bundleId = newBundleId();
 
@@ -44,6 +46,9 @@ export function buildCartItems(
   if (notebookEntries.length > 0) {
     properties["Notebooks"] = notebookEntries.map(([design, count]) => `${count}× ${design}`).join(", ");
   }
+  // Charm placement is freeform, so it can't be baked into the variant photo —
+  // link to a read-only page that renders exactly what the customer designed.
+  properties["View your custom design"] = buildDesignUrl(designPageOrigin, selection);
   properties["_bundle_id"] = bundleId;
 
   const items: CartLineItem[] = [{ id: toLegacyId(variant.id), quantity: 1, properties }];

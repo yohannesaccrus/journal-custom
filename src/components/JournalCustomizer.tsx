@@ -135,7 +135,7 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct }: J
   }
 
   function handleAddToCart() {
-    const items = buildCartItems(variant, charmProduct, selection);
+    const items = buildCartItems(variant, charmProduct, selection, window.location.origin);
 
     if (window.parent === window) {
       // Standalone (not embedded) — no shop origin to submit the cart to.
