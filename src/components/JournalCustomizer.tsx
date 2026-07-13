@@ -17,6 +17,7 @@ import {
   resolveSideImage,
   resolveVariant,
 } from "@/lib/catalog";
+import { buildCartItems } from "@/lib/cart";
 import { formatIDR } from "@/lib/pricing";
 import type { ShopifyJournalProduct } from "@/lib/shopify-admin";
 import type { CoverCategory, JournalSelection } from "@/lib/types";
@@ -42,6 +43,8 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct }: J
     charms: [],
     notebooks: {},
   });
+  const [addingToCart, setAddingToCart] = useState(false);
+  const [cartError, setCartError] = useState<string | null>(null);
 
   // When embedded in an iframe (e.g. the Shopify storefront), tell the parent
   // page our actual content height so it can resize the iframe instead of
@@ -63,6 +66,20 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct }: J
       window.removeEventListener("resize", postHeight);
     };
   }, [step]);
+
+  // The parent page performs the actual /cart/add.js call (same-origin with
+  // the shop, so cart cookies work correctly) and reports back if it failed.
+  // On success it redirects the top-level page to /checkout, which unmounts
+  // this iframe — so there is no explicit "success" message to handle here.
+  useEffect(() => {
+    function handleMessage(event: MessageEvent) {
+      if (!event.data || event.data.type !== "sanaya-journal-cart-error") return;
+      setAddingToCart(false);
+      setCartError(typeof event.data.message === "string" ? event.data.message : "Something went wrong adding this to your cart.");
+    }
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
 
   const product = useMemo(
     () => products.find((p) => p.handle === selection.cover) ?? products[0],
@@ -118,14 +135,17 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct }: J
   }
 
   function handleAddToCart() {
-    // Placeholder for Shopify cart integration — variant.id is the exact
-    // ProductVariant gid for the journal; each placed charm carries its own
-    // ProductVariant gid (charm.variantId) to add as a separate cart line
-    // with side/position stored as line item properties. Notebook selections
-    // map to Sanaya Component — Notebook variant ids/quantities the same way.
-    alert(
-      `Added to cart:\nVariant: ${variant.id}\nSKU: ${variant.sku}\nCharms: ${selection.charms.length}\nNotebooks: ${notebooksChosen}\nTotal: ${formatIDR(total)}`
-    );
+    const items = buildCartItems(variant, charmProduct, selection);
+
+    if (window.parent === window) {
+      // Standalone (not embedded) — no shop origin to submit the cart to.
+      alert(`Add to cart payload:\n${JSON.stringify(items, null, 2)}`);
+      return;
+    }
+
+    setCartError(null);
+    setAddingToCart(true);
+    window.parent.postMessage({ type: "sanaya-journal-add-to-cart", items }, "*");
   }
 
   const canContinue = step !== NOTEBOOKS_STEP || notebooksComplete;
@@ -306,6 +326,8 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct }: J
                 charmProduct={charmProduct}
                 selection={selection}
                 onAddToCart={handleAddToCart}
+                adding={addingToCart}
+                error={cartError}
               />
             )}
           </div>

@@ -11,9 +11,11 @@ interface PreviewStepProps {
   charmProduct: ShopifyJournalProduct;
   selection: JournalSelection;
   onAddToCart: () => void;
+  adding?: boolean;
+  error?: string | null;
 }
 
-export function PreviewStep({ products, product, charmProduct, selection, onAddToCart }: PreviewStepProps) {
+export function PreviewStep({ products, product, charmProduct, selection, onAddToCart, adding, error }: PreviewStepProps) {
   const cover = buildCoverEntries(products).find((c) => c.handle === product.handle);
   const variant = resolveVariant(product, selection);
   const charmsPrice = charmsTotal(charmProduct, selection.charms);
@@ -71,10 +73,15 @@ export function PreviewStep({ products, product, charmProduct, selection, onAddT
       <button
         type="button"
         onClick={onAddToCart}
-        className="mt-8 w-full sm:w-auto rounded-full bg-[#0f3d34] px-8 py-3.5 text-white font-medium hover:bg-[#0c332b] transition-colors"
+        disabled={adding}
+        className="mt-8 w-full sm:w-auto rounded-full bg-[#0f3d34] px-8 py-3.5 text-white font-medium hover:bg-[#0c332b] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
       >
-        Add to cart — {formatIDR(total)}
+        {adding ? "Adding to cart…" : `Add to cart — ${formatIDR(total)}`}
       </button>
+
+      {error && (
+        <p className="mt-3 text-sm text-[#b5342c]">{error}</p>
+      )}
     </div>
   );
 }
