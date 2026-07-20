@@ -55,20 +55,20 @@ export function PreviewStep({ products, product, charmProduct, patchProduct, sel
   ];
 
   return (
-    <div>
-      <h2 className="text-3xl font-serif text-[#1c1c1a]">Your journal is ready</h2>
-      <p className="mt-2 text-[#6b6a63]">Review the details before adding it to your cart.</p>
+    <div className="step-fade-in">
+      <h2 className="text-3xl font-heading text-[var(--ink)]">Your journal is ready</h2>
+      <p className="mt-2 text-[var(--muted)]">Review the details before adding it to your cart.</p>
 
-      <dl className="mt-8 divide-y divide-[#eae7de] rounded-xl bg-[#f7f5f0] px-6">
+      <dl className="mt-8 divide-y divide-[var(--border)] rounded-[var(--radius-panel)] bg-[var(--surface-soft)] px-6 step-fade-in">
         {rows.map((r) => (
           <div key={r.label} className="flex items-center justify-between py-4">
-            <dt className="text-sm text-[#6b6a63]">{r.label}</dt>
-            <dd className="text-sm font-medium text-[#1c1c1a]">{r.value}</dd>
+            <dt className="text-sm text-[var(--muted)]">{r.label}</dt>
+            <dd className="text-sm font-medium text-[var(--ink)]">{r.value}</dd>
           </div>
         ))}
         <div className="flex items-center justify-between py-4">
-          <dt className="text-sm text-[#6b6a63]">Price</dt>
-          <dd className="text-base font-semibold text-[#1c1c1a]">{formatIDR(total)}</dd>
+          <dt className="text-sm text-[var(--muted)]">Price</dt>
+          <dd className="text-base font-semibold text-[var(--ink)]">{formatIDR(total)}</dd>
         </div>
       </dl>
 
@@ -76,7 +76,7 @@ export function PreviewStep({ products, product, charmProduct, patchProduct, sel
         type="button"
         onClick={onAddToCart}
         disabled={adding}
-        className="mt-8 w-full sm:w-auto rounded-full bg-[#0f3d34] px-8 py-3.5 text-white font-medium hover:bg-[#0c332b] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+        className="btn-continue mt-8 w-full sm:w-auto rounded-[var(--radius-button)] bg-[var(--accent)] px-8 py-3.5 text-white font-medium hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {adding ? "Adding to cart…" : `Add to cart — ${formatIDR(total)}`}
       </button>

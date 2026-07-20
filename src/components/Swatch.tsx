@@ -19,10 +19,10 @@ export function Swatch({ label, selected, onClick, color, thumbnail, priceLabel,
       className="flex flex-col items-center gap-1.5 group disabled:opacity-40 disabled:cursor-not-allowed"
     >
       <span
-        className={`relative h-11 w-11 rounded-lg border-2 transition-all overflow-hidden ${
+        className={`relative h-11 w-11 rounded-[var(--radius-chip)] border-2 transition-all overflow-hidden ${
           selected
-            ? "border-[#0f3d34] ring-2 ring-[#0f3d34]/30"
-            : "border-transparent group-hover:border-[#0f3d34]/30"
+            ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/30"
+            : "border-transparent group-hover:border-[var(--accent)]/30"
         }`}
         style={color ? { backgroundColor: color } : undefined}
       >
@@ -31,8 +31,8 @@ export function Swatch({ label, selected, onClick, color, thumbnail, priceLabel,
           <img src={thumbnail} alt="" className="h-full w-full object-cover" />
         )}
       </span>
-      <span className="text-xs text-[#2a2a28] text-center leading-tight max-w-[4.5rem]">{label}</span>
-      {priceLabel && <span className="text-[10px] text-[#b1632f] -mt-1">{priceLabel}</span>}
+      <span className="text-xs text-[var(--ink)] text-center leading-tight max-w-[4.5rem]">{label}</span>
+      {priceLabel && <span className="text-[10px] text-[var(--brand)] -mt-1">{priceLabel}</span>}
     </button>
   );
 }

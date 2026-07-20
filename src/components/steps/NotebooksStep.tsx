@@ -32,53 +32,53 @@ export function NotebooksStep({ notebookProduct, notebooks, onChange }: Notebook
   }
 
   return (
-    <div>
-      <h2 className="text-xl font-serif text-[#1c1c1a]">Choose your 3 notebooks</h2>
-      <p className="mt-1 text-sm text-[#6b6a63]">Every journal ships with 3 refill notebooks inside. Mix &amp; match freely.</p>
+    <div className="step-fade-in">
+      <h2 className="text-xl font-heading text-[var(--ink)]">Choose your 3 notebooks</h2>
+      <p className="mt-1 text-sm text-[var(--muted)]">Every journal ships with 3 refill notebooks inside. Mix &amp; match freely.</p>
 
       <div className="mt-4 flex items-center gap-3">
         <div className="flex flex-1 gap-1.5">
           {Array.from({ length: NOTEBOOKS_PER_JOURNAL }).map((_, i) => (
             <span
               key={i}
-              className={`h-1.5 flex-1 rounded-full ${i < total ? "bg-[#0f3d34]" : "bg-[#eae7de]"}`}
+              className={`h-1.5 flex-1 rounded-full ${i < total ? "bg-[var(--accent)]" : "bg-[var(--border)]"}`}
             />
           ))}
         </div>
-        <span className="whitespace-nowrap text-sm text-[#6b6a63]">{total} of {NOTEBOOKS_PER_JOURNAL} chosen</span>
+        <span className="whitespace-nowrap text-sm text-[var(--muted)]">{total} of {NOTEBOOKS_PER_JOURNAL} chosen</span>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3">
+      <div className="mt-4 grid grid-cols-2 gap-3 step-fade-in">
         {entries.map((n) => {
           const count = notebooks[n.design] ?? 0;
           const atLimit = total >= NOTEBOOKS_PER_JOURNAL && count === 0;
           return (
             <div
               key={n.variantId}
-              className={`flex items-center gap-3 rounded-xl border-2 p-3 transition-colors ${
-                count > 0 ? "border-[#0f3d34] bg-[#0f3d34]/[0.03]" : "border-[#eae7de]"
+              className={`flex items-center gap-3 rounded-[var(--radius-panel)] border-2 p-3 transition-colors ${
+                count > 0 ? "border-[var(--accent)] bg-[var(--accent)]/[0.03]" : "border-[var(--border)]"
               } ${atLimit ? "opacity-40" : ""}`}
             >
               <NotebookIcon design={n.design} />
               <div className="min-w-0 flex-1">
-                <div className="font-medium text-[#1c1c1a]">{n.design}</div>
-                <div className="text-xs text-[#a89a80]">{DESCRIPTIONS[n.design]}</div>
+                <div className="font-medium text-[var(--ink)]">{n.design}</div>
+                <div className="text-xs text-[var(--faint)]">{DESCRIPTIONS[n.design]}</div>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setCount(n.design, -1)}
                   disabled={count === 0}
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0f3d34] text-white text-sm disabled:opacity-30"
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--accent)] text-white text-sm disabled:opacity-30"
                 >
                   −
                 </button>
-                <span className="w-4 text-center text-sm font-medium text-[#1c1c1a]">{count}</span>
+                <span className="w-4 text-center text-sm font-medium text-[var(--ink)]">{count}</span>
                 <button
                   type="button"
                   onClick={() => setCount(n.design, 1)}
                   disabled={atLimit}
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0f3d34] text-white text-sm disabled:opacity-30"
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--accent)] text-white text-sm disabled:opacity-30"
                 >
                   +
                 </button>
@@ -88,10 +88,10 @@ export function NotebooksStep({ notebookProduct, notebooks, onChange }: Notebook
         })}
       </div>
 
-      <p className="mt-5 text-xs text-[#a89a80]">{NOTEBOOK_SPEC_NOTE}</p>
+      <p className="mt-5 text-xs text-[var(--faint)]">{NOTEBOOK_SPEC_NOTE}</p>
 
       {remaining > 0 && (
-        <p className="mt-3 text-sm text-[#b1632f]">
+        <p className="mt-3 text-sm text-[var(--brand)]">
           Pick {remaining} more notebook{remaining > 1 ? "s" : ""} to continue.
         </p>
       )}

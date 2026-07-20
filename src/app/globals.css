@@ -25,6 +25,188 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* ------------------------------------------------------------------ */
+/* Journal customizer styles — three interchangeable looks, switched   */
+/* via the `data-theme` attribute on the customizer's outer wrapper.   */
+/* Every color/shape/font the customizer uses reads from these tokens  */
+/* so the whole UI restyles without touching component markup.        */
+/* ------------------------------------------------------------------ */
+[data-theme] {
+  --font-body: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  --heading-tracking: normal;
+  --heading-transform: none;
+  --heading-style: normal;
+}
+
+/* Heritage — the original warm, hand-stitched-leather look. */
+[data-theme="heritage"] {
+  --page-bg: #0f3d34;
+  --card-bg: #ffffff;
+  --ink: #1c1c1a;
+  --muted: #6b6a63;
+  --faint: #a8a69c;
+  --accent: #0f3d34;
+  --accent-hover: #0c332b;
+  --brand: #b1632f;
+  --border: #eae7de;
+  --surface-soft: #f7f5f0;
+  --surface-pill: #f2f0ea;
+  --surface-panel: #f7f3ec;
+  --surface-panel-2: #efeae0;
+  --radius-card: 1.5rem;
+  --radius-chip: 0.75rem;
+  --radius-panel: 0.75rem;
+  --radius-button: 9999px;
+  --font-heading: var(--font-playfair), Georgia, serif;
+  --preview-shadow: 0 22px 24px -10px rgba(15, 22, 20, 0.4);
+  --wallpaper-tint: rgba(15, 61, 52, 0.55);
+}
+
+/* Studio Mono — a stark, modern, monochrome atelier look. */
+[data-theme="studio"] {
+  --page-bg: #d4d4d4;
+  --card-bg: #ffffff;
+  --ink: #111111;
+  --muted: #52525b;
+  --faint: #8a8a8f;
+  --accent: #111111;
+  --accent-hover: #000000;
+  --brand: #111111;
+  --border: #e4e4e7;
+  --surface-soft: #f4f4f5;
+  --surface-pill: #ececee;
+  --surface-panel: #ececec;
+  --surface-panel-2: #e4e4e4;
+  --radius-card: 0.75rem;
+  --radius-chip: 0.375rem;
+  --radius-panel: 0.5rem;
+  --radius-button: 0.5rem;
+  --font-heading: var(--font-space-grotesk), sans-serif;
+  --heading-tracking: 0.06em;
+  --heading-transform: uppercase;
+  --preview-shadow: 0 10px 12px -6px rgba(0, 0, 0, 0.28);
+  --wallpaper-tint: rgba(20, 20, 20, 0.45);
+}
+
+/* Blush Atelier — a soft, romantic, boutique look. */
+[data-theme="atelier"] {
+  --page-bg: #4a2c34;
+  --card-bg: #fffaf7;
+  --ink: #3d2a2e;
+  --muted: #8a6b6f;
+  --faint: #bfa2a0;
+  --accent: #b5566f;
+  --accent-hover: #9c4560;
+  --brand: #b5566f;
+  --border: #f0dfdd;
+  --surface-soft: #fbf0ee;
+  --surface-pill: #f7e8e5;
+  --surface-panel: #fbf1ee;
+  --surface-panel-2: #f5e4e0;
+  --radius-card: 2rem;
+  --radius-chip: 9999px;
+  --radius-panel: 1.25rem;
+  --radius-button: 9999px;
+  --font-heading: var(--font-cormorant), Georgia, serif;
+  --heading-style: italic;
+  --preview-shadow: 0 26px 30px -10px rgba(181, 86, 111, 0.45);
+  --wallpaper-tint: rgba(74, 44, 52, 0.5);
+}
+
+/* Blurred wallpaper background option — a soft color wash built from the
+   active theme's own palette, sized larger than the viewport and blurred so
+   the edges never show a hard cutoff. */
+.wallpaper-layer {
+  position: absolute;
+  inset: -15%;
+  background-size: cover;
+  background-position: center;
+  filter: blur(60px);
+  pointer-events: none;
+}
+
+/* A theme-colored wash over the fetched photo so it still reads as
+   belonging to the active style rather than a random unrelated image. */
+.wallpaper-layer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--wallpaper-tint);
+}
+
+/* Journal preview image shadow — one intensity/tint per style, no border. */
+.preview-shadow {
+  filter: drop-shadow(var(--preview-shadow));
+  transition: filter 200ms ease;
+}
+
+.font-heading {
+  font-family: var(--font-heading);
+  letter-spacing: var(--heading-tracking);
+  text-transform: var(--heading-transform);
+  font-style: var(--heading-style);
+}
+
+/* Continue / Add-to-cart button micro-animations — one distinct feel per
+   style, playing with border width, shadow and motion instead of just color. */
+.btn-continue {
+  border: 2px solid transparent;
+  transition:
+    transform 220ms ease,
+    box-shadow 220ms ease,
+    border-width 160ms ease,
+    letter-spacing 200ms ease;
+}
+
+/* Heritage — a classic soft lift: rises and casts a deeper shadow on hover,
+   settles back down with a light press on click. */
+[data-theme="heritage"] .btn-continue:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 24px -10px rgba(15, 61, 52, 0.45);
+}
+[data-theme="heritage"] .btn-continue:active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
+  box-shadow: 0 6px 12px -6px rgba(15, 61, 52, 0.35);
+}
+
+/* Studio — flat and structural: no shadow, the border itself thickens and
+   the label tracks out on hover, snaps back thin on press. */
+[data-theme="studio"] .btn-continue {
+  border-color: var(--accent);
+}
+[data-theme="studio"] .btn-continue:hover:not(:disabled) {
+  border-width: 5px;
+  letter-spacing: 0.04em;
+}
+[data-theme="studio"] .btn-continue:active:not(:disabled) {
+  border-width: 2px;
+  transform: scale(0.96);
+  letter-spacing: 0;
+}
+
+/* Atelier — a soft romantic glow: the button grows slightly and blooms a
+   ring of color around itself on hover, eases back on press. */
+[data-theme="atelier"] .btn-continue:hover:not(:disabled) {
+  transform: scale(1.04);
+  box-shadow:
+    0 0 0 6px color-mix(in srgb, var(--accent) 18%, transparent),
+    0 16px 28px -12px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+[data-theme="atelier"] .btn-continue:active:not(:disabled) {
+  transform: scale(0.98);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-continue {
+    transition: none;
+  }
+  [data-theme] .btn-continue:hover:not(:disabled),
+  [data-theme] .btn-continue:active:not(:disabled) {
+    transform: none;
+  }
+}
+
 /* Thin, rounded scrollbars matching the journal customizer's palette —
    applied globally so every scrollable area (not just the customizer) shares
    the same style. */
@@ -51,4 +233,36 @@ body {
 
 *::-webkit-scrollbar-thumb:hover {
   background-color: #a89a80;
+}
+
+/* Elegant, simple fade-in for step content when moving between steps.
+   Applied per direct child of .step-fade-in so components (title, swatch
+   group, etc.) enter one after another instead of all at once. */
+@keyframes step-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.step-fade-in > * {
+  opacity: 0;
+  animation: step-fade-in 380ms ease both;
+}
+
+.step-fade-in > *:nth-child(1) { animation-delay: 0ms; }
+.step-fade-in > *:nth-child(2) { animation-delay: 90ms; }
+.step-fade-in > *:nth-child(3) { animation-delay: 180ms; }
+.step-fade-in > *:nth-child(4) { animation-delay: 270ms; }
+.step-fade-in > *:nth-child(n + 5) { animation-delay: 360ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .step-fade-in > * {
+    animation: none;
+    opacity: 1;
+  }
 }

@@ -103,7 +103,7 @@ function CharmCanvas({ label, wide, imageUrl, charms, entries, active, onSelect,
         type="button"
         onClick={onSelect}
         className={`text-xs font-medium uppercase tracking-wide transition-colors ${
-          active ? "text-[#0f3d34]" : "text-[#a89a80] hover:text-[#6b6a63]"
+          active ? "text-[var(--accent)]" : "text-[var(--faint)] hover:text-[var(--muted)]"
         }`}
       >
         {label}
@@ -115,8 +115,8 @@ function CharmCanvas({ label, wide, imageUrl, charms, entries, active, onSelect,
         onDrop={handleDrop}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        className={`relative rounded-xl overflow-hidden border-2 select-none bg-[#f7f5f0] transition-colors cursor-pointer ${
-          active ? "border-[#0f3d34] ring-2 ring-[#0f3d34]/20" : "border-[#eae7de] hover:border-[#0f3d34]/30"
+        className={`relative rounded-[var(--radius-panel)] overflow-hidden border-2 select-none bg-[var(--surface-soft)] transition-colors cursor-pointer ${
+          active ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/20" : "border-[var(--border)] hover:border-[var(--accent)]/30"
         } ${wide ? "w-[170px] aspect-[560/660]" : "w-[92px] aspect-[200/660]"}`}
       >
         {imageUrl && (
@@ -144,7 +144,7 @@ function CharmCanvas({ label, wide, imageUrl, charms, entries, active, onSelect,
               type="button"
               onPointerDown={(e) => e.stopPropagation()}
               onClick={() => onRemove(c.instanceId)}
-              className="absolute -top-1.5 -right-1.5 hidden h-4 w-4 items-center justify-center rounded-full bg-[#1c1c1a] text-white text-[10px] leading-none group-hover:flex"
+              className="absolute -top-1.5 -right-1.5 hidden h-4 w-4 items-center justify-center rounded-full bg-[var(--ink)] text-white text-[10px] leading-none group-hover:flex"
             >
               ×
             </button>
@@ -185,9 +185,9 @@ export function CharmsStep({
   const totalCharms = charms.length;
 
   return (
-    <div>
-      <h2 className="text-xl font-serif text-[#1c1c1a]">Add charms</h2>
-      <p className="mt-1 text-sm text-[#6b6a63]">
+    <div className="step-fade-in">
+      <h2 className="text-xl font-heading text-[var(--ink)]">Add charms</h2>
+      <p className="mt-1 text-sm text-[var(--muted)]">
         Drag a charm onto the front, back, or side cover — place as many as you like.
       </p>
 
@@ -203,17 +203,17 @@ export function CharmsStep({
             onClick={() => addCharm(activeSide, c.variantId, c.design, 50, 45)}
             className="flex cursor-grab flex-col items-center gap-1.5 group active:cursor-grabbing"
           >
-            <span className="flex h-11 w-11 items-center justify-center rounded-lg border-2 border-transparent bg-[#f7f5f0] group-hover:border-[#0f3d34]/30 transition-colors">
+            <span className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-chip)] border-2 border-transparent bg-[var(--surface-soft)] group-hover:border-[var(--accent)]/30 transition-colors">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={c.imageUrl} alt="" className="h-7 w-7 object-contain pointer-events-none" />
             </span>
-            <span className="text-xs text-[#2a2a28]">{c.design}</span>
-            <span className="text-[10px] text-[#b1632f] -mt-1">{formatIDR(c.price)}</span>
+            <span className="text-xs text-[var(--ink)]">{c.design}</span>
+            <span className="text-[10px] text-[var(--brand)] -mt-1">{formatIDR(c.price)}</span>
           </div>
         ))}
       </div>
 
-      <div className="mt-3 flex items-start gap-2 rounded-lg bg-[#f7f5f0] px-3 py-2 text-xs text-[#6b6a63]">
+      <div className="mt-3 flex items-start gap-2 rounded-lg bg-[var(--surface-soft)] px-3 py-2 text-xs text-[var(--muted)]">
         <span aria-hidden>💡</span>
         <span>
           Drag a charm from above and drop it onto any view below to place it there. Once placed, drag a
@@ -243,7 +243,7 @@ export function CharmsStep({
         ))}
       </div>
 
-      <p className="mt-4 text-sm text-[#6b6a63]">
+      <p className="mt-4 text-sm text-[var(--muted)]">
         {totalCharms === 0
           ? "No charms added yet."
           : `${totalCharms} charm${totalCharms > 1 ? "s" : ""} placed.`}

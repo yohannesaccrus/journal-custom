@@ -9,8 +9,12 @@ import { CharmsStep } from "@/components/steps/CharmsStep";
 import { NotebooksStep } from "@/components/steps/NotebooksStep";
 import { PreviewStep } from "@/components/steps/PreviewStep";
 import { NotebookIcon } from "@/components/NotebookIcon";
+import { ThemeSwitcher, THEMES, type Theme } from "@/components/ThemeSwitcher";
+import { BackgroundSwitcher, type BackgroundMode } from "@/components/BackgroundSwitcher";
+import { MobileViewSwitcher } from "@/components/MobileViewSwitcher";
 import {
   buildCharmEntries,
+  buildCordEntries,
   buildCoverEntries,
   charmsTotal,
   NOTEBOOKS_PER_JOURNAL,
@@ -28,15 +32,83 @@ import type { CharmSide, CoverCategory, JournalSelection } from "@/lib/types";
 const STEPS = ["Journal Covers", "Accessories", "Charms", "Content", "Preview"] as const;
 const NOTEBOOKS_STEP = 3;
 const PREVIEW_STEP = 4;
+const ROMAN_NUMERALS = ["I", "II", "III", "IV", "V"];
+
+// Picsum Photos (picsum.photos) serves free, license-friendly random stock
+// photos with no API key. A fixed seed per style keeps the same photo on
+// every reload instead of a fresh random one each render.
+const WALLPAPER_URL: Record<Theme, string> = {
+  heritage: "https://picsum.photos/seed/sanaya-heritage/1600/1000",
+  studio: "https://picsum.photos/seed/sanaya-studio-mono/1600/1000?grayscale",
+  atelier: "https://picsum.photos/seed/sanaya-atelier/1600/1000",
+};
 
 interface JournalCustomizerProps {
   products: ShopifyJournalProduct[];
   charmProduct: ShopifyJournalProduct;
   notebookProduct: ShopifyJournalProduct;
   patchProduct: ShopifyJournalProduct;
+  // Set when this render is the phone-sized <iframe> embed the "Mobile View"
+  // toggle opens (see page.tsx) — suppresses all the dev-only style controls
+  // so the embed just shows the customizer itself, seeded to match whatever
+  // the outer page had selected.
+  hideDevControls?: boolean;
+  initialTheme?: Theme;
+  initialBackground?: BackgroundMode;
 }
 
-export function JournalCustomizer({ products, charmProduct, notebookProduct, patchProduct }: JournalCustomizerProps) {
+export function JournalCustomizer({
+  products,
+  charmProduct,
+  notebookProduct,
+  patchProduct,
+  hideDevControls,
+  initialTheme,
+  initialBackground,
+}: JournalCustomizerProps) {
+  // Dev-only style preview: which of the three customizer looks is active.
+  // Persisted to localStorage purely so it survives a page reload while a
+  // client is clicking through options during a review call.
+  const [theme, setTheme] = useState<Theme>(initialTheme ?? THEMES[0].id);
+  const isDev = process.env.NODE_ENV !== "production" && !hideDevControls;
+  useEffect(() => {
+    // Dev-only preference restore — reads after mount so server and client
+    // render the same default on first paint (no hydration mismatch).
+    if (!isDev) return;
+    const stored = window.localStorage.getItem("sanaya-journal-theme");
+    if (stored && THEMES.some((t) => t.id === stored) && stored !== theme) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time restore of a dev-only preference from localStorage, not derivable at initial render without a hydration mismatch
+      setTheme(stored as Theme);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount only
+  }, []);
+  useEffect(() => {
+    if (isDev) window.localStorage.setItem("sanaya-journal-theme", theme);
+  }, [theme, isDev]);
+
+  // Dev-only: plain theme-color background vs. a blurred wallpaper wash
+  // built from that theme's own palette. Same restore-after-mount pattern
+  // as the theme picker above, for the same hydration-safety reason.
+  const [background, setBackground] = useState<BackgroundMode>(initialBackground ?? "plain");
+  useEffect(() => {
+    if (!isDev) return;
+    const stored = window.localStorage.getItem("sanaya-journal-background");
+    if ((stored === "plain" || stored === "wallpaper") && stored !== background) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time restore of a dev-only preference from localStorage, not derivable at initial render without a hydration mismatch
+      setBackground(stored);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount only
+  }, []);
+  useEffect(() => {
+    if (isDev) window.localStorage.setItem("sanaya-journal-background", background);
+  }, [background, isDev]);
+
+  // Dev-only: preview the customizer inside a phone-sized <iframe> pointing
+  // at the dedicated /mobile-preview route (see app/mobile-preview/page.tsx)
+  // so a real `md:` breakpoint switch happens inside the iframe's own narrow
+  // viewport, instead of trying to fake it by just shrinking a div.
+  const [mobilePreview, setMobilePreview] = useState(false);
+
   const [step, setStep] = useState(0);
   const [category, setCategory] = useState<CoverCategory>("classic");
   const [selection, setSelection] = useState<JournalSelection>({
@@ -50,6 +122,11 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct, pat
   });
   const [addingToCart, setAddingToCart] = useState(false);
   const [cartError, setCartError] = useState<string | null>(null);
+  // True when `selection.cord` was auto-picked by handlePenHolderChange
+  // (only so a real Shopify variant resolves) rather than chosen by the
+  // user — Patch should still read as locked in that case, since the user
+  // never actually decided on a cord.
+  const [cordAutoSelected, setCordAutoSelected] = useState(false);
   // Which side the left preview shows while on the Charms step — clicking
   // the Front/Back/Side canvas over there switches this.
   const [charmView, setCharmView] = useState<CharmSide>("front");
@@ -141,8 +218,13 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct, pat
   }
 
   function handleCordChange(cord: string) {
+    // This is always a deliberate user choice, so it overrides any cord
+    // that was only auto-picked to make a pen holder's variant resolve.
+    setCordAutoSelected(false);
     if (cord === "none") {
-      updateSelection({ cord, penHolder: "none", edge: false, patch: "none" });
+      // Patch requires a cord, and a pen holder can't exist without one
+      // either (no such Shopify variant) — both reset along with it.
+      updateSelection({ cord, patch: "none", penHolder: "none", edge: false });
     } else {
       updateSelection({ cord });
     }
@@ -151,9 +233,21 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct, pat
   function handlePenHolderChange(penHolder: JournalSelection["penHolder"]) {
     if (penHolder === "none") {
       updateSelection({ penHolder, edge: false });
-    } else {
-      updateSelection({ penHolder });
+      return;
     }
+    // Pen holder is selectable without a cord in the UI, but Shopify only
+    // has pen-holder variants paired with an actual cord color — auto-pick
+    // the first one behind the scenes so a real variant always resolves.
+    // Patch stays locked until the user picks a cord themselves.
+    if (selection.cord === "none") {
+      const fallbackCord = buildCordEntries(products)[0]?.label;
+      if (fallbackCord) {
+        setCordAutoSelected(true);
+        updateSelection({ penHolder, cord: fallbackCord });
+        return;
+      }
+    }
+    updateSelection({ penHolder });
   }
 
   function goNext() {
@@ -181,40 +275,80 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct, pat
   const showBackSide = step === PREVIEW_STEP;
   const showNotebookPreview = step === NOTEBOOKS_STEP || step === PREVIEW_STEP;
 
+  if (isDev && mobilePreview) {
+    const embedSrc = `/mobile-preview?theme=${theme}&background=${background}`;
+    return (
+      <div className="min-h-screen w-full bg-[var(--page-bg)] p-4 sm:p-8 flex flex-col items-center gap-6" data-theme={theme}>
+        <div className="flex w-full max-w-6xl justify-end gap-2">
+          <ThemeSwitcher theme={theme} onChange={setTheme} />
+          <BackgroundSwitcher mode={background} onChange={setBackground} />
+          <MobileViewSwitcher enabled={mobilePreview} onChange={setMobilePreview} />
+        </div>
+        <div className="flex flex-1 items-center justify-center py-8">
+          <div
+            className="rounded-[2.5rem] shadow-2xl overflow-hidden"
+            style={{ width: 390, height: 844 }}
+          >
+            {/* A real iframe (not a scaled-down div) — its own viewport is
+                390px wide, so the customizer's `md:` breakpoints behave
+                exactly as they would on an actual phone. */}
+            <iframe key={embedSrc} src={embedSrc} title="Mobile preview" className="h-full w-full bg-white" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen w-full bg-[#0f3d34] p-4 sm:p-8 flex items-center justify-center">
-      <div className="w-full max-w-6xl rounded-3xl bg-white shadow-2xl overflow-hidden">
+    <div
+      data-theme={theme}
+      className="relative isolate min-h-screen w-full overflow-hidden bg-[var(--page-bg)] p-0 md:p-8 flex flex-col items-center justify-start md:justify-center gap-4"
+    >
+      {/* On an actual small viewport this is a full-bleed mobile page — the
+          floating-card treatment (padding, rounded corners, shadow, wallpaper
+          backdrop, dev toolbar) is a desktop presentation and only applies
+          from md up. */}
+      {background === "wallpaper" && (
+        <div
+          className="wallpaper-layer -z-10 hidden md:block"
+          style={{ backgroundImage: `url(${WALLPAPER_URL[theme]})` }}
+          aria-hidden
+        />
+      )}
+      <div className="w-full max-w-6xl md:rounded-[var(--radius-card)] bg-[var(--card-bg)] md:shadow-2xl overflow-hidden">
         {/* header / stepper */}
-        <header className="flex items-center justify-between gap-6 border-b border-[#eae7de] px-6 sm:px-10 py-5">
-          <span className="text-xl tracking-[0.2em] font-serif text-[#b1632f]">SANAYA</span>
+        <header className="flex items-center justify-between gap-6 border-b border-[var(--border)] px-6 sm:px-10 py-5">
+          {/* Logo always keeps Style 1's look (Playfair, brand orange) regardless
+              of the active style — it's the one constant across all three. */}
+          <span
+            className="text-xl tracking-[0.2em]"
+            style={{ fontFamily: "var(--font-playfair), Georgia, serif", color: "#b1632f" }}
+          >
+            SANAYA
+          </span>
 
           <nav className="hidden md:flex items-center gap-6">
             {STEPS.map((label, i) => (
-              <button
-                key={label}
-                type="button"
-                onClick={() => setStep(i)}
-                className="flex items-center gap-2 text-sm"
-              >
+              <button key={label} type="button" onClick={() => setStep(i)} className="flex items-center gap-2 text-sm">
                 <span
-                  className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium ${
+                  className={`flex h-6 w-6 items-center justify-center rounded-[var(--radius-chip)] text-xs font-medium ${
                     i === step
-                      ? "bg-[#0f3d34] text-white"
+                      ? "bg-[var(--accent)] text-white"
                       : i < step
-                        ? "bg-[#0f3d34]/10 text-[#0f3d34]"
-                        : "bg-[#f2f0ea] text-[#a8a69c]"
+                        ? "bg-[var(--accent)]/10 text-[var(--accent)]"
+                        : "bg-[var(--surface-pill)] text-[var(--faint)]"
                   }`}
                 >
-                  {i + 1}
+                  {theme === "atelier" ? ROMAN_NUMERALS[i] ?? i + 1 : i + 1}
                 </span>
-                <span className={i === step ? "text-[#1c1c1a] font-medium" : "text-[#a8a69c]"}>{label}</span>
+                <span className={i === step ? "text-[var(--ink)] font-medium" : "text-[var(--faint)]"}>{label}</span>
               </button>
             ))}
           </nav>
 
           <div className="text-right">
-            <div className="text-xs text-[#a8a69c]">Total</div>
-            <div className="text-lg font-semibold text-[#1c1c1a]">{formatIDR(total)}</div>
+            <div className="text-xs text-[var(--faint)]">Total</div>
+            <div className="text-lg font-semibold text-[var(--ink)] font-heading">{formatIDR(total)}</div>
           </div>
         </header>
 
@@ -224,7 +358,7 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct, pat
           className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] md:max-h-[70vh] overflow-hidden"
         >
           {/* preview */}
-          <div className="flex flex-col items-center justify-start gap-6 overflow-y-auto bg-[#f7f3ec] p-10 min-h-[420px]">
+          <div className="flex flex-col items-center justify-start gap-6 overflow-y-auto bg-[var(--surface-panel)] p-10 min-h-[420px]">
             <div className="relative w-full max-w-[320px] aspect-[560/660]">
               {mainView === "side" ? (
                 // The side (spine) view is much narrower than front/back — render it
@@ -236,7 +370,7 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct, pat
                   <img
                     src={mainImageSrc}
                     alt="Journal preview"
-                    className="h-full w-full object-contain drop-shadow-xl transition-opacity duration-200"
+                    className="h-full w-full object-contain preview-shadow transition-opacity duration-200"
                   />
                   {mainCharms.map((c) => (
                     <img
@@ -254,7 +388,7 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct, pat
                   <img
                     src={mainImageSrc}
                     alt="Journal preview"
-                    className="h-full w-full object-contain drop-shadow-xl transition-opacity duration-200"
+                    className="h-full w-full object-contain preview-shadow transition-opacity duration-200"
                   />
                   {mainCharms.map((c) => (
                     <img
@@ -270,15 +404,15 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct, pat
             </div>
 
             {isCharmsStep && (
-              <span className="text-[11px] font-medium uppercase tracking-wide text-[#a89a80]">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--faint)]">
                 {mainView} view
               </span>
             )}
 
             {showNotebookPreview && (
               <div className="w-full max-w-[320px]">
-                <span className="text-[11px] font-medium uppercase tracking-wide text-[#a89a80]">Inside</span>
-                <div className="mt-2 grid grid-cols-3 items-start gap-4 rounded-lg bg-[#efeae0] p-4">
+                <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--faint)]">Inside</span>
+                <div className="mt-2 grid grid-cols-3 items-start gap-4 rounded-[var(--radius-panel)] bg-[var(--surface-panel-2)] p-4">
                   {notebookSlots.map((design, i) => (
                     <div key={i} className="flex flex-col items-center gap-2">
                       <div className="relative h-44 w-full">
@@ -292,12 +426,12 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct, pat
                             </div>
                           </>
                         ) : (
-                          <div className="flex h-full w-full items-center justify-center rounded-md border border-dashed border-[#c8c2b3] text-center text-[9px] leading-tight text-[#a89a80]">
+                          <div className="flex h-full w-full items-center justify-center rounded-md border border-dashed border-[var(--faint)] text-center text-[9px] leading-tight text-[var(--faint)]">
                             Choose a notebook
                           </div>
                         )}
                       </div>
-                      <span className="text-[11px] font-medium text-[#6b6a63]">
+                      <span className="text-[11px] font-medium text-[var(--muted)]">
                         {design ? design.replace(" Notebook", "") : "—"}
                       </span>
                     </div>
@@ -309,7 +443,7 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct, pat
             {showBackSide && (
               <div className="flex items-start gap-6">
                 <div className="flex flex-col items-center gap-1.5">
-                  <span className="text-[11px] font-medium uppercase tracking-wide text-[#a89a80]">Back</span>
+                  <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--faint)]">Back</span>
                   <div className="relative w-[100px] aspect-[560/660] rounded-lg overflow-hidden shadow-md">
                     {backImageSrc && (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -327,7 +461,7 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct, pat
                   </div>
                 </div>
                 <div className="flex flex-col items-center gap-1.5">
-                  <span className="text-[11px] font-medium uppercase tracking-wide text-[#a89a80]">Side</span>
+                  <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--faint)]">Side</span>
                   <div className="relative w-[52px] aspect-[200/660] rounded-lg overflow-hidden shadow-md">
                     {sideImageSrc && (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -350,8 +484,9 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct, pat
 
           {/* options */}
           <div className="overflow-y-auto px-6 sm:px-10 py-6">
+          <div key={step} className="step-fade-in">
             {step === 0 && (
-              <div>
+              <>
                 <CoverStep
                   products={products}
                   cover={selection.cover}
@@ -359,20 +494,20 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct, pat
                   onCategoryChange={handleCategoryChange}
                   onCoverChange={(cover) => updateSelection({ cover })}
                 />
-                <div className="mt-6 border-t border-[#eae7de] pt-6">
+                <div className="mt-6 border-t border-[var(--border)] pt-6">
                   <CordStep products={products} cord={selection.cord} onCordChange={handleCordChange} />
                 </div>
-              </div>
+              </>
             )}
             {step === 1 && (
-              <div>
+              <>
                 <PatchStep
                   patchProduct={patchProduct}
-                  cord={selection.cord}
+                  cordSelected={selection.cord !== "none" && !cordAutoSelected}
                   patch={selection.patch}
                   onPatchChange={(patch) => updateSelection({ patch })}
                 />
-                <div className="mt-6 border-t border-[#eae7de] pt-6">
+                <div className="mt-6 border-t border-[var(--border)] pt-6">
                   <PenHolderStep
                     product={product}
                     selection={selection}
@@ -380,7 +515,7 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct, pat
                     onEdgeChange={(edge) => updateSelection({ edge })}
                   />
                 </div>
-              </div>
+              </>
             )}
             {step === 2 && (
               <CharmsStep
@@ -413,36 +548,76 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct, pat
               />
             )}
           </div>
+          </div>
         </div>
 
-        {/* footer */}
-        <footer className="flex items-center justify-between gap-4 border-t border-[#eae7de] px-6 sm:px-10 py-5">
+        {/* footer — same layout across styles; the Continue button's own
+            border/shadow/motion (see .btn-continue in globals.css) is what
+            tells the styles apart, not where it sits. On mobile, Back/
+            Continue are replaced by the fixed side arrows below, so only
+            the total stays here. */}
+        <footer className="flex items-center justify-between gap-4 border-t border-[var(--border)] px-6 sm:px-10 py-5">
           <button
             type="button"
             onClick={goBack}
             disabled={step === 0}
-            className="text-sm font-medium text-[#6b6a63] disabled:opacity-0"
+            className="hidden md:inline text-sm font-medium text-[var(--muted)] disabled:opacity-0"
           >
             ← Back
           </button>
-          <div className="text-right md:hidden">
-            <div className="text-xs text-[#a8a69c]">Total</div>
-            <div className="text-base font-semibold text-[#1c1c1a]">{formatIDR(total)}</div>
+          <div className="ml-auto text-right md:hidden">
+            <div className="text-xs text-[var(--faint)]">Total</div>
+            <div className="text-base font-semibold text-[var(--ink)]">{formatIDR(total)}</div>
           </div>
           {step < STEPS.length - 1 ? (
             <button
               type="button"
               onClick={goNext}
               disabled={!canContinue}
-              className="rounded-full bg-[#0f3d34] px-8 py-3 text-white font-medium hover:bg-[#0c332b] transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#0f3d34]"
+              className="btn-continue hidden md:inline-block rounded-[var(--radius-button)] bg-[var(--accent)] px-8 py-3 text-white font-medium hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[var(--accent)]"
             >
               Continue →
             </button>
           ) : (
-            <span className="hidden md:inline text-sm text-[#a8a69c]">Ready to add to cart</span>
+            <span className="hidden md:inline text-sm text-[var(--faint)]">Ready to add to cart</span>
           )}
         </footer>
       </div>
+
+      {/* Mobile-only step nav: fixed, vertically-centered arrows at the
+          screen edges instead of a Back/Continue pair in the footer. */}
+      <button
+        type="button"
+        onClick={goBack}
+        disabled={step === 0}
+        aria-label="Previous step"
+        className="md:hidden fixed left-3 top-1/2 z-50 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--card-bg)] text-[var(--accent)] shadow-xl transition-opacity disabled:opacity-0 disabled:pointer-events-none"
+      >
+        <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
+          <path d="M15 6l-6 6 6 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        onClick={goNext}
+        disabled={step === STEPS.length - 1 || !canContinue}
+        aria-label="Next step"
+        className={`md:hidden fixed right-3 top-1/2 z-50 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--card-bg)] text-[var(--accent)] shadow-xl transition-opacity ${
+          step === STEPS.length - 1 ? "opacity-0 pointer-events-none" : !canContinue ? "opacity-40 pointer-events-none" : ""
+        }`}
+      >
+        <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
+          <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+
+      {isDev && (
+        <div className="hidden md:flex w-full max-w-6xl justify-end gap-2">
+          <ThemeSwitcher theme={theme} onChange={setTheme} />
+          <BackgroundSwitcher mode={background} onChange={setBackground} />
+          <MobileViewSwitcher enabled={mobilePreview} onChange={setMobilePreview} />
+        </div>
+      )}
     </div>
   );
 }

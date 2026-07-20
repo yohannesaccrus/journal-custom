@@ -23,16 +23,16 @@ export function CoverStep({ products, cover, category, onCategoryChange, onCover
   );
 
   return (
-    <div>
-      <h2 className="text-xl font-serif text-[#1c1c1a]">Choose your leather cover</h2>
-      <p className="mt-1 text-sm text-[#6b6a63]">All covers are hand-stitched from full-grain leather.</p>
+    <div className="step-fade-in">
+      <h2 className="text-xl font-heading text-[var(--ink)]">Choose your leather cover</h2>
+      <p className="mt-1 text-sm text-[var(--muted)]">All covers are hand-stitched from full-grain leather.</p>
 
-      <div className="mt-3 inline-flex rounded-full bg-[#f2f0ea] p-1">
+      <div className="mt-3 inline-flex rounded-[var(--radius-button)] bg-[var(--surface-pill)] p-1">
         <button
           type="button"
           onClick={() => onCategoryChange("classic")}
-          className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${
-            category === "classic" ? "bg-white shadow text-[#0f3d34]" : "text-[#6b6a63]"
+          className={`px-4 py-1.5 rounded-[var(--radius-button)] text-xs font-medium transition-colors ${
+            category === "classic" ? "bg-[var(--card-bg)] shadow text-[var(--accent)]" : "text-[var(--muted)]"
           }`}
         >
           Classic Leather
@@ -40,11 +40,11 @@ export function CoverStep({ products, cover, category, onCategoryChange, onCover
         <button
           type="button"
           onClick={() => onCategoryChange("pattern")}
-          className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${
-            category === "pattern" ? "bg-white shadow text-[#0f3d34]" : "text-[#6b6a63]"
+          className={`px-4 py-1.5 rounded-[var(--radius-button)] text-xs font-medium transition-colors ${
+            category === "pattern" ? "bg-[var(--card-bg)] shadow text-[var(--accent)]" : "text-[var(--muted)]"
           }`}
         >
-          Animal Print <span className="text-[#b1632f]">+{formatIDR(patternDeltaMin)}</span>
+          Animal Print <span className="text-[var(--brand)]">+{formatIDR(patternDeltaMin)}</span>
         </button>
       </div>
 
@@ -63,7 +63,7 @@ export function CoverStep({ products, cover, category, onCategoryChange, onCover
       </div>
 
       {current && (
-        <div className="mt-4 flex items-center gap-3 rounded-xl bg-[#f7f5f0] px-4 py-2.5">
+        <div className="mt-4 flex items-center gap-3 rounded-[var(--radius-panel)] bg-[var(--surface-soft)] px-4 py-2.5">
           <span
             className="h-4 w-4 rounded-full border border-black/10 overflow-hidden shrink-0"
             style={current.swatch ? { backgroundColor: current.swatch } : undefined}
@@ -73,7 +73,7 @@ export function CoverStep({ products, cover, category, onCategoryChange, onCover
               <img src={current.thumbnail} alt="" className="h-full w-full object-cover" />
             )}
           </span>
-          <span className="text-sm text-[#1c1c1a] font-medium">{current.label}</span>
+          <span className="text-sm text-[var(--ink)] font-medium">{current.label}</span>
         </div>
       )}
     </div>

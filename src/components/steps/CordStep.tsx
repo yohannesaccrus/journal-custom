@@ -15,9 +15,9 @@ export function CordStep({ products, cord, onCordChange }: CordStepProps) {
   const current = entries.find((c) => c.label === cord);
 
   return (
-    <div>
-      <h2 className="text-xl font-serif text-[#1c1c1a]">Pick a closure cord</h2>
-      <p className="mt-1 text-sm text-[#6b6a63]">
+    <div className="step-fade-in">
+      <h2 className="text-xl font-heading text-[var(--ink)]">Pick a closure cord</h2>
+      <p className="mt-1 text-sm text-[var(--muted)]">
         The cord wraps the journal shut and doubles as a bookmark button.
       </p>
 
@@ -29,9 +29,9 @@ export function CordStep({ products, cord, onCordChange }: CordStepProps) {
       </div>
 
       {current && (
-        <div className="mt-4 flex items-center gap-3 rounded-xl bg-[#f7f5f0] px-4 py-2.5">
+        <div className="mt-4 flex items-center gap-3 rounded-[var(--radius-panel)] bg-[var(--surface-soft)] px-4 py-2.5">
           <span className="h-4 w-4 rounded-full border border-black/10" style={{ backgroundColor: current.swatch }} />
-          <span className="text-sm text-[#1c1c1a] font-medium">{current.label} cord</span>
+          <span className="text-sm text-[var(--ink)] font-medium">{current.label} cord</span>
         </div>
       )}
     </div>
