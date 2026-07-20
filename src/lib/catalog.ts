@@ -57,8 +57,10 @@ export function buildCoverEntries(products: ShopifyJournalProduct[]): CoverEntry
       handle: p.handle,
       label,
       category,
-      swatch: category === "classic" ? SWATCH_HEX[label.replace("Classic ", "")] : undefined,
-      thumbnail: category === "pattern" ? base.image?.url : undefined,
+      // Always prefer the real product photo — falls back to a flat color
+      // swatch only if a variant somehow has no image yet.
+      thumbnail: base.image?.url,
+      swatch: base.image?.url ? undefined : SWATCH_HEX[label.replace("Classic ", "")],
       priceDelta: Number(base.price) - globalBase,
     };
   });

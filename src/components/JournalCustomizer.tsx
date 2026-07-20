@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CoverStep } from "@/components/steps/CoverStep";
 import { CordStep } from "@/components/steps/CordStep";
+import { PatchStep } from "@/components/steps/PatchStep";
 import { PenHolderStep } from "@/components/steps/PenHolderStep";
 import { CharmsStep } from "@/components/steps/CharmsStep";
 import { NotebooksStep } from "@/components/steps/NotebooksStep";
@@ -22,11 +23,11 @@ import {
 import { buildCartItems } from "@/lib/cart";
 import { formatIDR } from "@/lib/pricing";
 import type { ShopifyJournalProduct } from "@/lib/shopify-admin";
-import type { CoverCategory, JournalSelection } from "@/lib/types";
+import type { CharmSide, CoverCategory, JournalSelection } from "@/lib/types";
 
-const STEPS = ["Cover", "Cord", "Pen Holder", "Charms", "Notebooks", "Preview"] as const;
-const NOTEBOOKS_STEP = 4;
-const PREVIEW_STEP = 5;
+const STEPS = ["Journal Covers", "Accessories", "Charms", "Content", "Preview"] as const;
+const NOTEBOOKS_STEP = 3;
+const PREVIEW_STEP = 4;
 
 interface JournalCustomizerProps {
   products: ShopifyJournalProduct[];
@@ -49,6 +50,25 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct, pat
   });
   const [addingToCart, setAddingToCart] = useState(false);
   const [cartError, setCartError] = useState<string | null>(null);
+  // Which side the left preview shows while on the Charms step — clicking
+  // the Front/Back/Side canvas over there switches this.
+  const [charmView, setCharmView] = useState<CharmSide>("front");
+
+  // Smoothly animates the card body height when switching steps (each step's
+  // content has a different natural height) instead of snapping instantly.
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [bodyHeight, setBodyHeight] = useState<number | undefined>(undefined);
+
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+
+    const observer = new ResizeObserver(([entry]) => {
+      setBodyHeight(entry.contentRect.height);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // When embedded in an iframe (e.g. the Shopify storefront), tell the parent
   // page our actual content height so it can resize the iframe instead of
@@ -99,6 +119,10 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct, pat
   const sideCharms = selection.charms.filter((c) => c.side === "side");
   const backImageSrc = resolveSideImage(product, "back", selection);
   const sideImageSrc = resolveSideImage(product, "side", selection);
+  const isCharmsStep = step === 2;
+  const mainView: CharmSide = isCharmsStep ? charmView : "front";
+  const mainImageSrc = mainView === "front" ? imageSrc : mainView === "back" ? backImageSrc : sideImageSrc;
+  const mainCharms = mainView === "front" ? frontCharms : mainView === "back" ? backCharms : sideCharms;
   const notebooksChosen = notebookCount(selection.notebooks);
   const notebooksComplete = notebooksChosen === NOTEBOOKS_PER_JOURNAL;
   const notebookSlots: (string | null)[] = [
@@ -158,7 +182,7 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct, pat
   const showNotebookPreview = step === NOTEBOOKS_STEP || step === PREVIEW_STEP;
 
   return (
-    <div className="min-h-[600px] bg-[#0f3d34] p-4 sm:p-8 flex items-center justify-center">
+    <div className="min-h-screen w-full bg-[#0f3d34] p-4 sm:p-8 flex items-center justify-center">
       <div className="w-full max-w-6xl rounded-3xl bg-white shadow-2xl overflow-hidden">
         {/* header / stepper */}
         <header className="flex items-center justify-between gap-6 border-b border-[#eae7de] px-6 sm:px-10 py-5">
@@ -194,26 +218,62 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct, pat
           </div>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+        <div
+          ref={bodyRef}
+          style={bodyHeight !== undefined ? { height: bodyHeight, transition: "height 300ms ease" } : undefined}
+          className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] md:max-h-[70vh] overflow-hidden"
+        >
           {/* preview */}
-          <div className="flex flex-col items-center justify-center gap-6 bg-[#f7f3ec] p-10 min-h-[420px]">
+          <div className="flex flex-col items-center justify-start gap-6 overflow-y-auto bg-[#f7f3ec] p-10 min-h-[420px]">
             <div className="relative w-full max-w-[320px] aspect-[560/660]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={imageSrc}
-                alt="Journal preview"
-                className="h-full w-full object-contain drop-shadow-xl transition-opacity duration-200"
-              />
-              {frontCharms.map((c) => (
-                <img
-                  key={c.instanceId}
-                  src={charmEntries.find((e) => e.variantId === c.variantId)?.imageUrl}
-                  alt={c.design}
-                  className="absolute h-8 w-8 -translate-x-1/2 -translate-y-1/2 object-contain drop-shadow-md pointer-events-none"
-                  style={{ left: `${c.x}%`, top: `${c.y}%` }}
-                />
-              ))}
+              {mainView === "side" ? (
+                // The side (spine) view is much narrower than front/back — render it
+                // inside an inner strip sized to the same 200:660 ratio, centered in
+                // the same frame, so it lines up with the small canvases in CharmsStep
+                // and charm sizing stays consistent across views.
+                <div className="absolute inset-y-0 left-1/2 -translate-x-1/2" style={{ width: `${(200 / 560) * 100}%` }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={mainImageSrc}
+                    alt="Journal preview"
+                    className="h-full w-full object-contain drop-shadow-xl transition-opacity duration-200"
+                  />
+                  {mainCharms.map((c) => (
+                    <img
+                      key={c.instanceId}
+                      src={charmEntries.find((e) => e.variantId === c.variantId)?.imageUrl}
+                      alt={c.design}
+                      className="absolute h-8 w-8 -translate-x-1/2 -translate-y-1/2 object-contain drop-shadow-md pointer-events-none"
+                      style={{ left: `${c.x}%`, top: `${c.y}%` }}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={mainImageSrc}
+                    alt="Journal preview"
+                    className="h-full w-full object-contain drop-shadow-xl transition-opacity duration-200"
+                  />
+                  {mainCharms.map((c) => (
+                    <img
+                      key={c.instanceId}
+                      src={charmEntries.find((e) => e.variantId === c.variantId)?.imageUrl}
+                      alt={c.design}
+                      className="absolute h-8 w-8 -translate-x-1/2 -translate-y-1/2 object-contain drop-shadow-md pointer-events-none"
+                      style={{ left: `${c.x}%`, top: `${c.y}%` }}
+                    />
+                  ))}
+                </>
+              )}
             </div>
+
+            {isCharmsStep && (
+              <span className="text-[11px] font-medium uppercase tracking-wide text-[#a89a80]">
+                {mainView} view
+              </span>
+            )}
 
             {showNotebookPreview && (
               <div className="w-full max-w-[320px]">
@@ -289,41 +349,48 @@ export function JournalCustomizer({ products, charmProduct, notebookProduct, pat
           </div>
 
           {/* options */}
-          <div className="px-6 sm:px-10 py-10">
+          <div className="overflow-y-auto px-6 sm:px-10 py-6">
             {step === 0 && (
-              <CoverStep
-                products={products}
-                cover={selection.cover}
-                category={category}
-                onCategoryChange={handleCategoryChange}
-                onCoverChange={(cover) => updateSelection({ cover })}
-              />
+              <div>
+                <CoverStep
+                  products={products}
+                  cover={selection.cover}
+                  category={category}
+                  onCategoryChange={handleCategoryChange}
+                  onCoverChange={(cover) => updateSelection({ cover })}
+                />
+                <div className="mt-6 border-t border-[#eae7de] pt-6">
+                  <CordStep products={products} cord={selection.cord} onCordChange={handleCordChange} />
+                </div>
+              </div>
             )}
             {step === 1 && (
-              <CordStep
-                products={products}
-                patchProduct={patchProduct}
-                cord={selection.cord}
-                patch={selection.patch}
-                onCordChange={handleCordChange}
-                onPatchChange={(patch) => updateSelection({ patch })}
-              />
+              <div>
+                <PatchStep
+                  patchProduct={patchProduct}
+                  cord={selection.cord}
+                  patch={selection.patch}
+                  onPatchChange={(patch) => updateSelection({ patch })}
+                />
+                <div className="mt-6 border-t border-[#eae7de] pt-6">
+                  <PenHolderStep
+                    product={product}
+                    selection={selection}
+                    onPenHolderChange={handlePenHolderChange}
+                    onEdgeChange={(edge) => updateSelection({ edge })}
+                  />
+                </div>
+              </div>
             )}
             {step === 2 && (
-              <PenHolderStep
-                product={product}
-                selection={selection}
-                onPenHolderChange={handlePenHolderChange}
-                onEdgeChange={(edge) => updateSelection({ edge })}
-              />
-            )}
-            {step === 3 && (
               <CharmsStep
                 product={product}
                 charmProduct={charmProduct}
                 selection={selection}
                 journalImageUrl={imageSrc}
                 onChange={(charms) => updateSelection({ charms })}
+                activeSide={charmView}
+                onSelectSide={setCharmView}
               />
             )}
             {step === NOTEBOOKS_STEP && (

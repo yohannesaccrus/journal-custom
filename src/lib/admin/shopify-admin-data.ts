@@ -56,6 +56,7 @@ export interface AdminVariant {
   selectedOptions: { name: string; value: string }[];
   inventoryItemId: string;
   inventoryQuantity: number;
+  swatchColor: string | null;
 }
 
 export interface AdminOptionValue {
@@ -73,8 +74,11 @@ export interface AdminProduct {
   variants: AdminVariant[];
 }
 
+export const SWATCH_METAFIELD_NAMESPACE = "sanaya";
+export const SWATCH_METAFIELD_KEY = "swatch_color";
+
 const ASSET_PRODUCTS_QUERY = `
-  query AssetProducts($query: String!) {
+  query AssetProducts($query: String!, $swatchNamespace: String!, $swatchKey: String!) {
     products(first: 20, query: $query) {
       nodes {
         id
@@ -93,6 +97,7 @@ const ASSET_PRODUCTS_QUERY = `
             selectedOptions { name value }
             inventoryItem { id }
             inventoryQuantity
+            swatchMetafield: metafield(namespace: $swatchNamespace, key: $swatchKey) { value }
           }
         }
       }
@@ -102,9 +107,10 @@ const ASSET_PRODUCTS_QUERY = `
 
 interface RawAssetProduct extends Omit<AdminProduct, "variants"> {
   variants: {
-    nodes: (Omit<AdminVariant, "inventoryItemId" | "inventoryQuantity"> & {
+    nodes: (Omit<AdminVariant, "inventoryItemId" | "inventoryQuantity" | "swatchColor"> & {
       inventoryItem: { id: string };
       inventoryQuantity: number;
+      swatchMetafield: { value: string } | null;
     })[];
   };
 }
@@ -112,6 +118,8 @@ interface RawAssetProduct extends Omit<AdminProduct, "variants"> {
 export async function fetchAssetProducts(): Promise<AdminProduct[]> {
   const data = await shopifyAdmin<{ products: { nodes: RawAssetProduct[] } }>(ASSET_PRODUCTS_QUERY, {
     query: "tag:component OR tag:charm OR tag:patch",
+    swatchNamespace: SWATCH_METAFIELD_NAMESPACE,
+    swatchKey: SWATCH_METAFIELD_KEY,
   });
 
   return data.products.nodes.map((p) => ({
@@ -120,8 +128,54 @@ export async function fetchAssetProducts(): Promise<AdminProduct[]> {
       ...v,
       inventoryItemId: v.inventoryItem.id,
       inventoryQuantity: v.inventoryQuantity,
+      swatchColor: v.swatchMetafield?.value ?? null,
     })),
   }));
+}
+
+export async function setVariantSwatchColor(variantId: string, hex: string | null): Promise<void> {
+  if (hex === null) {
+    const DELETE_MUTATION = `
+      mutation DeleteSwatch($ownerId: ID!, $namespace: String!, $key: String!) {
+        metafieldsDelete(metafields: [{ ownerId: $ownerId, namespace: $namespace, key: $key }]) {
+          userErrors { field message }
+        }
+      }
+    `;
+    const data = await shopifyAdmin<{
+      metafieldsDelete: { userErrors: { field: string[]; message: string }[] };
+    }>(DELETE_MUTATION, {
+      ownerId: variantId,
+      namespace: SWATCH_METAFIELD_NAMESPACE,
+      key: SWATCH_METAFIELD_KEY,
+    });
+    const errs = data.metafieldsDelete.userErrors;
+    if (errs.length) throw new Error(errs.map((e) => e.message).join("; "));
+    return;
+  }
+
+  const MUTATION = `
+    mutation SetSwatch($metafields: [MetafieldsSetInput!]!) {
+      metafieldsSet(metafields: $metafields) {
+        userErrors { field message }
+      }
+    }
+  `;
+  const data = await shopifyAdmin<{
+    metafieldsSet: { userErrors: { field: string[]; message: string }[] };
+  }>(MUTATION, {
+    metafields: [
+      {
+        ownerId: variantId,
+        namespace: SWATCH_METAFIELD_NAMESPACE,
+        key: SWATCH_METAFIELD_KEY,
+        type: "single_line_text_field",
+        value: hex,
+      },
+    ],
+  });
+  const errs = data.metafieldsSet.userErrors;
+  if (errs.length) throw new Error(errs.map((e) => e.message).join("; "));
 }
 
 // ---------- Inventory mutations ----------
@@ -221,6 +275,75 @@ export async function renameOptionValue(
   if (errs.length) throw new Error(errs.map((e) => e.message).join("; "));
 }
 
+/**
+ * Some internal component products (Cover, Cord, Pen Holder) exist purely for
+ * admin stock/price tracking, but the customer-facing customizer actually
+ * reads its option labels from the separate sellable "tag:journal" products.
+ * Renaming a component variant would otherwise silently desync from what
+ * customers see, so mirror the rename onto every matching journal option
+ * value. Charm/Patch/Notebook components are the same product the customer
+ * sees (no separate sellable copy), so they never need this.
+ */
+const JOURNAL_OPTION_SYNC: Record<string, { optionName: string; allowPlusEdgeSuffix: boolean }> = {
+  cover: { optionName: "Cover", allowPlusEdgeSuffix: false },
+  cord: { optionName: "Cord", allowPlusEdgeSuffix: false },
+  "pen-holder": { optionName: "Pen Holder", allowPlusEdgeSuffix: true },
+};
+
+export async function syncJournalOptionRename(
+  componentTags: string[],
+  oldName: string,
+  newName: string
+): Promise<void> {
+  const rule = componentTags.map((t) => JOURNAL_OPTION_SYNC[t]).find(Boolean);
+  if (!rule || oldName === newName) return;
+
+  const JOURNAL_PRODUCTS_QUERY = `
+    query JournalProductOptions {
+      products(first: 20, query: "tag:journal") {
+        nodes {
+          id
+          options { id name optionValues { id name } }
+        }
+      }
+    }
+  `;
+  const data = await shopifyAdmin<{
+    products: {
+      nodes: { id: string; options: { id: string; name: string; optionValues: { id: string; name: string }[] }[] }[];
+    };
+  }>(JOURNAL_PRODUCTS_QUERY);
+
+  const suffix = " + Edge";
+  for (const product of data.products.nodes) {
+    const option = product.options.find((o) => o.name === rule.optionName);
+    if (!option) continue;
+
+    const updates: { id: string; name: string }[] = [];
+    for (const value of option.optionValues) {
+      if (value.name === oldName) {
+        updates.push({ id: value.id, name: newName });
+      } else if (rule.allowPlusEdgeSuffix && value.name === oldName + suffix) {
+        updates.push({ id: value.id, name: newName + suffix });
+      }
+    }
+    if (updates.length === 0) continue;
+
+    const MUTATION = `
+      mutation SyncOptionRename($productId: ID!, $option: OptionUpdateInput!, $optionValuesToUpdate: [OptionValueUpdateInput!]) {
+        productOptionUpdate(productId: $productId, option: $option, optionValuesToUpdate: $optionValuesToUpdate) {
+          userErrors { field message }
+        }
+      }
+    `;
+    const res = await shopifyAdmin<{
+      productOptionUpdate: { userErrors: { field: string[]; message: string }[] };
+    }>(MUTATION, { productId: product.id, option: { id: option.id }, optionValuesToUpdate: updates });
+    const errs = res.productOptionUpdate.userErrors;
+    if (errs.length) throw new Error(errs.map((e) => e.message).join("; "));
+  }
+}
+
 export async function updateProductTitle(productId: string, title: string): Promise<void> {
   const MUTATION = `
     mutation UpdateProductTitle($input: ProductUpdateInput!) {
@@ -297,6 +420,142 @@ export async function addAssetVariant(
   });
   const varErrs = varRes.productVariantsBulkCreate.userErrors;
   if (varErrs.length) throw new Error(varErrs.map((e) => e.message).join("; "));
+}
+
+// ---------- Variant image upload ----------
+
+/** Attaches an already-hosted image (any public URL, e.g. another Shopify CDN file) to a variant. */
+export async function attachImageUrlToVariant(
+  productId: string,
+  variantId: string,
+  sourceUrl: string
+): Promise<string> {
+  const alt = `variant-upload-${variantId.split("/").pop()}-${Date.now()}`;
+  const PRODUCT_ADD_MEDIA = `
+    mutation ProductAddMedia($product: ProductUpdateInput!, $media: [CreateMediaInput!]) {
+      productUpdate(product: $product, media: $media) {
+        product {
+          media(first: 1, reverse: true) {
+            nodes {
+              id
+              alt
+              ... on MediaImage { image { url } }
+            }
+          }
+        }
+        userErrors { field message }
+      }
+    }
+  `;
+  const mediaRes = await shopifyAdmin<{
+    productUpdate: {
+      product: { media: { nodes: { id: string; alt: string | null; image?: { url: string } }[] } } | null;
+      userErrors: { field: string[]; message: string }[];
+    };
+  }>(PRODUCT_ADD_MEDIA, {
+    product: { id: productId },
+    media: [{ originalSource: sourceUrl, mediaContentType: "IMAGE", alt }],
+  });
+  if (mediaRes.productUpdate.userErrors.length) {
+    throw new Error(mediaRes.productUpdate.userErrors.map((e) => e.message).join("; "));
+  }
+  const newMedia = mediaRes.productUpdate.product?.media.nodes.find((m) => m.alt === alt);
+  const mediaId = newMedia?.id;
+  if (!mediaId) throw new Error("Shopify did not return the newly created media");
+
+  // Media uploads process asynchronously; Shopify rejects attaching a variant
+  // to media that isn't READY yet, so poll status before appending.
+  const MEDIA_QUERY = `
+    query MediaImageStatus($id: ID!) {
+      node(id: $id) {
+        ... on MediaImage { status image { url } }
+      }
+    }
+  `;
+  let resolvedUrl = "";
+  let ready = false;
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const mediaData = await shopifyAdmin<{ node: { status?: string; image?: { url: string } } | null }>(
+      MEDIA_QUERY,
+      { id: mediaId }
+    );
+    if (mediaData.node?.status === "READY") {
+      ready = true;
+      resolvedUrl = mediaData.node.image?.url ?? "";
+      break;
+    }
+    if (mediaData.node?.status === "FAILED") {
+      throw new Error("Shopify failed to process the uploaded image");
+    }
+    await new Promise((r) => setTimeout(r, 700));
+  }
+  if (!ready) throw new Error("Image is still processing on Shopify's side — try refreshing shortly");
+
+  const APPEND_MEDIA = `
+    mutation AppendVariantMedia($productId: ID!, $variantMedia: [ProductVariantAppendMediaInput!]!) {
+      productVariantAppendMedia(productId: $productId, variantMedia: $variantMedia) {
+        userErrors { field message }
+      }
+    }
+  `;
+  const appendRes = await shopifyAdmin<{
+    productVariantAppendMedia: { userErrors: { field: string[]; message: string }[] };
+  }>(APPEND_MEDIA, {
+    productId,
+    variantMedia: [{ variantId, mediaIds: [mediaId] }],
+  });
+  if (appendRes.productVariantAppendMedia.userErrors.length) {
+    throw new Error(appendRes.productVariantAppendMedia.userErrors.map((e) => e.message).join("; "));
+  }
+
+  return resolvedUrl;
+}
+
+export async function uploadVariantImage(
+  productId: string,
+  variantId: string,
+  file: { filename: string; mimeType: string; size: number; data: Buffer }
+): Promise<string> {
+  const STAGED_UPLOADS_CREATE = `
+    mutation StagedUploadsCreate($input: [StagedUploadInput!]!) {
+      stagedUploadsCreate(input: $input) {
+        stagedTargets { url resourceUrl parameters { name value } }
+        userErrors { field message }
+      }
+    }
+  `;
+  const stagedRes = await shopifyAdmin<{
+    stagedUploadsCreate: {
+      stagedTargets: { url: string; resourceUrl: string; parameters: { name: string; value: string }[] }[];
+      userErrors: { field: string[]; message: string }[];
+    };
+  }>(STAGED_UPLOADS_CREATE, {
+    input: [
+      {
+        resource: "IMAGE",
+        filename: file.filename,
+        mimeType: file.mimeType,
+        httpMethod: "POST",
+        fileSize: String(file.size),
+      },
+    ],
+  });
+  if (stagedRes.stagedUploadsCreate.userErrors.length) {
+    throw new Error(stagedRes.stagedUploadsCreate.userErrors.map((e) => e.message).join("; "));
+  }
+  const target = stagedRes.stagedUploadsCreate.stagedTargets[0];
+  if (!target) throw new Error("Shopify did not return a staged upload target");
+
+  const form = new FormData();
+  for (const param of target.parameters) form.append(param.name, param.value);
+  form.append("file", new Blob([new Uint8Array(file.data)], { type: file.mimeType }), file.filename);
+
+  const uploadRes = await fetch(target.url, { method: "POST", body: form });
+  if (!uploadRes.ok) {
+    throw new Error(`Staged upload failed: ${uploadRes.status} ${uploadRes.statusText}`);
+  }
+
+  return attachImageUrlToVariant(productId, variantId, target.resourceUrl);
 }
 
 // ---------- Orders ----------

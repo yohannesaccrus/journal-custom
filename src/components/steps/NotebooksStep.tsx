@@ -33,10 +33,10 @@ export function NotebooksStep({ notebookProduct, notebooks, onChange }: Notebook
 
   return (
     <div>
-      <h2 className="text-3xl font-serif text-[#1c1c1a]">Choose your 3 notebooks</h2>
-      <p className="mt-2 text-[#6b6a63]">Every journal ships with 3 refill notebooks inside. Mix &amp; match freely.</p>
+      <h2 className="text-xl font-serif text-[#1c1c1a]">Choose your 3 notebooks</h2>
+      <p className="mt-1 text-sm text-[#6b6a63]">Every journal ships with 3 refill notebooks inside. Mix &amp; match freely.</p>
 
-      <div className="mt-6 flex items-center gap-3">
+      <div className="mt-4 flex items-center gap-3">
         <div className="flex flex-1 gap-1.5">
           {Array.from({ length: NOTEBOOKS_PER_JOURNAL }).map((_, i) => (
             <span
@@ -48,14 +48,14 @@ export function NotebooksStep({ notebookProduct, notebooks, onChange }: Notebook
         <span className="whitespace-nowrap text-sm text-[#6b6a63]">{total} of {NOTEBOOKS_PER_JOURNAL} chosen</span>
       </div>
 
-      <div className="mt-6 grid grid-cols-2 gap-4">
+      <div className="mt-4 grid grid-cols-2 gap-3">
         {entries.map((n) => {
           const count = notebooks[n.design] ?? 0;
           const atLimit = total >= NOTEBOOKS_PER_JOURNAL && count === 0;
           return (
             <div
               key={n.variantId}
-              className={`flex items-center gap-4 rounded-xl border-2 p-4 transition-colors ${
+              className={`flex items-center gap-3 rounded-xl border-2 p-3 transition-colors ${
                 count > 0 ? "border-[#0f3d34] bg-[#0f3d34]/[0.03]" : "border-[#eae7de]"
               } ${atLimit ? "opacity-40" : ""}`}
             >

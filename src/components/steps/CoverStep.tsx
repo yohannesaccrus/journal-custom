@@ -24,14 +24,14 @@ export function CoverStep({ products, cover, category, onCategoryChange, onCover
 
   return (
     <div>
-      <h2 className="text-3xl font-serif text-[#1c1c1a]">Choose your leather cover</h2>
-      <p className="mt-2 text-[#6b6a63]">All covers are hand-stitched from full-grain leather.</p>
+      <h2 className="text-xl font-serif text-[#1c1c1a]">Choose your leather cover</h2>
+      <p className="mt-1 text-sm text-[#6b6a63]">All covers are hand-stitched from full-grain leather.</p>
 
-      <div className="mt-6 inline-flex rounded-full bg-[#f2f0ea] p-1">
+      <div className="mt-3 inline-flex rounded-full bg-[#f2f0ea] p-1">
         <button
           type="button"
           onClick={() => onCategoryChange("classic")}
-          className={`px-6 py-2.5 rounded-full text-sm font-medium transition-colors ${
+          className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${
             category === "classic" ? "bg-white shadow text-[#0f3d34]" : "text-[#6b6a63]"
           }`}
         >
@@ -40,7 +40,7 @@ export function CoverStep({ products, cover, category, onCategoryChange, onCover
         <button
           type="button"
           onClick={() => onCategoryChange("pattern")}
-          className={`px-6 py-2.5 rounded-full text-sm font-medium transition-colors ${
+          className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${
             category === "pattern" ? "bg-white shadow text-[#0f3d34]" : "text-[#6b6a63]"
           }`}
         >
@@ -48,7 +48,7 @@ export function CoverStep({ products, cover, category, onCategoryChange, onCover
         </button>
       </div>
 
-      <div className="mt-8 flex flex-wrap gap-6">
+      <div className="mt-4 flex flex-wrap gap-4">
         {options.map((o) => (
           <Swatch
             key={o.handle}
@@ -63,9 +63,9 @@ export function CoverStep({ products, cover, category, onCategoryChange, onCover
       </div>
 
       {current && (
-        <div className="mt-8 flex items-center gap-3 rounded-xl bg-[#f7f5f0] px-5 py-4">
+        <div className="mt-4 flex items-center gap-3 rounded-xl bg-[#f7f5f0] px-4 py-2.5">
           <span
-            className="h-5 w-5 rounded-full border border-black/10 overflow-hidden shrink-0"
+            className="h-4 w-4 rounded-full border border-black/10 overflow-hidden shrink-0"
             style={current.swatch ? { backgroundColor: current.swatch } : undefined}
           >
             {!current.swatch && current.thumbnail && (
@@ -73,7 +73,7 @@ export function CoverStep({ products, cover, category, onCategoryChange, onCover
               <img src={current.thumbnail} alt="" className="h-full w-full object-cover" />
             )}
           </span>
-          <span className="text-[#1c1c1a] font-medium">{current.label}</span>
+          <span className="text-sm text-[#1c1c1a] font-medium">{current.label}</span>
         </div>
       )}
     </div>

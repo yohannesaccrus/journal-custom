@@ -1,39 +1,50 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { AdminProduct } from "@/lib/admin/shopify-admin-data";
+import VariantThumbnail from "./VariantThumbnail";
 
 type Variant = AdminProduct["variants"][number];
 
 export default function VariantRow({
+  productId,
   variant,
   onSave,
   onDelete,
 }: {
+  productId: string;
   variant: Variant;
   onSave: (
     variant: Variant,
-    fields: { name?: string; sku?: string; price?: string; stock?: number }
+    fields: { name?: string; sku?: string; price?: string; stock?: number; swatchColor?: string | null }
   ) => Promise<void>;
   onDelete: (variantId: string) => Promise<void>;
 }) {
+  const router = useRouter();
   const [name, setName] = useState(variant.title);
   const [sku, setSku] = useState(variant.sku);
   const [price, setPrice] = useState(variant.price);
   const [stock, setStock] = useState(variant.inventoryQuantity);
+  const [swatchColor, setSwatchColor] = useState(variant.swatchColor);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const dirty =
-    name !== variant.title || sku !== variant.sku || price !== variant.price || stock !== variant.inventoryQuantity;
+    name !== variant.title ||
+    sku !== variant.sku ||
+    price !== variant.price ||
+    stock !== variant.inventoryQuantity ||
+    swatchColor !== variant.swatchColor;
 
   function reset() {
     setName(variant.title);
     setSku(variant.sku);
     setPrice(variant.price);
     setStock(variant.inventoryQuantity);
+    setSwatchColor(variant.swatchColor);
   }
 
   async function save() {
@@ -44,6 +55,7 @@ export default function VariantRow({
         sku: sku !== variant.sku ? sku : undefined,
         price: price !== variant.price ? price : undefined,
         stock: stock !== variant.inventoryQuantity ? stock : undefined,
+        swatchColor: swatchColor !== variant.swatchColor ? swatchColor : undefined,
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 1400);
@@ -71,18 +83,20 @@ export default function VariantRow({
       } ${deleting ? "opacity-40" : ""}`}
     >
       <td className="px-5 py-2.5">
-        <div className="flex items-center gap-2">
-          {variant.image?.url && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={variant.image.url} alt="" className="h-8 w-8 rounded object-cover border border-[#e8e3d8]" />
-          )}
-          <input
-            value={name}
-            disabled={saving || deleting}
-            onChange={(e) => setName(e.target.value)}
-            className={`admin-input w-32 ${name !== variant.title ? "dirty" : ""}`}
-          />
-        </div>
+        <VariantThumbnail
+          productId={productId}
+          variantId={variant.id}
+          imageUrl={variant.image?.url ?? null}
+          onUploaded={() => router.refresh()}
+        />
+      </td>
+      <td className="px-5 py-2.5">
+        <input
+          value={name}
+          disabled={saving || deleting}
+          onChange={(e) => setName(e.target.value)}
+          className={`admin-input w-32 ${name !== variant.title ? "dirty" : ""}`}
+        />
       </td>
       <td className="px-5 py-2.5">
         <input
@@ -99,6 +113,35 @@ export default function VariantRow({
           onChange={(e) => setPrice(e.target.value)}
           className={`admin-input w-24 ${price !== variant.price ? "dirty" : ""}`}
         />
+      </td>
+      <td className="px-5 py-2.5">
+        <div className="flex items-center gap-1.5">
+          <label
+            className={`relative h-7 w-7 shrink-0 cursor-pointer rounded-full border transition-colors ${
+              swatchColor !== variant.swatchColor ? "border-[#b1632f]" : "border-[#e8e3d8]"
+            }`}
+            style={{ backgroundColor: swatchColor ?? "transparent" }}
+            title={swatchColor ?? "No swatch color set"}
+          >
+            {!swatchColor && (
+              <span className="absolute inset-0 rounded-full bg-[repeating-linear-gradient(45deg,#e8e3d8,#e8e3d8_3px,transparent_3px,transparent_6px)]" />
+            )}
+            <input
+              type="color"
+              disabled={saving || deleting}
+              value={swatchColor ?? "#cccccc"}
+              onChange={(e) => setSwatchColor(e.target.value)}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            />
+          </label>
+          <input
+            value={swatchColor ?? ""}
+            disabled={saving || deleting}
+            onChange={(e) => setSwatchColor(e.target.value || null)}
+            placeholder="none"
+            className={`admin-input w-20 ${swatchColor !== variant.swatchColor ? "dirty" : ""}`}
+          />
+        </div>
       </td>
       <td className="px-5 py-2.5">
         <div className="flex items-center gap-2">

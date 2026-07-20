@@ -24,3 +24,31 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Thin, rounded scrollbars matching the journal customizer's palette —
+   applied globally so every scrollable area (not just the customizer) shares
+   the same style. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #c8c2b3 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #c8c2b3;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #a89a80;
+}

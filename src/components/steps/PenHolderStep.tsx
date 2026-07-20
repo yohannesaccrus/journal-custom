@@ -26,14 +26,14 @@ export function PenHolderStep({ product, selection, onPenHolderChange, onEdgeCha
 
   return (
     <div>
-      <h2 className="text-3xl font-serif text-[#1c1c1a]">Pen holder & corner edge</h2>
-      <p className="mt-2 text-[#6b6a63]">
+      <h2 className="text-xl font-serif text-[#1c1c1a]">Pen holder & corner edge</h2>
+      <p className="mt-1 text-sm text-[#6b6a63]">
         {cordSelected
           ? "An elastic loop that holds a pen against the spine."
           : "Requires a cord — go back and pick one to unlock the pen holder."}
       </p>
 
-      <div className="mt-8 flex flex-wrap gap-6">
+      <div className="mt-4 flex flex-wrap gap-4">
         <Swatch
           label="No pen holder"
           selected={selection.penHolder === "none"}
@@ -58,17 +58,17 @@ export function PenHolderStep({ product, selection, onPenHolderChange, onEdgeCha
         })}
       </div>
 
-      <div className="mt-10 border-t border-[#eae7de] pt-8">
-        <h3 className="text-lg font-serif text-[#1c1c1a]">Corner edge accents</h3>
-        <p className="mt-1 text-sm text-[#6b6a63]">
+      <div className="mt-5 border-t border-[#eae7de] pt-5">
+        <h3 className="text-base font-serif text-[#1c1c1a]">Corner edge accents</h3>
+        <p className="mt-1 text-xs text-[#6b6a63]">
           Reinforced leather corners on all four edges of the cover.
         </p>
-        <div className="mt-4 flex gap-3">
+        <div className="mt-3 flex gap-3">
           <button
             type="button"
             disabled={!hasPenHolder}
             onClick={() => onEdgeChange(false)}
-            className={`px-5 py-2.5 rounded-full text-sm font-medium border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+            className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
               !selection.edge ? "border-[#0f3d34] bg-[#0f3d34] text-white" : "border-[#d8d5cb] text-[#6b6a63]"
             }`}
           >
@@ -78,7 +78,7 @@ export function PenHolderStep({ product, selection, onPenHolderChange, onEdgeCha
             type="button"
             disabled={!hasPenHolder}
             onClick={() => onEdgeChange(true)}
-            className={`px-5 py-2.5 rounded-full text-sm font-medium border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+            className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
               selection.edge ? "border-[#0f3d34] bg-[#0f3d34] text-white" : "border-[#d8d5cb] text-[#6b6a63]"
             }`}
           >
@@ -89,7 +89,7 @@ export function PenHolderStep({ product, selection, onPenHolderChange, onEdgeCha
           </button>
         </div>
         {!hasPenHolder && cordSelected && (
-          <p className="mt-3 text-xs text-[#a89a80]">Select a pen holder color to unlock corner edges.</p>
+          <p className="mt-2 text-xs text-[#a89a80]">Select a pen holder color to unlock corner edges.</p>
         )}
       </div>
     </div>

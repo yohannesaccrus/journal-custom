@@ -4,6 +4,7 @@ import {
   addAssetVariant,
   deleteAssetVariant,
   renameOptionValue,
+  syncJournalOptionRename,
   updateVariantDetails,
 } from "@/lib/admin/shopify-admin-data";
 
@@ -32,12 +33,14 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   const body = await request.json();
-  const { productId, variantId, price, sku, name, optionId, optionValueId } = body as {
+  const { productId, variantId, price, sku, name, previousName, productTags, optionId, optionValueId } = body as {
     productId?: string;
     variantId?: string;
     price?: string;
     sku?: string;
     name?: string;
+    previousName?: string;
+    productTags?: string[];
     optionId?: string;
     optionValueId?: string;
   };
@@ -55,6 +58,9 @@ export async function PATCH(request: NextRequest) {
     }
     if (name !== undefined && optionId && optionValueId) {
       await renameOptionValue(productId, optionId, optionValueId, name);
+      if (previousName) {
+        await syncJournalOptionRename(productTags ?? [], previousName, name);
+      }
     }
     return NextResponse.json({ ok: true });
   } catch (err) {

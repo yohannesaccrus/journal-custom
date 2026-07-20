@@ -35,7 +35,7 @@ export default function AssetCategoryCard({ product }: { product: AdminProduct }
 
   async function saveVariant(
     variant: AdminProduct["variants"][number],
-    fields: { name?: string; sku?: string; price?: string; stock?: number }
+    fields: { name?: string; sku?: string; price?: string; stock?: number; swatchColor?: string | null }
   ) {
     setError(null);
     const requests: Promise<Response>[] = [];
@@ -54,6 +54,8 @@ export default function AssetCategoryCard({ product }: { product: AdminProduct }
             sku: fields.sku,
             price: fields.price,
             name: fields.name,
+            previousName: fields.name !== undefined ? variant.title : undefined,
+            productTags: product.tags,
             optionId: primaryOption?.id,
             optionValueId,
           }),
@@ -67,6 +69,16 @@ export default function AssetCategoryCard({ product }: { product: AdminProduct }
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ inventoryItemId: variant.inventoryItemId, quantity: fields.stock }),
+        })
+      );
+    }
+
+    if (fields.swatchColor !== undefined) {
+      requests.push(
+        fetch("/api/admin/assets/swatch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ variantId: variant.id, hex: fields.swatchColor }),
         })
       );
     }
@@ -181,16 +193,24 @@ export default function AssetCategoryCard({ product }: { product: AdminProduct }
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-[#f2ece1] text-left text-xs text-[#6b6a63] uppercase tracking-wide">
+            <th className="px-5 py-2.5 font-medium">Image</th>
             <th className="px-5 py-2.5 font-medium">Variant</th>
             <th className="px-5 py-2.5 font-medium">SKU</th>
             <th className="px-5 py-2.5 font-medium">Price</th>
+            <th className="px-5 py-2.5 font-medium">Swatch</th>
             <th className="px-5 py-2.5 font-medium">Stock</th>
             <th className="px-5 py-2.5 font-medium" />
           </tr>
         </thead>
         <tbody>
           {product.variants.map((variant) => (
-            <VariantRow key={variant.id} variant={variant} onSave={saveVariant} onDelete={removeVariant} />
+            <VariantRow
+              key={variant.id}
+              productId={product.id}
+              variant={variant}
+              onSave={saveVariant}
+              onDelete={removeVariant}
+            />
           ))}
         </tbody>
       </table>
