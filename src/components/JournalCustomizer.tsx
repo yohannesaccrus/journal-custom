@@ -302,7 +302,7 @@ export function JournalCustomizer({
   return (
     <div
       data-theme={theme}
-      className="relative isolate min-h-screen w-full overflow-hidden bg-[var(--page-bg)] p-0 md:p-8 flex flex-col items-center justify-start md:justify-center gap-4"
+      className="relative isolate min-h-screen w-full overflow-hidden bg-[var(--page-bg)] p-0 md:p-8 flex flex-col items-center justify-start md:justify-center gap-4 pb-20 md:pb-0"
     >
       {/* On an actual small viewport this is a full-bleed mobile page — the
           floating-card treatment (padding, rounded corners, shadow, wallpaper
@@ -554,21 +554,17 @@ export function JournalCustomizer({
         {/* footer — same layout across styles; the Continue button's own
             border/shadow/motion (see .btn-continue in globals.css) is what
             tells the styles apart, not where it sits. On mobile, Back/
-            Continue are replaced by the fixed side arrows below, so only
-            the total stays here. */}
-        <footer className="flex items-center justify-between gap-4 border-t border-[var(--border)] px-6 sm:px-10 py-5">
+            Continue are replaced by the fixed side arrows + fixed bottom
+            total bar below, so this whole footer is desktop-only. */}
+        <footer className="hidden md:flex items-center justify-between gap-4 border-t border-[var(--border)] px-6 sm:px-10 py-5">
           <button
             type="button"
             onClick={goBack}
             disabled={step === 0}
-            className="hidden md:inline text-sm font-medium text-[var(--muted)] disabled:opacity-0"
+            className="text-sm font-medium text-[var(--muted)] disabled:opacity-0"
           >
             ← Back
           </button>
-          <div className="ml-auto text-right md:hidden">
-            <div className="text-xs text-[var(--faint)]">Total</div>
-            <div className="text-base font-semibold text-[var(--ink)]">{formatIDR(total)}</div>
-          </div>
           {step < STEPS.length - 1 ? (
             <button
               type="button"
@@ -582,6 +578,18 @@ export function JournalCustomizer({
             <span className="hidden md:inline text-sm text-[var(--faint)]">Ready to add to cart</span>
           )}
         </footer>
+      </div>
+
+      {/* Mobile-only fixed total bar — always pinned to the bottom of the
+          screen so the price is visible no matter how far the page is
+          scrolled. Height is explicit (h-20) and matches the outer
+          wrapper's pb-20 exactly, so no page-background gap ever shows
+          through above it once scrolled all the way down. */}
+      <div className="md:hidden fixed inset-x-0 bottom-0 z-40 flex h-20 items-center justify-end border-t border-[var(--border)] bg-[var(--card-bg)] px-6 shadow-[0_-12px_28px_-8px_rgba(0,0,0,0.35)]">
+        <div className="text-right">
+          <div className="text-xs text-[var(--faint)]">Total</div>
+          <div className="text-lg font-semibold text-[var(--ink)] font-heading">{formatIDR(total)}</div>
+        </div>
       </div>
 
       {/* Mobile-only step nav: fixed, vertically-centered arrows at the
