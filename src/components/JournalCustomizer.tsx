@@ -66,39 +66,57 @@ export function JournalCustomizer({
   initialTheme,
   initialBackground,
 }: JournalCustomizerProps) {
-  // Dev-only style preview: which of the three customizer looks is active.
-  // Persisted to localStorage purely so it survives a page reload while a
-  // client is clicking through options during a review call.
-  const [theme, setTheme] = useState<Theme>(initialTheme ?? THEMES[0].id);
-  const isDev = process.env.NODE_ENV !== "production" && !hideDevControls;
+  // The style tools (theme/background/mobile-view switchers) are always on
+  // in development. In production they're normally hidden from real
+  // customers, but a reviewer can unlock them on the live deployment with
+  // ?styleTools=1 — that unlock then persists via localStorage so it
+  // survives reloads without needing the query param every time.
+  const [toolsUnlocked, setToolsUnlocked] = useState(false);
   useEffect(() => {
-    // Dev-only preference restore — reads after mount so server and client
-    // render the same default on first paint (no hydration mismatch).
+    if (hideDevControls) return;
+    const hasParam = new URLSearchParams(window.location.search).get("styleTools") === "1";
+    const stored = window.localStorage.getItem("sanaya-journal-tools-unlocked") === "1";
+    if (hasParam) window.localStorage.setItem("sanaya-journal-tools-unlocked", "1");
+    if (hasParam || stored) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time unlock check from the URL/localStorage, not derivable at initial render without a hydration mismatch
+      setToolsUnlocked(true);
+    }
+  }, [hideDevControls]);
+  const isDev = (process.env.NODE_ENV !== "production" || toolsUnlocked) && !hideDevControls;
+
+  // Style preview: which of the three customizer looks is active. Persisted
+  // to localStorage purely so it survives a page reload while a client is
+  // clicking through options during a review call.
+  const [theme, setTheme] = useState<Theme>(initialTheme ?? THEMES[0].id);
+  useEffect(() => {
+    // Restore-after-mount (and again if `isDev` flips on via the
+    // styleTools unlock above) so server and client render the same
+    // default on first paint — no hydration mismatch.
     if (!isDev) return;
     const stored = window.localStorage.getItem("sanaya-journal-theme");
     if (stored && THEMES.some((t) => t.id === stored) && stored !== theme) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time restore of a dev-only preference from localStorage, not derivable at initial render without a hydration mismatch
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time restore of a persisted preference, not derivable at initial render without a hydration mismatch
       setTheme(stored as Theme);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount only
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-check when isDev turns on
+  }, [isDev]);
   useEffect(() => {
     if (isDev) window.localStorage.setItem("sanaya-journal-theme", theme);
   }, [theme, isDev]);
 
-  // Dev-only: plain theme-color background vs. a blurred wallpaper wash
-  // built from that theme's own palette. Same restore-after-mount pattern
-  // as the theme picker above, for the same hydration-safety reason.
+  // Plain theme-color background vs. a blurred wallpaper wash built from
+  // that theme's own palette. Same restore-after-mount pattern as the theme
+  // picker above, for the same hydration-safety reason.
   const [background, setBackground] = useState<BackgroundMode>(initialBackground ?? "plain");
   useEffect(() => {
     if (!isDev) return;
     const stored = window.localStorage.getItem("sanaya-journal-background");
     if ((stored === "plain" || stored === "wallpaper") && stored !== background) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time restore of a dev-only preference from localStorage, not derivable at initial render without a hydration mismatch
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time restore of a persisted preference, not derivable at initial render without a hydration mismatch
       setBackground(stored);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount only
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-check when isDev turns on
+  }, [isDev]);
   useEffect(() => {
     if (isDev) window.localStorage.setItem("sanaya-journal-background", background);
   }, [background, isDev]);
