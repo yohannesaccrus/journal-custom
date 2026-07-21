@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CoverStep } from "@/components/steps/CoverStep";
 import { CordStep } from "@/components/steps/CordStep";
 import { PatchStep } from "@/components/steps/PatchStep";
@@ -151,19 +151,23 @@ export function JournalCustomizer({
 
   // Smoothly animates the card body height when switching steps (each step's
   // content has a different natural height) instead of snapping instantly.
-  const bodyRef = useRef<HTMLDivElement>(null);
+  // A state-backed callback ref (rather than useRef + an empty-deps effect)
+  // so the observer re-attaches whenever the underlying DOM node changes —
+  // e.g. when the "Mobile View" toggle swaps this whole tree out and back
+  // in, the old node would otherwise be watched forever, leaving bodyHeight
+  // stuck at a stale value and clipping the content to near-zero height.
+  const [bodyEl, setBodyEl] = useState<HTMLDivElement | null>(null);
   const [bodyHeight, setBodyHeight] = useState<number | undefined>(undefined);
 
   useEffect(() => {
-    const el = bodyRef.current;
-    if (!el) return;
+    if (!bodyEl) return;
 
     const observer = new ResizeObserver(([entry]) => {
       setBodyHeight(entry.contentRect.height);
     });
-    observer.observe(el);
+    observer.observe(bodyEl);
     return () => observer.disconnect();
-  }, []);
+  }, [bodyEl]);
 
   // When embedded in an iframe (e.g. the Shopify storefront), tell the parent
   // page our actual content height so it can resize the iframe instead of
@@ -371,7 +375,7 @@ export function JournalCustomizer({
         </header>
 
         <div
-          ref={bodyRef}
+          ref={setBodyEl}
           style={bodyHeight !== undefined ? { height: bodyHeight, transition: "height 300ms ease" } : undefined}
           className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] md:max-h-[70vh] overflow-hidden"
         >
