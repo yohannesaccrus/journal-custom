@@ -2,7 +2,7 @@
 
 import { buildCoverEntries, charmsTotal, patchPrice, resolveVariant } from "@/lib/catalog";
 import type { ShopifyJournalProduct } from "@/lib/shopify-admin";
-import { formatIDR } from "@/lib/pricing";
+import { useCurrencyFormat } from "@/components/CurrencyContext";
 import type { JournalSelection } from "@/lib/types";
 
 interface PreviewStepProps {
@@ -17,6 +17,7 @@ interface PreviewStepProps {
 }
 
 export function PreviewStep({ products, product, charmProduct, patchProduct, selection, onAddToCart, adding, error }: PreviewStepProps) {
+  const { format } = useCurrencyFormat();
   const cover = buildCoverEntries(products).find((c) => c.handle === product.handle);
   const variant = resolveVariant(product, selection);
   const charmsPrice = charmsTotal(charmProduct, selection.charms);
@@ -68,7 +69,7 @@ export function PreviewStep({ products, product, charmProduct, patchProduct, sel
         ))}
         <div className="flex items-center justify-between py-4">
           <dt className="text-sm text-[var(--muted)]">Price</dt>
-          <dd className="text-base font-semibold text-[var(--ink)]">{formatIDR(total)}</dd>
+          <dd className="text-base font-semibold text-[var(--ink)]">{format(total)}</dd>
         </div>
       </dl>
 
@@ -78,7 +79,7 @@ export function PreviewStep({ products, product, charmProduct, patchProduct, sel
         disabled={adding}
         className="btn-continue mt-8 w-full sm:w-auto rounded-[var(--radius-button)] bg-[var(--accent)] px-8 py-3.5 text-white font-medium hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
       >
-        {adding ? "Adding to cart…" : `Add to cart — ${formatIDR(total)}`}
+        {adding ? "Adding to cart…" : `Add to cart — ${format(total)}`}
       </button>
 
       {error && (

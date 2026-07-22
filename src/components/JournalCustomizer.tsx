@@ -12,6 +12,9 @@ import { NotebookIcon } from "@/components/NotebookIcon";
 import { ThemeSwitcher, THEMES, type Theme } from "@/components/ThemeSwitcher";
 import { BackgroundSwitcher, type BackgroundMode } from "@/components/BackgroundSwitcher";
 import { MobileViewSwitcher } from "@/components/MobileViewSwitcher";
+import { DisabledHint } from "@/components/DisabledHint";
+import { CurrencyProvider, useCurrencyFormat } from "@/components/CurrencyContext";
+import { CurrencySwitcher } from "@/components/CurrencySwitcher";
 import {
   buildCharmEntries,
   buildCordEntries,
@@ -25,11 +28,13 @@ import {
   resolveVariant,
 } from "@/lib/catalog";
 import { buildCartItems } from "@/lib/cart";
-import { formatIDR } from "@/lib/pricing";
 import type { ShopifyJournalProduct } from "@/lib/shopify-admin";
 import type { CharmSide, CoverCategory, JournalSelection } from "@/lib/types";
 
-const STEPS = ["Journal Covers", "Accessories", "Charms", "Content", "Preview"] as const;
+const STEPS = ["Journal Covers", "Charms", "Accessories", "Content", "Preview"] as const;
+const JOURNAL_COVERS_STEP = 0;
+const CHARMS_STEP = 1;
+const ACCESSORIES_STEP = 2;
 const NOTEBOOKS_STEP = 3;
 const PREVIEW_STEP = 4;
 const ROMAN_NUMERALS = ["I", "II", "III", "IV", "V"];
@@ -57,7 +62,15 @@ interface JournalCustomizerProps {
   initialBackground?: BackgroundMode;
 }
 
-export function JournalCustomizer({
+export function JournalCustomizer(props: JournalCustomizerProps) {
+  return (
+    <CurrencyProvider>
+      <JournalCustomizerContent {...props} />
+    </CurrencyProvider>
+  );
+}
+
+function JournalCustomizerContent({
   products,
   charmProduct,
   notebookProduct,
@@ -126,6 +139,8 @@ export function JournalCustomizer({
   // so a real `md:` breakpoint switch happens inside the iframe's own narrow
   // viewport, instead of trying to fake it by just shrinking a div.
   const [mobilePreview, setMobilePreview] = useState(false);
+
+  const { format } = useCurrencyFormat();
 
   const [step, setStep] = useState(0);
   const [category, setCategory] = useState<CoverCategory>("classic");
@@ -218,7 +233,7 @@ export function JournalCustomizer({
   const sideCharms = selection.charms.filter((c) => c.side === "side");
   const backImageSrc = resolveSideImage(product, "back", selection);
   const sideImageSrc = resolveSideImage(product, "side", selection);
-  const isCharmsStep = step === 2;
+  const isCharmsStep = step === CHARMS_STEP;
   const mainView: CharmSide = isCharmsStep ? charmView : "front";
   const mainImageSrc = mainView === "front" ? imageSrc : mainView === "back" ? backImageSrc : sideImageSrc;
   const mainCharms = mainView === "front" ? frontCharms : mainView === "back" ? backCharms : sideCharms;
@@ -262,7 +277,7 @@ export function JournalCustomizer({
     // the first one behind the scenes so a real variant always resolves.
     // Patch stays locked until the user picks a cord themselves.
     if (selection.cord === "none") {
-      const fallbackCord = buildCordEntries(products)[0]?.label;
+      const fallbackCord = buildCordEntries(product)[0]?.label;
       if (fallbackCord) {
         setCordAutoSelected(true);
         updateSelection({ penHolder, cord: fallbackCord });
@@ -293,7 +308,16 @@ export function JournalCustomizer({
     window.parent.postMessage({ type: "sanaya-journal-add-to-cart", items }, "*");
   }
 
-  const canContinue = step !== NOTEBOOKS_STEP || notebooksComplete;
+  // Cord is the one required add-on (per client feedback) — patch, pen
+  // holder, corner edge, and charms all stay optional.
+  const canContinue =
+    (step !== JOURNAL_COVERS_STEP || selection.cord !== "none") && (step !== NOTEBOOKS_STEP || notebooksComplete);
+  const continueDisabledReason =
+    step === JOURNAL_COVERS_STEP && selection.cord === "none"
+      ? "Pick a cord color first"
+      : step === NOTEBOOKS_STEP && !notebooksComplete
+        ? `Pick ${NOTEBOOKS_PER_JOURNAL - notebooksChosen} more notebook${NOTEBOOKS_PER_JOURNAL - notebooksChosen > 1 ? "s" : ""} to continue`
+        : null;
   const showBackSide = step === PREVIEW_STEP;
   const showNotebookPreview = step === NOTEBOOKS_STEP || step === PREVIEW_STEP;
 
@@ -370,7 +394,7 @@ export function JournalCustomizer({
 
           <div className="text-right">
             <div className="text-xs text-[var(--faint)]">Total</div>
-            <div className="text-lg font-semibold text-[var(--ink)] font-heading">{formatIDR(total)}</div>
+            <div className="text-lg font-semibold text-[var(--ink)] font-heading">{format(total)}</div>
           </div>
         </header>
 
@@ -380,8 +404,13 @@ export function JournalCustomizer({
           className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] md:max-h-[70vh] overflow-hidden"
         >
           {/* preview */}
-          <div className="flex flex-col items-center justify-start gap-6 overflow-y-auto bg-[var(--surface-panel)] p-10 min-h-[420px]">
-            <div className="relative w-full max-w-[320px] aspect-[560/660]">
+          <div className="flex flex-col items-center overflow-y-auto bg-[var(--surface-panel)] p-10 min-h-[420px]">
+            {/* `my-auto` (not `justify-center` on the parent) so this block
+                centers vertically when there's spare room, but — unlike
+                flex `justify-center` — still aligns to the top and scrolls
+                normally instead of clipping when it's taller than the panel. */}
+            <div className="flex flex-col items-center gap-6 my-auto">
+            <div className="relative w-full max-w-[360px] aspect-[560/660]">
               {mainView === "side" ? (
                 // The side (spine) view is much narrower than front/back — render it
                 // inside an inner strip sized to the same 200:660 ratio, centered in
@@ -432,7 +461,7 @@ export function JournalCustomizer({
             )}
 
             {showNotebookPreview && (
-              <div className="w-full max-w-[320px]">
+              <div className="w-full max-w-[360px]">
                 <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--faint)]">Inside</span>
                 <div className="mt-2 grid grid-cols-3 items-start gap-4 rounded-[var(--radius-panel)] bg-[var(--surface-panel-2)] p-4">
                   {notebookSlots.map((design, i) => (
@@ -502,6 +531,7 @@ export function JournalCustomizer({
                 </div>
               </div>
             )}
+            </div>
           </div>
 
           {/* options */}
@@ -517,29 +547,19 @@ export function JournalCustomizer({
                   onCoverChange={(cover) => updateSelection({ cover })}
                 />
                 <div className="mt-6 border-t border-[var(--border)] pt-6">
-                  <CordStep products={products} cord={selection.cord} onCordChange={handleCordChange} />
+                  <CordStep product={product} cord={selection.cord} onCordChange={handleCordChange} />
                 </div>
-              </>
-            )}
-            {step === 1 && (
-              <>
-                <PatchStep
-                  patchProduct={patchProduct}
-                  cordSelected={selection.cord !== "none" && !cordAutoSelected}
-                  patch={selection.patch}
-                  onPatchChange={(patch) => updateSelection({ patch })}
-                />
                 <div className="mt-6 border-t border-[var(--border)] pt-6">
-                  <PenHolderStep
-                    product={product}
-                    selection={selection}
-                    onPenHolderChange={handlePenHolderChange}
-                    onEdgeChange={(edge) => updateSelection({ edge })}
+                  <PatchStep
+                    patchProduct={patchProduct}
+                    cordSelected={selection.cord !== "none" && !cordAutoSelected}
+                    patch={selection.patch}
+                    onPatchChange={(patch) => updateSelection({ patch })}
                   />
                 </div>
               </>
             )}
-            {step === 2 && (
+            {step === CHARMS_STEP && (
               <CharmsStep
                 product={product}
                 charmProduct={charmProduct}
@@ -548,6 +568,14 @@ export function JournalCustomizer({
                 onChange={(charms) => updateSelection({ charms })}
                 activeSide={charmView}
                 onSelectSide={setCharmView}
+              />
+            )}
+            {step === ACCESSORIES_STEP && (
+              <PenHolderStep
+                product={product}
+                selection={selection}
+                onPenHolderChange={handlePenHolderChange}
+                onEdgeChange={(edge) => updateSelection({ edge })}
               />
             )}
             {step === NOTEBOOKS_STEP && (
@@ -579,23 +607,28 @@ export function JournalCustomizer({
             Continue are replaced by the fixed side arrows + fixed bottom
             total bar below, so this whole footer is desktop-only. */}
         <footer className="hidden md:flex items-center justify-between gap-4 border-t border-[var(--border)] px-6 sm:px-10 py-5">
-          <button
-            type="button"
-            onClick={goBack}
-            disabled={step === 0}
-            className="text-sm font-medium text-[var(--muted)] disabled:opacity-0"
-          >
-            ← Back
-          </button>
-          {step < STEPS.length - 1 ? (
+          <div className="flex items-center gap-4">
+            <CurrencySwitcher />
             <button
               type="button"
-              onClick={goNext}
-              disabled={!canContinue}
-              className="btn-continue hidden md:inline-block rounded-[var(--radius-button)] bg-[var(--accent)] px-8 py-3 text-white font-medium hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[var(--accent)]"
+              onClick={goBack}
+              disabled={step === 0}
+              className="text-sm font-medium text-[var(--muted)] disabled:opacity-0"
             >
-              Continue →
+              ← Back
             </button>
+          </div>
+          {step < STEPS.length - 1 ? (
+            <DisabledHint message={!canContinue ? continueDisabledReason : null} className="hidden md:inline-flex">
+              <button
+                type="button"
+                onClick={goNext}
+                disabled={!canContinue}
+                className="btn-continue rounded-[var(--radius-button)] bg-[var(--accent)] px-8 py-3 text-white font-medium hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[var(--accent)]"
+              >
+                Continue →
+              </button>
+            </DisabledHint>
           ) : (
             <span className="hidden md:inline text-sm text-[var(--faint)]">Ready to add to cart</span>
           )}
@@ -607,10 +640,11 @@ export function JournalCustomizer({
           scrolled. Height is explicit (h-20) and matches the outer
           wrapper's pb-20 exactly, so no page-background gap ever shows
           through above it once scrolled all the way down. */}
-      <div className="md:hidden fixed inset-x-0 bottom-0 z-40 flex h-20 items-center justify-end border-t border-[var(--border)] bg-[var(--card-bg)] px-6 shadow-[0_-12px_28px_-8px_rgba(0,0,0,0.35)]">
+      <div className="md:hidden fixed inset-x-0 bottom-0 z-40 flex h-20 items-center justify-between border-t border-[var(--border)] bg-[var(--card-bg)] px-6 shadow-[0_-12px_28px_-8px_rgba(0,0,0,0.35)]">
+        <CurrencySwitcher />
         <div className="text-right">
           <div className="text-xs text-[var(--faint)]">Total</div>
-          <div className="text-lg font-semibold text-[var(--ink)] font-heading">{formatIDR(total)}</div>
+          <div className="text-lg font-semibold text-[var(--ink)] font-heading">{format(total)}</div>
         </div>
       </div>
 

@@ -5,12 +5,17 @@ import { useRouter } from "next/navigation";
 import type { AdminProduct } from "@/lib/admin/shopify-admin-data";
 import EditableTitle from "./EditableTitle";
 import VariantRow from "./VariantRow";
+import { useCurrency } from "../CurrencyContext";
+import { CURRENCIES, convertToIDR, formatAmountInput, parseAmountInput, sanitizeAmountInput, toShopifyPriceString } from "@/lib/currency";
 
 export default function AssetCategoryCard({ product }: { product: AdminProduct }) {
   const router = useRouter();
+  const { currency } = useCurrency();
+  const currencyCfg = CURRENCIES[currency];
   const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [newPriceInput, setNewPriceInput] = useState("0");
 
   const primaryOption = product.options[0];
 
@@ -135,12 +140,13 @@ export default function AssetCategoryCard({ product }: { product: AdminProduct }
       return;
     }
     setAdding(false);
+    setNewPriceInput("0");
     refresh();
   }
 
   return (
-    <div className="group/card rounded-xl border border-[#e8e3d8] bg-white overflow-hidden transition-shadow hover:shadow-sm">
-      <div className="flex items-center justify-between gap-4 border-b border-[#f0ece0] px-5 py-4">
+    <div className="group/card rounded-xl border border-white/70 bg-white/45 backdrop-blur-2xl ring-1 ring-inset ring-white/50 overflow-hidden shadow-[0_8px_30px_-14px_rgba(15,61,52,0.15)] transition-shadow hover:shadow-[0_12px_36px_-14px_rgba(15,61,52,0.22)]">
+      <div className="flex items-center justify-between gap-4 border-b border-[#f0ece0]/80 bg-gradient-to-r from-white/40 to-transparent px-5 py-4">
         <div className="min-w-0">
           <EditableTitle value={product.title} onSave={saveTitle} />
           <p className="mt-0.5 text-xs text-[#a89a80]">
@@ -153,7 +159,7 @@ export default function AssetCategoryCard({ product }: { product: AdminProduct }
             className={`shrink-0 rounded-full border px-4 py-1.5 text-xs font-medium transition-all duration-150 ${
               adding
                 ? "border-[#d8d5cb] text-[#6b6a63] hover:bg-[#f2ece1]"
-                : "border-[#0f3d34] text-[#0f3d34] hover:bg-[#0f3d34] hover:text-white"
+                : "border-transparent bg-gradient-to-r from-[#154a3f] to-[#0f3d34] text-white shadow-sm hover:from-[#0f3d34] hover:to-[#0a2b25]"
             }`}
           >
             {adding ? "Cancel" : "+ Add variant"}
@@ -162,7 +168,7 @@ export default function AssetCategoryCard({ product }: { product: AdminProduct }
       </div>
 
       {error && (
-        <p className="animate-[fadeIn_0.15s_ease-out] border-b border-[#f6dcd6] bg-[#fbe9e7] px-5 py-2 text-xs text-[#b5342c]">
+        <p className="animate-[fadeIn_0.15s_ease-out] border-b border-[#f6dcd6] bg-gradient-to-r from-[#fbe9e7] to-[#f8dcd8] px-5 py-2 text-xs text-[#b5342c]">
           {error}
         </p>
       )}
@@ -170,20 +176,33 @@ export default function AssetCategoryCard({ product }: { product: AdminProduct }
       {adding && primaryOption && (
         <form
           action={addVariant}
-          className="flex flex-wrap items-end gap-3 border-b border-[#f0ece0] bg-[#f7f5f0] px-5 py-4 animate-[fadeIn_0.15s_ease-out]"
+          className="flex flex-wrap items-end gap-3 border-b border-[#f0ece0] bg-gradient-to-r from-[#f7f5f0] to-[#f0ebe0] px-5 py-4 animate-[fadeIn_0.15s_ease-out]"
         >
           <Field label={primaryOption.name}>
             <input name="value" required autoFocus className="admin-input" placeholder="e.g. Navy" />
           </Field>
-          <Field label="Price">
-            <input name="price" defaultValue="0.00" className="admin-input w-24" />
+          <Field label={`Price (${currency})`}>
+            <div className="admin-input-group w-28">
+              <span className="admin-input-prefix">{currencyCfg.symbol}</span>
+              <input
+                inputMode="decimal"
+                value={formatAmountInput(newPriceInput, currency)}
+                onChange={(e) => setNewPriceInput(sanitizeAmountInput(e.target.value, currency))}
+                className="admin-input-bare"
+              />
+            </div>
+            <input
+              type="hidden"
+              name="price"
+              value={toShopifyPriceString(convertToIDR(parseAmountInput(newPriceInput, currency), currency))}
+            />
           </Field>
           <Field label="SKU">
             <input name="sku" className="admin-input w-32" />
           </Field>
           <button
             type="submit"
-            className="rounded-full bg-[#0f3d34] px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-[#0c332b]"
+            className="rounded-full bg-gradient-to-r from-[#154a3f] to-[#0f3d34] px-4 py-2 text-xs font-medium text-white shadow-sm transition-all hover:from-[#0f3d34] hover:to-[#0a2b25]"
           >
             Add
           </button>
@@ -192,11 +211,11 @@ export default function AssetCategoryCard({ product }: { product: AdminProduct }
 
       <table className="w-full text-sm">
         <thead>
-          <tr className="bg-[#f2ece1] text-left text-xs text-[#6b6a63] uppercase tracking-wide">
+          <tr className="bg-gradient-to-r from-[#f2ece1] to-[#ece4d3] text-left text-xs text-[#6b6a63] uppercase tracking-wide">
             <th className="px-5 py-2.5 font-medium">Image</th>
             <th className="px-5 py-2.5 font-medium">Variant</th>
             <th className="px-5 py-2.5 font-medium">SKU</th>
-            <th className="px-5 py-2.5 font-medium">Price</th>
+            <th className="px-5 py-2.5 font-medium">Price ({currency})</th>
             <th className="px-5 py-2.5 font-medium">Swatch</th>
             <th className="px-5 py-2.5 font-medium">Stock</th>
             <th className="px-5 py-2.5 font-medium" />
@@ -232,6 +251,43 @@ export default function AssetCategoryCard({ product }: { product: AdminProduct }
         .admin-input.dirty {
           border-color: #b1632f;
           background: #fdf8f0;
+        }
+        /* Price fields — a "Rp" prefix baked into the input group, ready to
+           swap for a live IDR/USD toggle later (see the currency switcher
+           planned for the admin nav). */
+        .admin-input-group {
+          display: flex;
+          align-items: center;
+          border: 1px solid #d8d5cb;
+          border-radius: 8px;
+          background: white;
+          transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+        }
+        .admin-input-group:focus-within {
+          border-color: #0f3d34;
+          box-shadow: 0 0 0 3px rgba(15, 61, 52, 0.08);
+        }
+        .admin-input-group.dirty {
+          border-color: #b1632f;
+          background: #fdf8f0;
+        }
+        .admin-input-prefix {
+          padding: 0.375rem 0 0.375rem 0.625rem;
+          font-size: 0.8125rem;
+          color: #a89a80;
+          user-select: none;
+        }
+        .admin-input-bare {
+          width: 100%;
+          min-width: 0;
+          border: none;
+          background: transparent;
+          padding: 0.375rem 0.625rem 0.375rem 0.25rem;
+          font-size: 0.8125rem;
+          color: inherit;
+        }
+        .admin-input-bare:focus {
+          outline: none;
         }
         @keyframes fadeIn {
           from {

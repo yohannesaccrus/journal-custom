@@ -56,7 +56,7 @@ export default function EditableTitle({
   return (
     <button
       onClick={() => setEditing(true)}
-      className="group/title flex items-center gap-1.5 rounded-md -mx-2 px-2 py-0.5 text-left transition-colors hover:bg-[#f2ece1]"
+      className="group/title flex items-center gap-1.5 rounded-md -mx-2 px-2 py-0.5 text-left transition-colors hover:bg-gradient-to-r hover:from-[#f2ece1] hover:to-transparent"
     >
       <span className="font-medium">{value}</span>
       <svg

@@ -80,7 +80,7 @@ export default function VariantThumbnail({
         // eslint-disable-next-line @next/next/no-img-element
         <img src={displaySrc} alt="" className="h-full w-full object-cover" />
       ) : (
-        <div className="flex h-full w-full items-center justify-center bg-[#f7f5f0] text-[#a89a80]">
+        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#f7f5f0] to-[#ece4d3] text-[#a89a80]">
           <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
             <path
               fillRule="evenodd"
@@ -92,7 +92,7 @@ export default function VariantThumbnail({
       )}
 
       <div
-        className={`absolute inset-0 flex items-center justify-center bg-black/40 text-white opacity-0 transition-opacity duration-150 group-hover/thumb:opacity-100 ${
+        className={`absolute inset-0 flex items-center justify-center bg-black/40 text-white backdrop-blur-[2px] opacity-0 transition-opacity duration-150 group-hover/thumb:opacity-100 ${
           uploading ? "opacity-100" : ""
         }`}
       >

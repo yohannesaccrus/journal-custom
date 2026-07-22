@@ -1,9 +1,10 @@
 "use client";
 
 import { buildPatchEntries } from "@/lib/catalog";
-import { formatIDR } from "@/lib/pricing";
+import { useCurrencyFormat } from "@/components/CurrencyContext";
 import type { ShopifyJournalProduct } from "@/lib/shopify-admin";
 import { PatchIcon } from "@/components/PatchIcon";
+import { DisabledHint } from "@/components/DisabledHint";
 import type { JournalSelection } from "@/lib/types";
 
 interface PatchStepProps {
@@ -14,6 +15,7 @@ interface PatchStepProps {
 }
 
 export function PatchStep({ patchProduct, cordSelected, patch, onPatchChange }: PatchStepProps) {
+  const { format } = useCurrencyFormat();
   const patchEntries = buildPatchEntries(patchProduct);
 
   return (
@@ -43,23 +45,27 @@ export function PatchStep({ patchProduct, cordSelected, patch, onPatchChange }: 
         </button>
 
         {patchEntries.map((p) => (
-          <button
+          <DisabledHint
             key={p.variantId}
-            type="button"
-            onClick={() => onPatchChange(p.shape)}
-            disabled={!cordSelected}
-            className="flex flex-col items-center gap-1.5 group disabled:opacity-40 disabled:cursor-not-allowed"
+            message={cordSelected && !p.inStock ? "Out of stock" : null}
           >
-            <span
-              className={`flex h-11 w-11 items-center justify-center rounded-[var(--radius-chip)] border-2 bg-[var(--surface-soft)] transition-all ${
-                patch === p.shape ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/30" : "border-transparent group-hover:border-[var(--accent)]/30"
-              }`}
+            <button
+              type="button"
+              onClick={() => onPatchChange(p.shape)}
+              disabled={!cordSelected || !p.inStock}
+              className="flex flex-col items-center gap-1.5 group disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <PatchIcon shape={p.shape} className="h-6 w-6" />
-            </span>
-            <span className="text-xs text-[var(--ink)] capitalize">{p.shape}</span>
-            <span className="text-[10px] text-[var(--brand)] -mt-1">+{formatIDR(p.price)}</span>
-          </button>
+              <span
+                className={`flex h-11 w-11 items-center justify-center rounded-[var(--radius-chip)] border-2 bg-[var(--surface-soft)] transition-all ${
+                  patch === p.shape ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/30" : "border-transparent group-hover:border-[var(--accent)]/30"
+                }`}
+              >
+                <PatchIcon shape={p.shape} className="h-6 w-6" />
+              </span>
+              <span className="text-xs text-[var(--ink)] capitalize">{p.shape}</span>
+              <span className="text-[10px] text-[var(--brand)] -mt-1">+{format(p.price)}</span>
+            </button>
+          </DisabledHint>
         ))}
       </div>
     </div>

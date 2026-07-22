@@ -153,9 +153,7 @@ body {
   border: 2px solid transparent;
   transition:
     transform 220ms ease,
-    box-shadow 220ms ease,
-    border-width 160ms ease,
-    letter-spacing 200ms ease;
+    box-shadow 220ms ease;
 }
 
 /* Heritage — a classic soft lift: rises and casts a deeper shadow on hover,
@@ -169,19 +167,16 @@ body {
   box-shadow: 0 6px 12px -6px rgba(15, 61, 52, 0.35);
 }
 
-/* Studio — flat and structural: no shadow, the border itself thickens and
-   the label tracks out on hover, snaps back thin on press. */
+/* Studio — flat and structural: no shadow, no reflowing border/letter
+   tricks, just a simple, snappy scale on hover and press. */
 [data-theme="studio"] .btn-continue {
   border-color: var(--accent);
 }
 [data-theme="studio"] .btn-continue:hover:not(:disabled) {
-  border-width: 5px;
-  letter-spacing: 0.04em;
+  transform: scale(1.03);
 }
 [data-theme="studio"] .btn-continue:active:not(:disabled) {
-  border-width: 2px;
   transform: scale(0.96);
-  letter-spacing: 0;
 }
 
 /* Atelier — a soft romantic glow: the button grows slightly and blooms a
@@ -205,6 +200,34 @@ body {
   [data-theme] .btn-continue:active:not(:disabled) {
     transform: none;
   }
+}
+
+/* Currency switcher trigger — glass + a soft glow tinted from the active
+   style's own accent color via color-mix(), so it reads as "noticeable" on
+   every style (including Studio's near-black accent, where a flat tinted
+   background alone was too subtle to see) without hardcoding per-theme
+   colors. */
+.currency-trigger {
+  background: color-mix(in srgb, var(--card-bg) 55%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: none;
+  box-shadow:
+    0 6px 20px -6px color-mix(in srgb, var(--accent) 45%, transparent),
+    0 2px 6px -2px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 200ms ease, background 200ms ease, transform 150ms ease;
+}
+.currency-trigger:hover {
+  box-shadow:
+    0 10px 28px -6px color-mix(in srgb, var(--accent) 55%, transparent),
+    0 2px 8px -2px rgba(0, 0, 0, 0.12);
+}
+.currency-trigger.is-open {
+  background: color-mix(in srgb, var(--card-bg) 85%, transparent);
+  box-shadow:
+    0 14px 32px -6px color-mix(in srgb, var(--accent) 65%, transparent),
+    0 3px 10px -2px rgba(0, 0, 0, 0.14);
+  transform: translateY(-1px);
 }
 
 /* Thin, rounded scrollbars matching the journal customizer's palette —

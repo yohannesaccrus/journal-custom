@@ -2,8 +2,9 @@
 
 import { buildCoverEntries } from "@/lib/catalog";
 import type { ShopifyJournalProduct } from "@/lib/shopify-admin";
-import { formatIDR } from "@/lib/pricing";
+import { useCurrencyFormat } from "@/components/CurrencyContext";
 import { Swatch } from "@/components/Swatch";
+import { DisabledHint } from "@/components/DisabledHint";
 import type { CoverCategory } from "@/lib/types";
 
 interface CoverStepProps {
@@ -15,6 +16,7 @@ interface CoverStepProps {
 }
 
 export function CoverStep({ products, cover, category, onCategoryChange, onCoverChange }: CoverStepProps) {
+  const { format } = useCurrencyFormat();
   const entries = buildCoverEntries(products);
   const options = entries.filter((o) => o.category === category);
   const current = entries.find((o) => o.handle === cover);
@@ -44,21 +46,23 @@ export function CoverStep({ products, cover, category, onCategoryChange, onCover
             category === "pattern" ? "bg-[var(--card-bg)] shadow text-[var(--accent)]" : "text-[var(--muted)]"
           }`}
         >
-          Animal Print <span className="text-[var(--brand)]">+{formatIDR(patternDeltaMin)}</span>
+          Animal Print <span className="text-[var(--brand)]">+{format(patternDeltaMin)}</span>
         </button>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-4">
         {options.map((o) => (
-          <Swatch
-            key={o.handle}
-            label={o.label}
-            selected={cover === o.handle}
-            onClick={() => onCoverChange(o.handle)}
-            color={o.swatch}
-            thumbnail={o.thumbnail}
-            priceLabel={o.priceDelta > 0 ? `+${formatIDR(o.priceDelta)}` : undefined}
-          />
+          <DisabledHint key={o.handle} message={!o.inStock ? "Out of stock" : null}>
+            <Swatch
+              label={o.label}
+              selected={cover === o.handle}
+              onClick={() => onCoverChange(o.handle)}
+              color={o.swatch}
+              thumbnail={o.thumbnail}
+              priceLabel={o.priceDelta > 0 ? `+${format(o.priceDelta)}` : undefined}
+              disabled={!o.inStock}
+            />
+          </DisabledHint>
         ))}
       </div>
 

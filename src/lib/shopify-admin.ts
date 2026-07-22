@@ -11,6 +11,7 @@ export interface ShopifyVariant {
   sku: string;
   image: { url: string } | null;
   selectedOptions: { name: string; value: string }[];
+  inventoryQuantity: number;
 }
 
 export interface ShopifyMedia {
@@ -44,6 +45,7 @@ const PRODUCTS_QUERY = `
             sku
             image { url }
             selectedOptions { name value }
+            inventoryQuantity
           }
         }
         media(first: 150) {

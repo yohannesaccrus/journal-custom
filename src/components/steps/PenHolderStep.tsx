@@ -1,9 +1,10 @@
 "use client";
 
-import { buildCordEntries, buildPenHolderEntries, resolveVariant } from "@/lib/catalog";
+import { buildCordEntries, buildPenHolderEntries, isEdgeInStock, resolveVariant } from "@/lib/catalog";
 import type { ShopifyJournalProduct } from "@/lib/shopify-admin";
-import { formatIDR } from "@/lib/pricing";
+import { useCurrencyFormat } from "@/components/CurrencyContext";
 import { Swatch } from "@/components/Swatch";
+import { DisabledHint } from "@/components/DisabledHint";
 import type { JournalSelection } from "@/lib/types";
 
 interface PenHolderStepProps {
@@ -14,15 +15,17 @@ interface PenHolderStepProps {
 }
 
 export function PenHolderStep({ product, selection, onPenHolderChange, onEdgeChange }: PenHolderStepProps) {
+  const { format } = useCurrencyFormat();
   const hasPenHolder = selection.penHolder !== "none";
-  const entries = buildPenHolderEntries([product]);
 
   // Shopify only has pen-holder variants paired with an actual cord color —
   // picking a pen holder color auto-selects the first cord behind the scenes
   // (see handlePenHolderChange in JournalCustomizer). Price previews here
   // need that same substitution, or resolving a "No Cord + Pen Holder"
   // variant that doesn't exist would throw before the user even clicks.
-  const effectiveCord = selection.cord !== "none" ? selection.cord : buildCordEntries([product])[0]?.label ?? selection.cord;
+  const effectiveCord = selection.cord !== "none" ? selection.cord : buildCordEntries(product)[0]?.label ?? selection.cord;
+  const entries = buildPenHolderEntries(product, effectiveCord);
+  const edgeInStock = selection.penHolder !== "none" ? isEdgeInStock(product, effectiveCord, selection.penHolder) : true;
 
   const priceAt = (penHolder: JournalSelection["penHolder"], edge: boolean) => {
     const cord = penHolder === "none" ? selection.cord : effectiveCord;
@@ -48,14 +51,16 @@ export function PenHolderStep({ product, selection, onPenHolderChange, onEdgeCha
           const slug = o.label.toLowerCase() as JournalSelection["penHolder"];
           const delta = priceAt(slug, false) - basePrice;
           return (
-            <Swatch
-              key={o.label}
-              label={o.label}
-              selected={selection.penHolder === slug}
-              onClick={() => onPenHolderChange(slug)}
-              color={o.swatch}
-              priceLabel={delta > 0 ? `+${formatIDR(delta)}` : undefined}
-            />
+            <DisabledHint key={o.label} message={!o.inStock ? "Out of stock" : null}>
+              <Swatch
+                label={o.label}
+                selected={selection.penHolder === slug}
+                onClick={() => onPenHolderChange(slug)}
+                color={o.swatch}
+                priceLabel={delta > 0 ? `+${format(delta)}` : undefined}
+                disabled={!o.inStock}
+              />
+            </DisabledHint>
           );
         })}
       </div>
@@ -76,19 +81,21 @@ export function PenHolderStep({ product, selection, onPenHolderChange, onEdgeCha
           >
             No edge
           </button>
-          <button
-            type="button"
-            disabled={!hasPenHolder}
-            onClick={() => onEdgeChange(true)}
-            className={`px-4 py-1.5 rounded-[var(--radius-button)] text-xs font-medium border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-              selection.edge ? "border-[var(--accent)] bg-[var(--accent)] text-white" : "border-[var(--border)] text-[var(--muted)]"
-            }`}
-          >
-            Add edge{" "}
-            <span className={selection.edge ? "text-white/70" : "text-[var(--brand)]"}>
-              +{formatIDR(edgeDelta)}
-            </span>
-          </button>
+          <DisabledHint message={hasPenHolder && !edgeInStock ? "Out of stock" : null}>
+            <button
+              type="button"
+              disabled={!hasPenHolder || !edgeInStock}
+              onClick={() => onEdgeChange(true)}
+              className={`px-4 py-1.5 rounded-[var(--radius-button)] text-xs font-medium border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                selection.edge ? "border-[var(--accent)] bg-[var(--accent)] text-white" : "border-[var(--border)] text-[var(--muted)]"
+              }`}
+            >
+              Add edge{" "}
+              <span className={selection.edge ? "text-white/70" : "text-[var(--brand)]"}>
+                +{format(edgeDelta)}
+              </span>
+            </button>
+          </DisabledHint>
         </div>
         {!hasPenHolder && (
           <p className="mt-2 text-xs text-[var(--faint)]">Select a pen holder color to unlock corner edges.</p>

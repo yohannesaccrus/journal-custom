@@ -33,10 +33,16 @@ export interface CoverEntry {
   swatch?: string;
   thumbnail?: string;
   priceDelta: number;
+  inStock: boolean;
 }
 
 function optionValue(variant: ShopifyVariant, name: string): string | undefined {
   return variant.selectedOptions.find((o) => o.name === name)?.value;
+}
+
+/** Whether a variant can actually be added to cart right now. */
+function inStock(variant: ShopifyVariant | undefined): boolean {
+  return (variant?.inventoryQuantity ?? 0) > 0;
 }
 
 function baseVariant(product: ShopifyJournalProduct): ShopifyVariant {
@@ -62,26 +68,64 @@ export function buildCoverEntries(products: ShopifyJournalProduct[]): CoverEntry
       thumbnail: base.image?.url,
       swatch: base.image?.url ? undefined : SWATCH_HEX[label.replace("Classic ", "")],
       priceDelta: Number(base.price) - globalBase,
+      inStock: inStock(base),
     };
   });
 }
 
-export function buildCordEntries(products: ShopifyJournalProduct[]): { label: string; swatch: string }[] {
-  const product = products[0];
+export interface CordEntry {
+  label: string;
+  swatch: string;
+  inStock: boolean;
+}
+
+/** `product` is the currently selected cover — stock is per (cover, cord) variant. */
+export function buildCordEntries(product: ShopifyJournalProduct): CordEntry[] {
   const values = new Set(
     product.variants.map((v) => optionValue(v, "Cord")).filter((v): v is string => !!v && v !== "No Cord")
   );
-  return Array.from(values).map((label) => ({ label, swatch: SWATCH_HEX[label] ?? "#999999" }));
+  return Array.from(values).map((label) => {
+    const variant = product.variants.find(
+      (v) => optionValue(v, "Cord") === label && optionValue(v, "Pen Holder") === "None"
+    );
+    return { label, swatch: SWATCH_HEX[label] ?? "#999999", inStock: inStock(variant) };
+  });
 }
 
-export function buildPenHolderEntries(products: ShopifyJournalProduct[]): { label: string; swatch: string }[] {
-  const product = products[0];
+export interface PenHolderEntry {
+  label: string;
+  swatch: string;
+  inStock: boolean;
+}
+
+/** `cord` is the currently selected/effective cord — stock is per (cover, cord, pen holder) variant. */
+export function buildPenHolderEntries(product: ShopifyJournalProduct, cord: string): PenHolderEntry[] {
+  const cordValue = cord === "none" ? "No Cord" : cord;
   const values = new Set(
     product.variants
       .map((v) => optionValue(v, "Pen Holder"))
       .filter((v): v is string => !!v && v !== "None" && !v.includes("+ Edge"))
   );
-  return Array.from(values).map((label) => ({ label, swatch: SWATCH_HEX[label] ?? "#999999" }));
+  return Array.from(values).map((label) => {
+    const variant = product.variants.find(
+      (v) => optionValue(v, "Cord") === cordValue && optionValue(v, "Pen Holder") === label
+    );
+    return { label, swatch: SWATCH_HEX[label] ?? "#999999", inStock: inStock(variant) };
+  });
+}
+
+/** Whether the corner-edge add-on is in stock for the current cord + pen holder. */
+export function isEdgeInStock(
+  product: ShopifyJournalProduct,
+  cord: string,
+  penHolder: Exclude<JournalSelection["penHolder"], "none">
+): boolean {
+  const cordValue = cord === "none" ? "No Cord" : cord;
+  const cap = penHolder === "black" ? "Black" : "Brown";
+  const variant = product.variants.find(
+    (v) => optionValue(v, "Cord") === cordValue && optionValue(v, "Pen Holder") === `${cap} + Edge`
+  );
+  return inStock(variant);
 }
 
 /** Resolves the exact Shopify variant matching a customizer selection. */
@@ -114,6 +158,7 @@ export interface CharmEntry {
   design: string;
   imageUrl: string;
   price: number;
+  inStock: boolean;
 }
 
 export function buildCharmEntries(charmProduct: ShopifyJournalProduct): CharmEntry[] {
@@ -122,6 +167,7 @@ export function buildCharmEntries(charmProduct: ShopifyJournalProduct): CharmEnt
     design: optionValue(v, "Design") ?? v.title,
     imageUrl: v.image?.url ?? "",
     price: Number(v.price),
+    inStock: inStock(v),
   }));
 }
 
@@ -177,12 +223,14 @@ export const NOTEBOOK_SPEC_NOTE =
 export interface NotebookEntry {
   variantId: string;
   design: string;
+  inStock: boolean;
 }
 
 export function buildNotebookEntries(notebookProduct: ShopifyJournalProduct): NotebookEntry[] {
   return notebookProduct.variants.map((v) => ({
     variantId: v.id,
     design: optionValue(v, "Type") ?? v.title,
+    inStock: inStock(v),
   }));
 }
 
@@ -194,6 +242,7 @@ export interface PatchEntry {
   variantId: string;
   shape: "star" | "heart";
   price: number;
+  inStock: boolean;
 }
 
 export function buildPatchEntries(patchProduct: ShopifyJournalProduct): PatchEntry[] {
@@ -201,6 +250,7 @@ export function buildPatchEntries(patchProduct: ShopifyJournalProduct): PatchEnt
     variantId: v.id,
     shape: (optionValue(v, "Shape") ?? v.title).toLowerCase() as "star" | "heart",
     price: Number(v.price),
+    inStock: inStock(v),
   }));
 }
 

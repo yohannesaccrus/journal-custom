@@ -4,6 +4,16 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { AdminProduct } from "@/lib/admin/shopify-admin-data";
 import VariantThumbnail from "./VariantThumbnail";
+import { useCurrency } from "../CurrencyContext";
+import {
+  CURRENCIES,
+  convertToIDR,
+  formatAmountInput,
+  idrToInputValue,
+  parseAmountInput,
+  sanitizeAmountInput,
+  toShopifyPriceString,
+} from "@/lib/currency";
 
 type Variant = AdminProduct["variants"][number];
 
@@ -22,9 +32,15 @@ export default function VariantRow({
   onDelete: (variantId: string) => Promise<void>;
 }) {
   const router = useRouter();
+  const { currency } = useCurrency();
+  const currencyCfg = CURRENCIES[currency];
+  const initialPriceIDR = Number(variant.price) || 0;
   const [name, setName] = useState(variant.title);
   const [sku, setSku] = useState(variant.sku);
-  const [price, setPrice] = useState(variant.price);
+  // Always the canonical IDR value — the input just displays/edits it
+  // converted into whatever currency is currently selected, so switching
+  // currency mid-session re-renders the same underlying price correctly.
+  const [priceIDR, setPriceIDR] = useState(initialPriceIDR);
   const [stock, setStock] = useState(variant.inventoryQuantity);
   const [swatchColor, setSwatchColor] = useState(variant.swatchColor);
   const [saving, setSaving] = useState(false);
@@ -32,17 +48,19 @@ export default function VariantRow({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  const priceDisplay = formatAmountInput(idrToInputValue(priceIDR, currency), currency);
+
   const dirty =
     name !== variant.title ||
     sku !== variant.sku ||
-    price !== variant.price ||
+    priceIDR !== initialPriceIDR ||
     stock !== variant.inventoryQuantity ||
     swatchColor !== variant.swatchColor;
 
   function reset() {
     setName(variant.title);
     setSku(variant.sku);
-    setPrice(variant.price);
+    setPriceIDR(initialPriceIDR);
     setStock(variant.inventoryQuantity);
     setSwatchColor(variant.swatchColor);
   }
@@ -53,7 +71,7 @@ export default function VariantRow({
       await onSave(variant, {
         name: name !== variant.title ? name : undefined,
         sku: sku !== variant.sku ? sku : undefined,
-        price: price !== variant.price ? price : undefined,
+        price: priceIDR !== initialPriceIDR ? toShopifyPriceString(priceIDR) : undefined,
         stock: stock !== variant.inventoryQuantity ? stock : undefined,
         swatchColor: swatchColor !== variant.swatchColor ? swatchColor : undefined,
       });
@@ -78,8 +96,8 @@ export default function VariantRow({
 
   return (
     <tr
-      className={`border-t border-[#f0ece0] transition-colors ${
-        dirty ? "bg-[#fdf8f0]" : "hover:bg-[#faf9f6]"
+      className={`border-t border-[#f0ece0]/80 transition-colors ${
+        dirty ? "bg-gradient-to-r from-[#fdf8f0] to-[#faf1e0]" : "hover:bg-white/60"
       } ${deleting ? "opacity-40" : ""}`}
     >
       <td className="px-5 py-2.5">
@@ -107,12 +125,19 @@ export default function VariantRow({
         />
       </td>
       <td className="px-5 py-2.5">
-        <input
-          value={price}
-          disabled={saving || deleting}
-          onChange={(e) => setPrice(e.target.value)}
-          className={`admin-input w-24 ${price !== variant.price ? "dirty" : ""}`}
-        />
+        <div className={`admin-input-group w-28 ${priceIDR !== initialPriceIDR ? "dirty" : ""}`}>
+          <span className="admin-input-prefix">{currencyCfg.symbol}</span>
+          <input
+            inputMode="decimal"
+            value={priceDisplay}
+            disabled={saving || deleting}
+            onChange={(e) => {
+              const sanitized = sanitizeAmountInput(e.target.value, currency);
+              setPriceIDR(convertToIDR(parseAmountInput(sanitized, currency), currency));
+            }}
+            className="admin-input-bare"
+          />
+        </div>
       </td>
       <td className="px-5 py-2.5">
         <div className="flex items-center gap-1.5">
@@ -153,8 +178,16 @@ export default function VariantRow({
             onChange={(e) => setStock(Number(e.target.value))}
             className={`admin-input w-20 ${stock !== variant.inventoryQuantity ? "dirty" : ""}`}
           />
-          {!dirty && stock <= 0 && <span className="text-xs text-[#b5342c] font-medium">Out</span>}
-          {!dirty && stock > 0 && stock <= 10 && <span className="text-xs text-[#b1632f] font-medium">Low</span>}
+          {!dirty && stock <= 0 && (
+            <span className="rounded-full bg-gradient-to-r from-[#c23f35] to-[#b5342c] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white shadow-sm">
+              Out of stock
+            </span>
+          )}
+          {!dirty && stock > 0 && stock <= 10 && (
+            <span className="rounded-full bg-gradient-to-r from-[#f6dcbb] to-[#f0ce9f] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#8a4d1f]">
+              Low
+            </span>
+          )}
         </div>
       </td>
       <td className="px-5 py-2.5">
@@ -184,7 +217,7 @@ export default function VariantRow({
               <button
                 disabled={saving}
                 onClick={save}
-                className="rounded-full bg-[#0f3d34] px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-[#0c332b] disabled:opacity-60 flex items-center gap-1.5"
+                className="rounded-full bg-gradient-to-r from-[#154a3f] to-[#0f3d34] px-3 py-1 text-xs font-medium text-white shadow-sm transition-all hover:from-[#0f3d34] hover:to-[#0a2b25] disabled:opacity-60 flex items-center gap-1.5"
               >
                 {saving && (
                   <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">

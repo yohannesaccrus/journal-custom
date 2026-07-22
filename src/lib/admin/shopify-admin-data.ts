@@ -36,8 +36,11 @@ let cachedLocationId: string | null = null;
 
 export async function getPrimaryLocationId(): Promise<string> {
   if (cachedLocationId) return cachedLocationId;
-  const data = await shopifyAdmin<{ locations: { nodes: { id: string; name: string }[] } }>(
-    `query { locations(first: 5) { nodes { id name } } }`
+  // Only `id` is used below — `name` isn't, and requesting it requires the
+  // `read_locations` (or `read_markets_home`) access scope, which this
+  // app's Admin API token doesn't have.
+  const data = await shopifyAdmin<{ locations: { nodes: { id: string }[] } }>(
+    `query { locations(first: 5) { nodes { id } } }`
   );
   const id = data.locations.nodes[0]?.id;
   if (!id) throw new Error("No Shopify location found");
@@ -573,7 +576,9 @@ export interface AdminOrder {
   displayFinancialStatus: string;
   displayFulfillmentStatus: string;
   customerName: string | null;
-  totalPrice: string;
+  /** Raw numeric total, in the store's currency — pair with `totalPriceCurrency` to format/convert. */
+  totalPriceAmount: number;
+  totalPriceCurrency: string;
   lineItems: AdminOrderLineItem[];
 }
 
@@ -640,7 +645,8 @@ export async function fetchJournalOrders(cursor?: string): Promise<{
       displayFinancialStatus: o.displayFinancialStatus,
       displayFulfillmentStatus: o.displayFulfillmentStatus,
       customerName: o.customer?.displayName ?? null,
-      totalPrice: `${o.totalPriceSet.shopMoney.amount} ${o.totalPriceSet.shopMoney.currencyCode}`,
+      totalPriceAmount: Number(o.totalPriceSet.shopMoney.amount),
+      totalPriceCurrency: o.totalPriceSet.shopMoney.currencyCode,
       lineItems: o.lineItems.nodes.map((li) => ({
         title: li.title,
         quantity: li.quantity,
@@ -649,4 +655,37 @@ export async function fetchJournalOrders(cursor?: string): Promise<{
     }));
 
   return { orders, hasNextPage: data.orders.pageInfo.hasNextPage, endCursor: data.orders.pageInfo.endCursor };
+}
+
+const ORDER_COUNT_QUERY = `
+  query JournalOrderCount($cursor: String) {
+    orders(first: 100, after: $cursor, reverse: true, sortKey: CREATED_AT) {
+      pageInfo { hasNextPage endCursor }
+      nodes {
+        lineItems(first: 20) { nodes { title } }
+      }
+    }
+  }
+`;
+
+/**
+ * Lightweight count of orders containing at least one journal line item.
+ * Caps at 500 scanned orders (5 pages) so a busy store can't turn the
+ * dashboard summary card into a slow, unbounded scan — `capped: true` lets
+ * the UI show "500+" instead of a wrong exact number past that point.
+ */
+export async function fetchJournalOrderCount(): Promise<{ count: number; capped: boolean }> {
+  let count = 0;
+  let cursor: string | undefined;
+  for (let page = 0; page < 5; page++) {
+    const data = await shopifyAdmin<{
+      orders: { pageInfo: { hasNextPage: boolean; endCursor: string | null }; nodes: { lineItems: { nodes: { title: string }[] } }[] };
+    }>(ORDER_COUNT_QUERY, { cursor: cursor ?? null });
+
+    count += data.orders.nodes.filter((o) => o.lineItems.nodes.some((li) => isJournalLine(li.title))).length;
+
+    if (!data.orders.pageInfo.hasNextPage) return { count, capped: false };
+    cursor = data.orders.pageInfo.endCursor ?? undefined;
+  }
+  return { count, capped: true };
 }

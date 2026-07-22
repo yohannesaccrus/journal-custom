@@ -2,9 +2,10 @@
 
 import { useRef } from "react";
 import { buildCharmEntries, resolveSideImage, type CharmEntry } from "@/lib/catalog";
-import { formatIDR } from "@/lib/pricing";
+import { useCurrencyFormat } from "@/components/CurrencyContext";
 import type { ShopifyJournalProduct } from "@/lib/shopify-admin";
 import type { CharmSide, JournalSelection, PlacedCharm } from "@/lib/types";
+import { DisabledHint } from "@/components/DisabledHint";
 
 interface CharmsStepProps {
   product: ShopifyJournalProduct;
@@ -164,6 +165,7 @@ export function CharmsStep({
   activeSide,
   onSelectSide,
 }: CharmsStepProps) {
+  const { format } = useCurrencyFormat();
   const charms = selection.charms;
   const entries = buildCharmEntries(charmProduct);
 
@@ -193,23 +195,27 @@ export function CharmsStep({
 
       <div className="mt-4 flex flex-wrap gap-4">
         {entries.map((c) => (
-          <div
-            key={c.variantId}
-            draggable
-            onDragStart={(e) => {
-              e.dataTransfer.setData(DRAG_MIME, JSON.stringify({ variantId: c.variantId, design: c.design }));
-              e.dataTransfer.effectAllowed = "copy";
-            }}
-            onClick={() => addCharm(activeSide, c.variantId, c.design, 50, 45)}
-            className="flex cursor-grab flex-col items-center gap-1.5 group active:cursor-grabbing"
-          >
-            <span className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-chip)] border-2 border-transparent bg-[var(--surface-soft)] group-hover:border-[var(--accent)]/30 transition-colors">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={c.imageUrl} alt="" className="h-7 w-7 object-contain pointer-events-none" />
-            </span>
-            <span className="text-xs text-[var(--ink)]">{c.design}</span>
-            <span className="text-[10px] text-[var(--brand)] -mt-1">{formatIDR(c.price)}</span>
-          </div>
+          <DisabledHint key={c.variantId} message={!c.inStock ? "Out of stock" : null}>
+            <div
+              draggable={c.inStock}
+              onDragStart={(e) => {
+                if (!c.inStock) return;
+                e.dataTransfer.setData(DRAG_MIME, JSON.stringify({ variantId: c.variantId, design: c.design }));
+                e.dataTransfer.effectAllowed = "copy";
+              }}
+              onClick={() => c.inStock && addCharm(activeSide, c.variantId, c.design, 50, 45)}
+              className={`flex flex-col items-center gap-1.5 group ${
+                c.inStock ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed opacity-40"
+              }`}
+            >
+              <span className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-chip)] border-2 border-transparent bg-[var(--surface-soft)] group-hover:border-[var(--accent)]/30 transition-colors">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={c.imageUrl} alt="" className="h-7 w-7 object-contain pointer-events-none" />
+              </span>
+              <span className="text-xs text-[var(--ink)]">{c.design}</span>
+              <span className="text-[10px] text-[var(--brand)] -mt-1">{format(c.price)}</span>
+            </div>
+          </DisabledHint>
         ))}
       </div>
 

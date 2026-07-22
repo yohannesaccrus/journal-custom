@@ -1,8 +1,13 @@
 import { fetchAssetProducts } from "@/lib/admin/shopify-admin-data";
-import AssetCategoryCard from "./AssetCategoryCard";
+import { AssetsPageBody } from "@/components/admin/AssetsPageBody";
 
 export default async function AdminAssetsPage() {
   const products = await fetchAssetProducts();
+
+  const coverImage =
+    products.find((p) => /cover/i.test(p.title))?.variants.find((v) => v.image)?.image?.url ??
+    products.flatMap((p) => p.variants).find((v) => v.image)?.image?.url ??
+    null;
 
   return (
     <div>
@@ -12,11 +17,7 @@ export default async function AdminAssetsPage() {
         variants.
       </p>
 
-      <div className="mt-6 space-y-6">
-        {products.map((product) => (
-          <AssetCategoryCard key={product.id} product={product} />
-        ))}
-      </div>
+      <AssetsPageBody products={products} coverImage={coverImage} />
     </div>
   );
 }

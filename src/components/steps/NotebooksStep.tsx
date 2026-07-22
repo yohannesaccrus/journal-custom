@@ -2,6 +2,7 @@
 
 import { buildNotebookEntries, NOTEBOOK_SPEC_NOTE, NOTEBOOKS_PER_JOURNAL, notebookCount } from "@/lib/catalog";
 import { NotebookIcon } from "@/components/NotebookIcon";
+import { DisabledHint } from "@/components/DisabledHint";
 import type { ShopifyJournalProduct } from "@/lib/shopify-admin";
 
 interface NotebooksStepProps {
@@ -52,17 +53,20 @@ export function NotebooksStep({ notebookProduct, notebooks, onChange }: Notebook
         {entries.map((n) => {
           const count = notebooks[n.design] ?? 0;
           const atLimit = total >= NOTEBOOKS_PER_JOURNAL && count === 0;
+          const addDisabled = atLimit || !n.inStock;
           return (
             <div
               key={n.variantId}
               className={`flex items-center gap-3 rounded-[var(--radius-panel)] border-2 p-3 transition-colors ${
                 count > 0 ? "border-[var(--accent)] bg-[var(--accent)]/[0.03]" : "border-[var(--border)]"
-              } ${atLimit ? "opacity-40" : ""}`}
+              } ${atLimit || !n.inStock ? "opacity-40" : ""}`}
             >
               <NotebookIcon design={n.design} />
               <div className="min-w-0 flex-1">
                 <div className="font-medium text-[var(--ink)]">{n.design}</div>
-                <div className="text-xs text-[var(--faint)]">{DESCRIPTIONS[n.design]}</div>
+                <div className="text-xs text-[var(--faint)]">
+                  {n.inStock ? DESCRIPTIONS[n.design] : "Out of stock"}
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -74,14 +78,16 @@ export function NotebooksStep({ notebookProduct, notebooks, onChange }: Notebook
                   −
                 </button>
                 <span className="w-4 text-center text-sm font-medium text-[var(--ink)]">{count}</span>
-                <button
-                  type="button"
-                  onClick={() => setCount(n.design, 1)}
-                  disabled={atLimit}
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--accent)] text-white text-sm disabled:opacity-30"
-                >
-                  +
-                </button>
+                <DisabledHint message={!n.inStock ? "Out of stock" : null}>
+                  <button
+                    type="button"
+                    onClick={() => setCount(n.design, 1)}
+                    disabled={addDisabled}
+                    className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--accent)] text-white text-sm disabled:opacity-30"
+                  >
+                    +
+                  </button>
+                </DisabledHint>
               </div>
             </div>
           );
