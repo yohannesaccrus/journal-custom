@@ -567,6 +567,10 @@ export interface AdminOrderLineItem {
   title: string;
   quantity: number;
   designUrl: string | null;
+  imageUrl: string | null;
+  bundleId: string | null;
+  /** Customer-visible spec properties (Cord, Patch, Pen Holder, Corner Edge, Notebooks, Placement, …). */
+  specs: Record<string, string>;
 }
 
 export interface AdminOrder {
@@ -598,6 +602,7 @@ const ORDERS_QUERY = `
           nodes {
             title
             quantity
+            image { url }
             customAttributes { key value }
           }
         }
@@ -618,10 +623,14 @@ interface RawOrder {
     nodes: {
       title: string;
       quantity: number;
+      image: { url: string } | null;
       customAttributes: { key: string; value: string }[];
     }[];
   };
 }
+
+/** Keys that are internal bookkeeping or already shown elsewhere — hide from the spec summary. */
+const HIDDEN_SPEC_KEYS = new Set(["_bundle_id", "_for_journal", "View your custom design"]);
 
 function isJournalLine(title: string): boolean {
   return /sanaya journal/i.test(title);
@@ -651,6 +660,14 @@ export async function fetchJournalOrders(cursor?: string): Promise<{
         title: li.title,
         quantity: li.quantity,
         designUrl: li.customAttributes.find((a) => a.key === "View your custom design")?.value ?? null,
+        imageUrl: li.image?.url ?? null,
+        bundleId:
+          li.customAttributes.find((a) => a.key === "_bundle_id")?.value ??
+          li.customAttributes.find((a) => a.key === "_for_journal")?.value ??
+          null,
+        specs: Object.fromEntries(
+          li.customAttributes.filter((a) => !HIDDEN_SPEC_KEYS.has(a.key)).map((a) => [a.key, a.value])
+        ),
       })),
     }));
 

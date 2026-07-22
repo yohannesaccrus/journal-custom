@@ -12,6 +12,10 @@ function formatDate(iso: string): string {
   });
 }
 
+function isJournalTitle(title: string): boolean {
+  return /sanaya journal/i.test(title);
+}
+
 function statusTone(status: string): string {
   const s = status.toLowerCase();
   if (["paid", "fulfilled", "delivered"].includes(s)) return "bg-gradient-to-r from-[#dcefe1] to-[#c9e4d1] text-[#0f3d34]";
@@ -66,7 +70,7 @@ export function OrdersPageBody({ orders, coverImage }: { orders: AdminOrder[]; c
                 <th className="px-5 py-2.5 font-medium">Customer</th>
                 <th className="px-5 py-2.5 font-medium">Status</th>
                 <th className="px-5 py-2.5 font-medium">Total</th>
-                <th className="px-5 py-2.5 font-medium">Design</th>
+                <th className="px-5 py-2.5 font-medium">Journal spec</th>
               </tr>
             </thead>
             <tbody>
@@ -91,24 +95,55 @@ export function OrdersPageBody({ orders, coverImage }: { orders: AdminOrder[]; c
                       <PriceDisplay amountIDR={order.totalPriceAmount} />
                     </td>
                     <td className="px-5 py-3">
-                      <div className="flex flex-col gap-1">
-                        {journalLines.map((li, i) =>
-                          li.designUrl ? (
-                            <a
-                              key={i}
-                              href={li.designUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-xs text-[#0f3d34] underline"
-                            >
-                              {li.title} →
-                            </a>
-                          ) : (
-                            <span key={i} className="text-xs text-[#a89a80]">
-                              {li.title} (no link)
-                            </span>
-                          )
-                        )}
+                      <div className="flex flex-col gap-4">
+                        {journalLines.map((line, i) => {
+                          const charmLines = line.bundleId
+                            ? order.lineItems.filter(
+                                (li) => li !== line && li.bundleId === line.bundleId && !isJournalTitle(li.title)
+                              )
+                            : [];
+                          return (
+                            <div key={i} className="flex gap-3">
+                              <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#eae7de] bg-[#f7f5f0]">
+                                {line.imageUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={line.imageUrl} alt="" className="h-full w-full object-cover" />
+                                ) : (
+                                  <span className="text-[10px] text-[#c8c2b3]">—</span>
+                                )}
+                              </span>
+                              <div className="min-w-0">
+                                <p className="text-xs font-medium text-[#1c1c1a]">{line.title}</p>
+                                <dl className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-[#6b6a63]">
+                                  {Object.entries(line.specs).map(([key, value]) => (
+                                    <div key={key} className="flex gap-1">
+                                      <dt className="text-[#a89a80]">{key}:</dt>
+                                      <dd>{value}</dd>
+                                    </div>
+                                  ))}
+                                </dl>
+                                {charmLines.length > 0 && (
+                                  <p className="mt-0.5 text-[11px] text-[#6b6a63]">
+                                    Charms:{" "}
+                                    {charmLines
+                                      .map((c) => `${c.quantity}× ${c.title}${c.specs.Placement ? ` (${c.specs.Placement})` : ""}`)
+                                      .join(", ")}
+                                  </p>
+                                )}
+                                {line.designUrl && (
+                                  <a
+                                    href={line.designUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="mt-1 inline-block text-xs text-[#0f3d34] underline"
+                                  >
+                                    View full design →
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </td>
                   </tr>
