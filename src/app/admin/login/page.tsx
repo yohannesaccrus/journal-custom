@@ -17,7 +17,7 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
       <div className="pointer-events-none absolute -bottom-24 -right-16 h-96 w-96 rounded-full bg-white/15 blur-[100px]" />
       <div className="pointer-events-none absolute top-1/3 right-1/4 h-64 w-64 rounded-full bg-[#2f7a63]/30 blur-[100px]" />
 
-      <div className="relative w-full max-w-sm rounded-2xl border border-white/70 bg-white/50 backdrop-blur-2xl ring-1 ring-inset ring-white/50 shadow-2xl p-8">
+      <div className="relative w-full max-w-sm rounded-2xl border border-white/60 bg-[#faf8f3]/95 backdrop-blur-2xl ring-1 ring-inset ring-white/70 shadow-2xl p-8">
         <span className="text-xl tracking-[0.2em] font-serif text-[#b1632f]">SANAYA</span>
         <h1 className="mt-4 text-2xl font-serif text-[#1c1c1a]">Admin sign in</h1>
         <p className="mt-1 text-sm text-[#6b6a63]">Asset & order management — internal use only.</p>
