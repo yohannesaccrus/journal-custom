@@ -20,11 +20,11 @@ export function PatchStep({ patchProduct, cordSelected, patch, onPatchChange }: 
 
   return (
     <div className="step-fade-in">
-      <h2 className="text-xl font-heading text-[var(--ink)]">Cord patch</h2>
+      <h2 className="text-xl font-heading text-[var(--ink)]">String patch</h2>
       <p className="mt-1 text-sm text-[var(--muted)]">
         {cordSelected
-          ? "A stitched leather patch sitting right where the cord ties."
-          : "Pick a cord first to unlock a patch."}
+          ? "A stitched leather patch sitting right where the string ties."
+          : "Pick a string first to unlock a patch."}
       </p>
 
       <div className="mt-4 flex flex-wrap gap-4">

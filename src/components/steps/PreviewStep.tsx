@@ -46,7 +46,7 @@ export function PreviewStep({ products, product, charmProduct, patchProduct, sel
 
   const rows = [
     { label: "Cover", value: cover?.label ?? product.title },
-    { label: "Cord", value: selection.cord !== "none" ? selection.cord : "None" },
+    { label: "String", value: selection.cord !== "none" ? selection.cord : "None" },
     { label: "Patch", value: selection.patch === "none" ? "None" : selection.patch.charAt(0).toUpperCase() + selection.patch.slice(1) },
     { label: "Pen holder", value: selection.penHolder === "none" ? "None" : selection.penHolder === "black" ? "Black" : "Brown" },
     { label: "Corner edge", value: selection.edge && selection.penHolder !== "none" ? "Yes" : "No" },

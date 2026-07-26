@@ -8,6 +8,22 @@ export interface CartLineItem {
   properties?: Record<string, string>;
 }
 
+export interface CartPayload {
+  items: CartLineItem[];
+  /**
+   * Cart-level (order) attributes, to be sent alongside `items` as the
+   * `attributes` field of the /cart/add.js (or a follow-up /cart/update.js)
+   * request. Unlike line-item `properties`, these survive Shopify's native
+   * Bundle explosion — when the journal variant is configured as a Bundle,
+   * its line item gets replaced at order-creation time by separate lines for
+   * each bundle component (e.g. "Sanaya Component — Cover", "— Cord"), and
+   * whatever `properties` were set on the original bundle line are dropped
+   * entirely. The design preview link has to live here instead, or it's
+   * unrecoverable once the order exists.
+   */
+  attributes: Record<string, string>;
+}
+
 /** Shopify's cart AJAX API (/cart/add.js) wants the plain numeric variant id, not the GraphQL gid. */
 export function toLegacyId(gid: string): number {
   const match = gid.match(/(\d+)$/);
@@ -34,11 +50,11 @@ export function buildCartItems(
   patchProduct: ShopifyJournalProduct,
   selection: JournalSelection,
   designPageOrigin: string
-): CartLineItem[] {
+): CartPayload {
   const bundleId = newBundleId();
 
   const properties: Record<string, string> = {};
-  if (selection.cord !== "none") properties["Cord"] = selection.cord;
+  if (selection.cord !== "none") properties["String"] = selection.cord;
   if (selection.patch !== "none") {
     properties["Patch"] = selection.patch.charAt(0).toUpperCase() + selection.patch.slice(1);
   }
@@ -52,7 +68,11 @@ export function buildCartItems(
   }
   // Charm placement is freeform, so it can't be baked into the variant photo —
   // link to a read-only page that renders exactly what the customer designed.
-  properties["View your custom design"] = buildDesignUrl(designPageOrigin, selection);
+  // Also set as a `properties` value below (so it still shows on the cart page
+  // before checkout), but the cart-level `attributes` copy is the one that
+  // actually survives once the order is created — see `CartPayload`.
+  const designUrl = buildDesignUrl(designPageOrigin, selection);
+  properties["View your custom design"] = designUrl;
   properties["_bundle_id"] = bundleId;
 
   const items: CartLineItem[] = [{ id: toLegacyId(variant.id), quantity: 1, properties }];
@@ -88,5 +108,8 @@ export function buildCartItems(
     });
   }
 
-  return items;
+  return {
+    items,
+    attributes: { [`Design link — ${bundleId}`]: designUrl },
+  };
 }

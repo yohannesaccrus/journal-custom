@@ -60,7 +60,7 @@ export default async function DesignPage({ searchParams }: DesignPageProps) {
 
   const rows = [
     { label: "Cover", value: cover?.label ?? product.title },
-    { label: "Cord", value: selection.cord !== "none" ? selection.cord : "None" },
+    { label: "String", value: selection.cord !== "none" ? selection.cord : "None" },
     { label: "Patch", value: selection.patch === "none" ? "None" : selection.patch.charAt(0).toUpperCase() + selection.patch.slice(1) },
     {
       label: "Pen holder",

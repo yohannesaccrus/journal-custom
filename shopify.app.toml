@@ -1,0 +1,18 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "9f392f1cf033a8eb91a97f0e19ef05c5"
+application_url = "https://example.com"
+embedded = false
+name = "Journal Customizer"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_customers,read_inventory,read_orders,read_products,write_draft_orders,write_files,write_inventory,write_products"
+optional_scopes = [ ]
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = [ "https://example.com/callback" ]
+
+[webhooks]
+api_version = "2026-07"

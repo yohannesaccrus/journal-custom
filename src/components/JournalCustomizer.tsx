@@ -295,17 +295,17 @@ function JournalCustomizerContent({
   }
 
   function handleAddToCart() {
-    const items = buildCartItems(variant, charmProduct, patchProduct, selection, window.location.origin);
+    const { items, attributes } = buildCartItems(variant, charmProduct, patchProduct, selection, window.location.origin);
 
     if (window.parent === window) {
       // Standalone (not embedded) — no shop origin to submit the cart to.
-      alert(`Add to cart payload:\n${JSON.stringify(items, null, 2)}`);
+      alert(`Add to cart payload:\n${JSON.stringify({ items, attributes }, null, 2)}`);
       return;
     }
 
     setCartError(null);
     setAddingToCart(true);
-    window.parent.postMessage({ type: "sanaya-journal-add-to-cart", items }, "*");
+    window.parent.postMessage({ type: "sanaya-journal-add-to-cart", items, attributes }, "*");
   }
 
   // Cord is the one required add-on (per client feedback) — patch, pen
@@ -314,7 +314,7 @@ function JournalCustomizerContent({
     (step !== JOURNAL_COVERS_STEP || selection.cord !== "none") && (step !== NOTEBOOKS_STEP || notebooksComplete);
   const continueDisabledReason =
     step === JOURNAL_COVERS_STEP && selection.cord === "none"
-      ? "Pick a cord color first"
+      ? "Pick a string color first"
       : step === NOTEBOOKS_STEP && !notebooksComplete
         ? `Pick ${NOTEBOOKS_PER_JOURNAL - notebooksChosen} more notebook${NOTEBOOKS_PER_JOURNAL - notebooksChosen > 1 ? "s" : ""} to continue`
         : null;
@@ -410,13 +410,13 @@ function JournalCustomizerContent({
                 flex `justify-center` — still aligns to the top and scrolls
                 normally instead of clipping when it's taller than the panel. */}
             <div className="flex flex-col items-center gap-6 my-auto">
-            <div className="relative w-full max-w-[360px] aspect-[560/660]">
+            <div className="relative flex w-full max-w-[360px] aspect-[560/660]">
               {mainView === "side" ? (
                 // The side (spine) view is much narrower than front/back — render it
                 // inside an inner strip sized to the same 200:660 ratio, centered in
                 // the same frame, so it lines up with the small canvases in CharmsStep
                 // and charm sizing stays consistent across views.
-                <div className="absolute inset-y-0 left-1/2 -translate-x-1/2" style={{ width: `${(200 / 560) * 100}%` }}>
+                <div className="relative mx-auto h-full" style={{ width: `${(200 / 560) * 100}%` }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={mainImageSrc}

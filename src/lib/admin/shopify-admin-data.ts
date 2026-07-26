@@ -563,14 +563,9 @@ export async function uploadVariantImage(
 
 // ---------- Orders ----------
 
-export interface AdminOrderLineItem {
+export interface AdminOrderJournal {
   title: string;
-  quantity: number;
-  designUrl: string | null;
   imageUrl: string | null;
-  bundleId: string | null;
-  /** Customer-visible spec properties (Cord, Patch, Pen Holder, Corner Edge, Notebooks, Placement, …). */
-  specs: Record<string, string>;
 }
 
 export interface AdminOrder {
@@ -583,7 +578,10 @@ export interface AdminOrder {
   /** Raw numeric total, in the store's currency — pair with `totalPriceCurrency` to format/convert. */
   totalPriceAmount: number;
   totalPriceCurrency: string;
-  lineItems: AdminOrderLineItem[];
+  /** One entry per journal in the order (grouped by Shopify's native Bundle `lineItemGroup`, or by line title for older/non-bundle orders). */
+  journals: AdminOrderJournal[];
+  /** Read-only design preview links, one per journal — see the `attributes` note in `cart.ts`. */
+  designLinks: string[];
 }
 
 const ORDERS_QUERY = `
@@ -598,12 +596,13 @@ const ORDERS_QUERY = `
         displayFulfillmentStatus
         totalPriceSet { shopMoney { amount currencyCode } }
         customer { displayName }
+        customAttributes { key value }
         lineItems(first: 20) {
           nodes {
             title
             quantity
             image { url }
-            customAttributes { key value }
+            lineItemGroup { title }
           }
         }
       }
@@ -619,21 +618,28 @@ interface RawOrder {
   displayFulfillmentStatus: string;
   totalPriceSet: { shopMoney: { amount: string; currencyCode: string } };
   customer: { displayName: string } | null;
+  customAttributes: { key: string; value: string }[];
   lineItems: {
     nodes: {
       title: string;
       quantity: number;
       image: { url: string } | null;
-      customAttributes: { key: string; value: string }[];
+      lineItemGroup: { title: string } | null;
     }[];
   };
 }
 
-/** Keys that are internal bookkeeping or already shown elsewhere — hide from the spec summary. */
-const HIDDEN_SPEC_KEYS = new Set(["_bundle_id", "_for_journal", "View your custom design"]);
-
-function isJournalLine(title: string): boolean {
-  return /sanaya journal/i.test(title);
+/**
+ * The journal variant is configured in Shopify as a native Bundle (cover +
+ * cord component products). Once an order is placed, Shopify replaces that
+ * one line with separate lines per bundle component — each titled after the
+ * *component* product ("Sanaya Component — Cover"/"— Cord"), not the journal.
+ * The original bundle product's name only survives on `lineItemGroup.title`,
+ * so detection has to check both that and the line's own title (older test
+ * orders, or any journal that isn't set up as a Bundle, only have the latter).
+ */
+function isJournalLine(li: { title: string; lineItemGroup: { title: string } | null }): boolean {
+  return /sanaya journal/i.test(li.lineItemGroup?.title ?? li.title);
 }
 
 export async function fetchJournalOrders(cursor?: string): Promise<{
@@ -646,30 +652,31 @@ export async function fetchJournalOrders(cursor?: string): Promise<{
   }>(ORDERS_QUERY, { cursor: cursor ?? null });
 
   const orders = data.orders.nodes
-    .filter((o) => o.lineItems.nodes.some((li) => isJournalLine(li.title)))
-    .map((o) => ({
-      id: o.id,
-      name: o.name,
-      createdAt: o.createdAt,
-      displayFinancialStatus: o.displayFinancialStatus,
-      displayFulfillmentStatus: o.displayFulfillmentStatus,
-      customerName: o.customer?.displayName ?? null,
-      totalPriceAmount: Number(o.totalPriceSet.shopMoney.amount),
-      totalPriceCurrency: o.totalPriceSet.shopMoney.currencyCode,
-      lineItems: o.lineItems.nodes.map((li) => ({
-        title: li.title,
-        quantity: li.quantity,
-        designUrl: li.customAttributes.find((a) => a.key === "View your custom design")?.value ?? null,
-        imageUrl: li.image?.url ?? null,
-        bundleId:
-          li.customAttributes.find((a) => a.key === "_bundle_id")?.value ??
-          li.customAttributes.find((a) => a.key === "_for_journal")?.value ??
-          null,
-        specs: Object.fromEntries(
-          li.customAttributes.filter((a) => !HIDDEN_SPEC_KEYS.has(a.key)).map((a) => [a.key, a.value])
-        ),
-      })),
-    }));
+    .filter((o) => o.lineItems.nodes.some(isJournalLine))
+    .map((o) => {
+      const journalLines = o.lineItems.nodes.filter(isJournalLine);
+      const seenTitles = new Set<string>();
+      const journals: AdminOrderJournal[] = [];
+      for (const li of journalLines) {
+        const title = li.lineItemGroup?.title ?? li.title;
+        if (seenTitles.has(title)) continue;
+        seenTitles.add(title);
+        journals.push({ title, imageUrl: li.image?.url ?? null });
+      }
+
+      return {
+        id: o.id,
+        name: o.name,
+        createdAt: o.createdAt,
+        displayFinancialStatus: o.displayFinancialStatus,
+        displayFulfillmentStatus: o.displayFulfillmentStatus,
+        customerName: o.customer?.displayName ?? null,
+        totalPriceAmount: Number(o.totalPriceSet.shopMoney.amount),
+        totalPriceCurrency: o.totalPriceSet.shopMoney.currencyCode,
+        journals,
+        designLinks: o.customAttributes.filter((a) => a.key.startsWith("Design link")).map((a) => a.value),
+      };
+    });
 
   return { orders, hasNextPage: data.orders.pageInfo.hasNextPage, endCursor: data.orders.pageInfo.endCursor };
 }
@@ -679,7 +686,7 @@ const ORDER_COUNT_QUERY = `
     orders(first: 100, after: $cursor, reverse: true, sortKey: CREATED_AT) {
       pageInfo { hasNextPage endCursor }
       nodes {
-        lineItems(first: 20) { nodes { title } }
+        lineItems(first: 20) { nodes { title lineItemGroup { title } } }
       }
     }
   }
@@ -696,10 +703,13 @@ export async function fetchJournalOrderCount(): Promise<{ count: number; capped:
   let cursor: string | undefined;
   for (let page = 0; page < 5; page++) {
     const data = await shopifyAdmin<{
-      orders: { pageInfo: { hasNextPage: boolean; endCursor: string | null }; nodes: { lineItems: { nodes: { title: string }[] } }[] };
+      orders: {
+        pageInfo: { hasNextPage: boolean; endCursor: string | null };
+        nodes: { lineItems: { nodes: { title: string; lineItemGroup: { title: string } | null }[] } }[];
+      };
     }>(ORDER_COUNT_QUERY, { cursor: cursor ?? null });
 
-    count += data.orders.nodes.filter((o) => o.lineItems.nodes.some((li) => isJournalLine(li.title))).length;
+    count += data.orders.nodes.filter((o) => o.lineItems.nodes.some(isJournalLine)).length;
 
     if (!data.orders.pageInfo.hasNextPage) return { count, capped: false };
     cursor = data.orders.pageInfo.endCursor ?? undefined;
