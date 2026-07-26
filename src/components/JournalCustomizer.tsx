@@ -84,9 +84,14 @@ function JournalCustomizerContent({
   // customers, but a reviewer can unlock them on the live deployment with
   // ?styleTools=1 — that unlock then persists via localStorage so it
   // survives reloads without needing the query param every time.
+  //
+  // Temporarily disabled: flip this back to true to restore the ?styleTools=1
+  // unlock on live deployments. Style 1 is the only shipped look while this
+  // is off — Style 2/3 stay fully intact in THEMES, just unreachable.
+  const STYLE_TOOLS_UNLOCKABLE = false;
   const [toolsUnlocked, setToolsUnlocked] = useState(false);
   useEffect(() => {
-    if (hideDevControls) return;
+    if (hideDevControls || !STYLE_TOOLS_UNLOCKABLE) return;
     const hasParam = new URLSearchParams(window.location.search).get("styleTools") === "1";
     const stored = window.localStorage.getItem("sanaya-journal-tools-unlocked") === "1";
     if (hasParam) window.localStorage.setItem("sanaya-journal-tools-unlocked", "1");
