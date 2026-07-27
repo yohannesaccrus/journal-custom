@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { ADMIN_SESSION_COOKIE, isValidSessionCookieValue } from "@/lib/admin-auth";
 
-const PUBLIC_ADMIN_PATHS = ["/admin/login", "/api/admin/login"];
+const PUBLIC_ADMIN_PATHS = [
+  "/admin/login",
+  "/api/admin/login",
+  "/api/admin/auth/shopify/start",
+  "/api/admin/auth/shopify/callback",
+];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
