@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { CoverStep } from "@/components/steps/CoverStep";
 import { CordStep } from "@/components/steps/CordStep";
 import { PatchStep } from "@/components/steps/PatchStep";
@@ -353,7 +353,7 @@ function JournalCustomizerContent({
   return (
     <div
       data-theme={theme}
-      className="relative isolate min-h-screen w-full overflow-hidden bg-[var(--page-bg)] p-0 md:p-8 flex flex-col items-center justify-start md:justify-center gap-4 pb-20 md:pb-8"
+      className="relative isolate min-h-screen w-full overflow-hidden bg-[var(--page-bg)] p-0 md:p-8 flex flex-col items-center justify-start md:justify-center gap-4 pb-28 md:pb-8"
     >
       {/* On an actual small viewport this is a full-bleed mobile page — the
           floating-card treatment (padding, rounded corners, shadow, wallpaper
@@ -398,11 +398,16 @@ function JournalCustomizerContent({
 
         <div
           ref={setBodyEl}
-          style={bodyHeight !== undefined ? { height: bodyHeight, transition: "height 300ms ease" } : undefined}
-          className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] md:max-h-[70vh] overflow-hidden"
+          // The measured-height animation + capped/scrollable panes are a
+          // desktop-only technique (see the two-pane layout below) — scoped
+          // to `md:` via a CSS var so mobile stays in normal document flow
+          // with a single scroll owner (the page), instead of being locked
+          // to a stale pinned height with its own clipped scroll islands.
+          style={bodyHeight !== undefined ? ({ "--jc-body-h": `${bodyHeight}px` } as CSSProperties) : undefined}
+          className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] md:max-h-[70vh] md:overflow-hidden md:h-[var(--jc-body-h)] md:transition-[height] md:duration-300 md:ease-in-out"
         >
           {/* preview */}
-          <div className="flex flex-col items-center overflow-y-auto bg-[var(--surface-panel)] p-10 min-h-[420px]">
+          <div className="flex flex-col items-center md:overflow-y-auto bg-[var(--surface-panel)] p-10 min-h-[420px]">
             {/* `my-auto` (not `justify-center` on the parent) so this block
                 centers vertically when there's spare room, but — unlike
                 flex `justify-center` — still aligns to the top and scrolls
@@ -533,7 +538,7 @@ function JournalCustomizerContent({
           </div>
 
           {/* options */}
-          <div className="overflow-y-auto px-6 sm:px-10 py-6">
+          <div className="md:overflow-y-auto px-6 sm:px-10 py-6">
           <div key={step} className="step-fade-in">
             {step === 0 && (
               <>
@@ -633,16 +638,40 @@ function JournalCustomizerContent({
         </footer>
       </div>
 
-      {/* Mobile-only fixed total bar — always pinned to the bottom of the
-          screen so the price is visible no matter how far the page is
-          scrolled. Height is explicit (h-20) and matches the outer
-          wrapper's pb-20 exactly, so no page-background gap ever shows
-          through above it once scrolled all the way down. */}
-      <div className="md:hidden fixed inset-x-0 bottom-0 z-40 flex h-20 items-center justify-between border-t border-[var(--border)] bg-[var(--card-bg)] px-6 shadow-[0_-12px_28px_-8px_rgba(0,0,0,0.35)]">
-        <CurrencySwitcher />
-        <div className="text-right">
-          <div className="text-xs text-[var(--faint)]">Total</div>
-          <div className="text-lg font-semibold text-[var(--ink)] font-heading">{format(total)}</div>
+      {/* Mobile-only fixed bottom bar — Back/Continue on top, currency +
+          total below. Always pinned so both stay reachable no matter how
+          far the page is scrolled. Natural height (~112px, two rows + gap +
+          padding) matches the outer wrapper's pb-28 below, so no
+          page-background gap ever shows through once scrolled to the end. */}
+      <div className="md:hidden fixed inset-x-0 bottom-0 z-40 flex flex-col justify-center gap-2 border-t border-[var(--border)] bg-[var(--card-bg)] px-4 py-3 shadow-[0_-12px_28px_-8px_rgba(0,0,0,0.35)]">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={goBack}
+            disabled={step === 0}
+            className="flex-1 rounded-[var(--radius-button)] border border-[var(--border)] py-2.5 text-sm font-medium text-[var(--muted)] transition-opacity disabled:opacity-40"
+          >
+            ← Back
+          </button>
+          {step < STEPS.length - 1 ? (
+            <button
+              type="button"
+              onClick={goNext}
+              disabled={!canContinue}
+              className="btn-continue flex-[2] rounded-[var(--radius-button)] bg-[var(--accent)] py-2.5 text-sm font-medium text-white transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Continue →
+            </button>
+          ) : (
+            <span className="flex-[2] text-center text-sm text-[var(--faint)]">Ready to add to cart</span>
+          )}
+        </div>
+        <div className="flex items-center justify-between">
+          <CurrencySwitcher />
+          <div className="text-right">
+            <div className="text-xs text-[var(--faint)]">Total</div>
+            <div className="text-base font-semibold text-[var(--ink)] font-heading">{format(total)}</div>
+          </div>
         </div>
       </div>
 
