@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { CoverStep } from "@/components/steps/CoverStep";
 import { CordStep } from "@/components/steps/CordStep";
 import { PatchStep } from "@/components/steps/PatchStep";
 import { PenHolderStep } from "@/components/steps/PenHolderStep";
-import { CharmsStep } from "@/components/steps/CharmsStep";
+import { CharmsStep, DRAG_MIME, newPlacement } from "@/components/steps/CharmsStep";
 import { NotebooksStep } from "@/components/steps/NotebooksStep";
 import { PreviewStep } from "@/components/steps/PreviewStep";
 import { NotebookIcon } from "@/components/NotebookIcon";
@@ -29,7 +29,7 @@ import {
 } from "@/lib/catalog";
 import { buildCartItems } from "@/lib/cart";
 import type { ShopifyJournalProduct } from "@/lib/shopify-admin";
-import type { CharmSide, CoverCategory, JournalSelection } from "@/lib/types";
+import type { CharmSide, CoverCategory, JournalSelection, PlacedCharm } from "@/lib/types";
 
 const STEPS = ["Journal Covers", "Charms", "Accessories", "Content", "Preview"] as const;
 const JOURNAL_COVERS_STEP = 0;
@@ -242,6 +242,95 @@ function JournalCustomizerContent({
   const mainView: CharmSide = isCharmsStep ? charmView : "front";
   const mainImageSrc = mainView === "front" ? imageSrc : mainView === "back" ? backImageSrc : sideImageSrc;
   const mainCharms = mainView === "front" ? frontCharms : mainView === "back" ? backCharms : sideCharms;
+
+  // Lets the large preview on the left act as a second drop target for
+  // charms, mirroring the small canvases in CharmsStep — both read/write
+  // the same `selection.charms`, so a charm dropped on either side shows up
+  // reflected on the other immediately. Two refs (not one) because the
+  // "side" view's actual image lives inside a narrower inner strip, offset
+  // within the outer aspect box — using the outer box's bounds there would
+  // misalign drop/drag coordinates against the visible artwork.
+  const previewFrontBackRef = useRef<HTMLDivElement>(null);
+  const previewSideRef = useRef<HTMLDivElement>(null);
+  const mainDragId = useRef<string | null>(null);
+
+  function mainPosFromEvent(clientX: number, clientY: number) {
+    const el = mainView === "side" ? previewSideRef.current : previewFrontBackRef.current;
+    if (!el) return { x: 50, y: 50 };
+    const rect = el.getBoundingClientRect();
+    const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
+    return {
+      x: clamp(((clientX - rect.left) / rect.width) * 100, 4, 96),
+      y: clamp(((clientY - rect.top) / rect.height) * 100, 4, 96),
+    };
+  }
+
+  function handleMainDragOver(e: React.DragEvent) {
+    e.preventDefault();
+  }
+
+  function handleMainDrop(e: React.DragEvent) {
+    e.preventDefault();
+    const raw = e.dataTransfer.getData(DRAG_MIME);
+    if (!raw) return;
+    const { variantId, design } = JSON.parse(raw);
+    const { x, y } = mainPosFromEvent(e.clientX, e.clientY);
+    updateSelection({ charms: [...selection.charms, newPlacement(variantId, design, mainView, x, y)] });
+  }
+
+  function handleMainCharmPointerMove(e: React.PointerEvent) {
+    if (!mainDragId.current) return;
+    const { x, y } = mainPosFromEvent(e.clientX, e.clientY);
+    const id = mainDragId.current;
+    updateSelection({ charms: selection.charms.map((c) => (c.instanceId === id ? { ...c, x, y } : c)) });
+  }
+
+  function handleMainCharmPointerUp(e: React.PointerEvent) {
+    mainDragId.current = null;
+    (e.target as Element).releasePointerCapture?.(e.pointerId);
+  }
+
+  function removeMainCharm(instanceId: string) {
+    updateSelection({ charms: selection.charms.filter((c) => c.instanceId !== instanceId) });
+  }
+
+  function renderMainCharmMarker(c: PlacedCharm) {
+    return (
+      <div
+        key={c.instanceId}
+        onPointerDown={
+          isCharmsStep
+            ? (e) => {
+                mainDragId.current = c.instanceId;
+                (e.target as Element).setPointerCapture?.(e.pointerId);
+              }
+            : undefined
+        }
+        className={`group absolute h-8 w-8 -translate-x-1/2 -translate-y-1/2 touch-none ${
+          isCharmsStep ? "cursor-grab active:cursor-grabbing" : "pointer-events-none"
+        }`}
+        style={{ left: `${c.x}%`, top: `${c.y}%` }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={charmEntries.find((e) => e.variantId === c.variantId)?.imageUrl}
+          alt={c.design}
+          className="h-full w-full object-contain drop-shadow-md pointer-events-none"
+        />
+        {isCharmsStep && (
+          <button
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={() => removeMainCharm(c.instanceId)}
+            className="absolute -top-1.5 -right-1.5 hidden h-4 w-4 items-center justify-center rounded-full bg-[var(--ink)] text-white text-[10px] leading-none group-hover:flex"
+          >
+            ×
+          </button>
+        )}
+      </div>
+    );
+  }
+
   const notebooksChosen = notebookCount(selection.notebooks);
   const notebooksComplete = notebooksChosen === NOTEBOOKS_PER_JOURNAL;
   const notebookSlots: (string | null)[] = [
@@ -414,6 +503,8 @@ function JournalCustomizerContent({
                 normally instead of clipping when it's taller than the panel. */}
             <div className="flex flex-col items-center gap-6 my-auto">
             <div
+              onPointerMove={isCharmsStep ? handleMainCharmPointerMove : undefined}
+              onPointerUp={isCharmsStep ? handleMainCharmPointerUp : undefined}
               className={
                 // The side (spine) view is much narrower than front/back, so
                 // sizing it off the same fixed width as front/back leaves it
@@ -431,42 +522,39 @@ function JournalCustomizerContent({
                 // The side (spine) view is much narrower than front/back — render it
                 // inside an inner strip sized to the same 200:660 ratio, centered in
                 // the same frame, so it lines up with the small canvases in CharmsStep
-                // and charm sizing stays consistent across views.
-                <div className="relative mx-auto h-full" style={{ width: `${(200 / 560) * 100}%` }}>
+                // and charm sizing stays consistent across views. Drag/drop handlers
+                // live on this inner strip (not the outer box) since it's the strip's
+                // bounds — not the wider outer frame — that match the visible artwork.
+                <div
+                  ref={previewSideRef}
+                  onDragOver={isCharmsStep ? handleMainDragOver : undefined}
+                  onDrop={isCharmsStep ? handleMainDrop : undefined}
+                  className="relative mx-auto h-full"
+                  style={{ width: `${(200 / 560) * 100}%` }}
+                >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={mainImageSrc}
                     alt="Journal preview"
-                    className="h-full w-full object-contain preview-shadow transition-opacity duration-200"
+                    className="h-full w-full object-contain preview-shadow transition-opacity duration-200 pointer-events-none"
                   />
-                  {mainCharms.map((c) => (
-                    <img
-                      key={c.instanceId}
-                      src={charmEntries.find((e) => e.variantId === c.variantId)?.imageUrl}
-                      alt={c.design}
-                      className="absolute h-8 w-8 -translate-x-1/2 -translate-y-1/2 object-contain drop-shadow-md pointer-events-none"
-                      style={{ left: `${c.x}%`, top: `${c.y}%` }}
-                    />
-                  ))}
+                  {mainCharms.map(renderMainCharmMarker)}
                 </div>
               ) : (
-                <>
+                <div
+                  ref={previewFrontBackRef}
+                  onDragOver={isCharmsStep ? handleMainDragOver : undefined}
+                  onDrop={isCharmsStep ? handleMainDrop : undefined}
+                  className="relative h-full w-full"
+                >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={mainImageSrc}
                     alt="Journal preview"
-                    className="h-full w-full object-contain preview-shadow transition-opacity duration-200"
+                    className="h-full w-full object-contain preview-shadow transition-opacity duration-200 pointer-events-none"
                   />
-                  {mainCharms.map((c) => (
-                    <img
-                      key={c.instanceId}
-                      src={charmEntries.find((e) => e.variantId === c.variantId)?.imageUrl}
-                      alt={c.design}
-                      className="absolute h-8 w-8 -translate-x-1/2 -translate-y-1/2 object-contain drop-shadow-md pointer-events-none"
-                      style={{ left: `${c.x}%`, top: `${c.y}%` }}
-                    />
-                  ))}
-                </>
+                  {mainCharms.map(renderMainCharmMarker)}
+                </div>
               )}
             </div>
 

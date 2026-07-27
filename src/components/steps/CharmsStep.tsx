@@ -28,7 +28,7 @@ function clamp(n: number, min: number, max: number) {
 }
 
 /** Generates a placement outside the component so the impure Date/Math calls aren't part of render scope. */
-function newPlacement(variantId: string, design: string, side: CharmSide, x: number, y: number): PlacedCharm {
+export function newPlacement(variantId: string, design: string, side: CharmSide, x: number, y: number): PlacedCharm {
   return {
     instanceId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     variantId,
@@ -39,7 +39,7 @@ function newPlacement(variantId: string, design: string, side: CharmSide, x: num
   };
 }
 
-const DRAG_MIME = "application/x-sanaya-charm";
+export const DRAG_MIME = "application/x-sanaya-charm";
 
 interface CharmCanvasProps {
   label: string;
