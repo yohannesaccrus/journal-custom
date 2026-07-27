@@ -49,7 +49,7 @@ export function NotebooksStep({ notebookProduct, notebooks, onChange }: Notebook
         <span className="whitespace-nowrap text-sm text-[var(--muted)]">{total} of {NOTEBOOKS_PER_JOURNAL} chosen</span>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3 step-fade-in">
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 step-fade-in">
         {entries.map((n) => {
           const count = notebooks[n.design] ?? 0;
           const atLimit = total >= NOTEBOOKS_PER_JOURNAL && count === 0;
@@ -68,7 +68,7 @@ export function NotebooksStep({ notebookProduct, notebooks, onChange }: Notebook
                   {n.inStock ? DESCRIPTIONS[n.design] : "Out of stock"}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setCount(n.design, -1)}
