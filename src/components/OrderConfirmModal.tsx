@@ -124,7 +124,7 @@ export function OrderConfirmModal({
                     <rect x="8" y="8" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.6" />
                     <path d="M4 16V6a2 2 0 0 1 2-2h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
                   </svg>
-                  Copy link
+                  Copy Design Link
                 </>
               )}
             </button>
