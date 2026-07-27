@@ -413,7 +413,20 @@ function JournalCustomizerContent({
                 flex `justify-center` — still aligns to the top and scrolls
                 normally instead of clipping when it's taller than the panel. */}
             <div className="flex flex-col items-center gap-6 my-auto">
-            <div className="relative flex w-full max-w-[360px] aspect-[560/660]">
+            <div
+              className={
+                // The side (spine) view is much narrower than front/back, so
+                // sizing it off the same fixed width as front/back leaves it
+                // tiny with huge empty space above/below. Sized off height
+                // instead — close to the full preview panel. This can
+                // overflow the panel on short viewports (scroll appears) —
+                // accepted tradeoff, prioritizing a large image over never
+                // scrolling here.
+                mainView === "side"
+                  ? "relative mx-auto h-[min(65vh,560px)] aspect-[560/660]"
+                  : "relative flex w-full max-w-[360px] aspect-[560/660]"
+              }
+            >
               {mainView === "side" ? (
                 // The side (spine) view is much narrower than front/back — render it
                 // inside an inner strip sized to the same 200:660 ratio, centered in
