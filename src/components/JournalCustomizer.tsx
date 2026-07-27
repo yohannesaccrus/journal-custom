@@ -8,6 +8,7 @@ import { PenHolderStep } from "@/components/steps/PenHolderStep";
 import { CharmsStep, DRAG_MIME, newPlacement } from "@/components/steps/CharmsStep";
 import { NotebooksStep } from "@/components/steps/NotebooksStep";
 import { PreviewStep } from "@/components/steps/PreviewStep";
+import { OrderConfirmModal } from "@/components/OrderConfirmModal";
 import { NotebookIcon } from "@/components/NotebookIcon";
 import { ThemeSwitcher, THEMES, type Theme } from "@/components/ThemeSwitcher";
 import { BackgroundSwitcher, type BackgroundMode } from "@/components/BackgroundSwitcher";
@@ -28,6 +29,7 @@ import {
   resolveVariant,
 } from "@/lib/catalog";
 import { buildCartItems } from "@/lib/cart";
+import { buildDesignUrl } from "@/lib/design-link";
 import type { ShopifyJournalProduct } from "@/lib/shopify-admin";
 import type { CharmSide, CoverCategory, JournalSelection, PlacedCharm } from "@/lib/types";
 
@@ -160,6 +162,8 @@ function JournalCustomizerContent({
   });
   const [addingToCart, setAddingToCart] = useState(false);
   const [cartError, setCartError] = useState<string | null>(null);
+  const [orderConfirm, setOrderConfirm] = useState<{ invoiceUrl: string; designUrl: string } | null>(null);
+  const [designLinkCopied, setDesignLinkCopied] = useState(false);
   // True when `selection.cord` was auto-picked by handlePenHolderChange
   // (only so a real Shopify variant resolves) rather than chosen by the
   // user — Patch should still read as locked in that case, since the user
@@ -222,6 +226,31 @@ function JournalCustomizerContent({
   const frontCharms = selection.charms.filter((c) => c.side === "front");
   const backCharms = selection.charms.filter((c) => c.side === "back");
   const sideCharms = selection.charms.filter((c) => c.side === "side");
+  const orderConfirmRows = [
+    { label: "Cover", value: buildCoverEntries(products).find((c) => c.handle === product.handle)?.label ?? product.title },
+    { label: "String", value: selection.cord !== "none" ? selection.cord : "None" },
+    { label: "Pen holder", value: selection.penHolder === "none" ? "None" : selection.penHolder === "black" ? "Black" : "Brown" },
+    {
+      label: "Charms",
+      value:
+        selection.charms.length === 0
+          ? "None"
+          : [
+              frontCharms.length > 0 ? `${frontCharms.length} front` : null,
+              backCharms.length > 0 ? `${backCharms.length} back` : null,
+              sideCharms.length > 0 ? `${sideCharms.length} side` : null,
+            ]
+              .filter(Boolean)
+              .join(", "),
+    },
+    {
+      label: "Notebooks",
+      value:
+        Object.keys(selection.notebooks).length === 0
+          ? "None"
+          : Object.entries(selection.notebooks).map(([design, count]) => `${count}× ${design}`).join(", "),
+    },
+  ];
   const backImageSrc = resolveSideImage(product, "back", selection);
   const sideImageSrc = resolveSideImage(product, "side", selection);
   const isCharmsStep = step === CHARMS_STEP;
@@ -397,13 +426,34 @@ function JournalCustomizerContent({
         setCartError(data.message ?? "Something went wrong adding your journal to the cart. Please try again.");
         return;
       }
-      // Navigate the top-level page (not just this iframe) to the hosted
-      // Shopify checkout page for the draft order.
-      const target = window.parent === window ? window : window.top ?? window;
-      target.location.href = data.invoiceUrl;
+      // Show a confirmation modal (preview + design link) before sending the
+      // customer off to pay, rather than redirecting immediately.
+      setAddingToCart(false);
+      setDesignLinkCopied(false);
+      setOrderConfirm({ invoiceUrl: data.invoiceUrl, designUrl: buildDesignUrl(window.location.origin, selection) });
     } catch {
       setAddingToCart(false);
       setCartError("Something went wrong adding your journal to the cart. Please try again.");
+    }
+  }
+
+  function handleConfirmCheckout() {
+    if (!orderConfirm) return;
+    // Navigate the top-level page (not just this iframe) to the hosted
+    // Shopify checkout page for the draft order.
+    const target = window.parent === window ? window : window.top ?? window;
+    target.location.href = orderConfirm.invoiceUrl;
+  }
+
+  async function handleCopyDesignLink() {
+    if (!orderConfirm) return;
+    try {
+      await navigator.clipboard.writeText(orderConfirm.designUrl);
+      setDesignLinkCopied(true);
+      setTimeout(() => setDesignLinkCopied(false), 2000);
+    } catch {
+      // Clipboard API unavailable (e.g. insecure context) — link is still
+      // reachable via the "View full design" button, so fail silently.
     }
   }
 
@@ -814,6 +864,21 @@ function JournalCustomizerContent({
           <BackgroundSwitcher mode={background} onChange={setBackground} />
           <MobileViewSwitcher enabled={mobilePreview} onChange={setMobilePreview} />
         </div>
+      )}
+
+      {orderConfirm && (
+        <OrderConfirmModal
+          imageSrc={imageSrc}
+          frontCharms={frontCharms}
+          charmEntries={charmEntries}
+          rows={orderConfirmRows}
+          formattedTotal={format(total)}
+          designUrl={orderConfirm.designUrl}
+          copied={designLinkCopied}
+          onCopyLink={handleCopyDesignLink}
+          onEdit={() => setOrderConfirm(null)}
+          onConfirm={handleConfirmCheckout}
+        />
       )}
     </div>
   );
