@@ -674,7 +674,11 @@ export async function fetchJournalOrders(cursor?: string): Promise<{
         totalPriceAmount: Number(o.totalPriceSet.shopMoney.amount),
         totalPriceCurrency: o.totalPriceSet.shopMoney.currencyCode,
         journals,
-        designLinks: o.customAttributes.filter((a) => a.key.startsWith("Design link")).map((a) => a.value),
+        // Matched by value (a URL), not by key text — the caption on this
+        // attribute (see cart.ts) is customer-facing copy that's changed
+        // more than once, so pinning to an exact/prefix key string here just
+        // breaks again on the next wording tweak.
+        designLinks: o.customAttributes.filter((a) => /^https?:\/\//.test(a.value.trim())).map((a) => a.value),
       };
     });
 

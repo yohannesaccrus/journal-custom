@@ -96,7 +96,7 @@ function OrderTable({ title, orders, emptyMessage }: { title: string; orders: Ad
             </thead>
             <tbody>
               {orders.map((order) => (
-                <tr key={order.id} className="border-t border-[#f0ece0]/80 align-top hover:bg-white/60 transition-colors">
+                <tr key={order.id} className="border-t border-[#f0ece0]/80 hover:bg-white/60 transition-colors">
                   <td className="px-5 py-3 font-medium whitespace-nowrap">{order.name}</td>
                   <td className="px-5 py-3 text-[#6b6a63] whitespace-nowrap">{formatDate(order.createdAt)}</td>
                   <td className="px-5 py-3 text-[#6b6a63] whitespace-nowrap">{order.customerName ?? "Guest"}</td>
@@ -113,7 +113,7 @@ function OrderTable({ title, orders, emptyMessage }: { title: string; orders: Ad
                   <td className="px-5 py-3 font-medium text-[#1c1c1a] whitespace-nowrap">
                     <PriceDisplay amountIDR={order.totalPriceAmount} />
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="px-5 py-3 align-top">
                     <div className="flex flex-col gap-2">
                       {order.journals.map((j, i) => (
                         <div key={i} className="flex items-center gap-2 whitespace-nowrap">
