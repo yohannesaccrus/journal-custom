@@ -32,6 +32,14 @@ import type { ShopifyJournalProduct } from "@/lib/shopify-admin";
 import type { CharmSide, CoverCategory, JournalSelection } from "@/lib/types";
 
 const STEPS = ["Journal Covers", "Charms", "Accessories", "Content", "Preview"] as const;
+/** Shown in the header in place of the (redundant, once embedded) logo — one line per STEPS entry. */
+const STEP_CAPTIONS = [
+  "Choose your leather cover & closure string",
+  "Add charms to make it yours",
+  "Pick a pen holder & corner edge",
+  "Select your notebooks",
+  "Review your finished journal",
+];
 const JOURNAL_COVERS_STEP = 0;
 const CHARMS_STEP = 1;
 const ACCESSORIES_STEP = 2;
@@ -148,6 +156,19 @@ function JournalCustomizerContent({
   const { format } = useCurrencyFormat();
 
   const [step, setStep] = useState(0);
+  // Crossfades the header caption on step change: fade the old line out,
+  // swap the text, then fade the new one in — rather than an instant swap.
+  const [captionStep, setCaptionStep] = useState(0);
+  const [captionVisible, setCaptionVisible] = useState(true);
+  useEffect(() => {
+    if (step === captionStep) return;
+    setCaptionVisible(false);
+    const timeout = setTimeout(() => {
+      setCaptionStep(step);
+      setCaptionVisible(true);
+    }, 200);
+    return () => clearTimeout(timeout);
+  }, [step, captionStep]);
   const [category, setCategory] = useState<CoverCategory>("classic");
   const [selection, setSelection] = useState<JournalSelection>({
     cover: buildCoverEntries(products).find((c) => c.category === "classic")?.handle ?? products[0]?.handle ?? "",
@@ -353,7 +374,7 @@ function JournalCustomizerContent({
   return (
     <div
       data-theme={theme}
-      className="relative isolate min-h-screen w-full overflow-hidden bg-[var(--page-bg)] p-0 md:p-8 flex flex-col items-center justify-start md:justify-center gap-4 pb-20 md:pb-0"
+      className="relative isolate min-h-screen w-full overflow-hidden bg-[var(--page-bg)] p-0 md:p-8 flex flex-col items-center justify-start md:justify-center gap-4 pb-20 md:pb-8"
     >
       {/* On an actual small viewport this is a full-bleed mobile page — the
           floating-card treatment (padding, rounded corners, shadow, wallpaper
@@ -369,14 +390,20 @@ function JournalCustomizerContent({
       <div className="w-full max-w-6xl md:rounded-[var(--radius-card)] bg-[var(--card-bg)] md:shadow-2xl overflow-hidden">
         {/* header / stepper */}
         <header className="flex items-center justify-between gap-6 border-b border-[var(--border)] px-6 sm:px-10 py-5">
-          {/* Logo always keeps Style 1's look (Playfair, brand orange) regardless
-              of the active style — it's the one constant across all three. */}
-          <span
-            className="text-xl tracking-[0.2em]"
-            style={{ fontFamily: "var(--font-playfair), Georgia, serif", color: "#b1632f" }}
+          {/* The Shopify storefront's own header already shows the SANAYA
+              logo directly above this iframe, so repeating it here just reads
+              as a duplicate — a short per-step caption is more useful and
+              crossfades as `step` changes. */}
+          <div
+            className={`flex items-center gap-2.5 transition-all duration-200 ease-out ${
+              captionVisible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-1"
+            }`}
           >
-            SANAYA
-          </span>
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent)]" aria-hidden />
+            <span className="font-heading text-base italic text-[var(--ink)] sm:text-lg">
+              {STEP_CAPTIONS[captionStep]}
+            </span>
+          </div>
 
           <nav className="hidden md:flex items-center gap-6">
             {STEPS.map((label, i) => (
