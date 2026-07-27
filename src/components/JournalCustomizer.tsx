@@ -210,20 +210,6 @@ function JournalCustomizerContent({
     };
   }, [step]);
 
-  // The parent page performs the actual /cart/add.js call (same-origin with
-  // the shop, so cart cookies work correctly) and reports back if it failed.
-  // On success it redirects the top-level page to /checkout, which unmounts
-  // this iframe — so there is no explicit "success" message to handle here.
-  useEffect(() => {
-    function handleMessage(event: MessageEvent) {
-      if (!event.data || event.data.type !== "sanaya-journal-cart-error") return;
-      setAddingToCart(false);
-      setCartError(typeof event.data.message === "string" ? event.data.message : "Something went wrong adding this to your cart.");
-    }
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, []);
-
   const product = useMemo(
     () => products.find((p) => p.handle === selection.cover) ?? products[0],
     [products, selection.cover]
@@ -388,18 +374,37 @@ function JournalCustomizerContent({
     setStep((s) => Math.max(s - 1, 0));
   }
 
-  function handleAddToCart() {
+  // The journal/notebook products are intentionally kept unpublished (Draft)
+  // in Shopify — they're internal components, not meant to be found or
+  // bought outside this customizer. That means the storefront's regular
+  // /cart/add.js rejects them. Instead we create a Shopify Draft Order via
+  // the Admin API (which can include draft/unpublished variants) and send
+  // the customer straight to its hosted invoice/payment page.
+  async function handleAddToCart() {
     const { items, attributes } = buildCartItems(variant, charmProduct, patchProduct, selection, window.location.origin);
-
-    if (window.parent === window) {
-      // Standalone (not embedded) — no shop origin to submit the cart to.
-      alert(`Add to cart payload:\n${JSON.stringify({ items, attributes }, null, 2)}`);
-      return;
-    }
 
     setCartError(null);
     setAddingToCart(true);
-    window.parent.postMessage({ type: "sanaya-journal-add-to-cart", items, attributes }, "*");
+    try {
+      const res = await fetch("/api/draft-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items, attributes }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.invoiceUrl) {
+        setAddingToCart(false);
+        setCartError(data.message ?? "Something went wrong adding your journal to the cart. Please try again.");
+        return;
+      }
+      // Navigate the top-level page (not just this iframe) to the hosted
+      // Shopify checkout page for the draft order.
+      const target = window.parent === window ? window : window.top ?? window;
+      target.location.href = data.invoiceUrl;
+    } catch {
+      setAddingToCart(false);
+      setCartError("Something went wrong adding your journal to the cart. Please try again.");
+    }
   }
 
   // Cord is the one required add-on (per client feedback) — patch, pen

@@ -4,6 +4,8 @@ import { buildDesignUrl } from "./design-link";
 
 export interface CartLineItem {
   id: number;
+  /** Shopify ProductVariant gid — needed for draftOrderCreate, which (unlike /cart/add.js) accepts variants from unpublished/draft products. */
+  variantId: string;
   quantity: number;
   properties?: Record<string, string>;
 }
@@ -75,7 +77,9 @@ export function buildCartItems(
   properties["View your custom design"] = designUrl;
   properties["_bundle_id"] = bundleId;
 
-  const items: CartLineItem[] = [{ id: toLegacyId(variant.id), quantity: 1, properties }];
+  const items: CartLineItem[] = [
+    { id: toLegacyId(variant.id), variantId: variant.id, quantity: 1, properties },
+  ];
 
   if (selection.patch !== "none") {
     const patchVariant = patchProduct.variants.find(
@@ -84,6 +88,7 @@ export function buildCartItems(
     if (patchVariant) {
       items.push({
         id: toLegacyId(patchVariant.id),
+        variantId: patchVariant.id,
         quantity: 1,
         properties: { _for_journal: bundleId },
       });
@@ -100,6 +105,7 @@ export function buildCartItems(
   for (const g of charmGroups.values()) {
     items.push({
       id: toLegacyId(g.variantId),
+      variantId: g.variantId,
       quantity: g.count,
       properties: {
         Placement: g.side.charAt(0).toUpperCase() + g.side.slice(1),
