@@ -74,7 +74,7 @@ export function buildCartItems(
   // before checkout), but the cart-level `attributes` copy is the one that
   // actually survives once the order is created — see `CartPayload`.
   const designUrl = buildDesignUrl(designPageOrigin, selection);
-  properties["View your custom design"] = designUrl;
+  properties["✨ Tap to preview your custom journal"] = designUrl;
   properties["_bundle_id"] = bundleId;
 
   const items: CartLineItem[] = [
@@ -116,6 +116,6 @@ export function buildCartItems(
 
   return {
     items,
-    attributes: { [`Design link — ${bundleId}`]: designUrl },
+    attributes: { [`✨ Preview your custom journal — ${bundleId}`]: designUrl },
   };
 }
