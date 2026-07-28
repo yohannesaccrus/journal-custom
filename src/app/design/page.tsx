@@ -28,7 +28,7 @@ export default async function DesignPage({ searchParams }: DesignPageProps) {
 
   if (!selection || !charmProduct) {
     return (
-      <main className="flex h-screen items-center justify-center bg-[#0f3d34] p-8 text-center text-white">
+      <main className="flex min-h-screen items-center justify-center bg-[#0f3d34] p-8 text-center text-white">
         <p>This design link is invalid or has expired.</p>
       </main>
     );
@@ -37,7 +37,7 @@ export default async function DesignPage({ searchParams }: DesignPageProps) {
   const product = products.find((p) => p.handle === selection.cover);
   if (!product) {
     return (
-      <main className="flex h-screen items-center justify-center bg-[#0f3d34] p-8 text-center text-white">
+      <main className="flex min-h-screen items-center justify-center bg-[#0f3d34] p-8 text-center text-white">
         <p>This design link is invalid or has expired.</p>
       </main>
     );
@@ -78,46 +78,44 @@ export default async function DesignPage({ searchParams }: DesignPageProps) {
     },
   ];
 
+  const views = [
+    { label: "Front", image: frontImage, charms: frontCharms, aspect: "aspect-[560/660]", maxWidth: "max-w-md", charmSize: "h-10 w-10" },
+    { label: "Back", image: backImage, charms: backCharms, aspect: "aspect-[560/660]", maxWidth: "max-w-md", charmSize: "h-8 w-8" },
+    { label: "Side", image: sideImage, charms: sideCharms, aspect: "aspect-[200/660]", maxWidth: "max-w-[180px]", charmSize: "h-6 w-6" },
+  ] as const;
+
   return (
-    <main className="flex h-screen items-center justify-center overflow-hidden bg-[#0f3d34] p-4 sm:p-8">
-      <div className="flex h-full max-h-[900px] w-full max-w-5xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
-        <header className="shrink-0 border-b border-[#eae7de] px-6 sm:px-10 py-5">
+    <main className="min-h-screen bg-[#0f3d34] p-4 sm:p-8">
+      <div className="mx-auto w-full max-w-5xl rounded-3xl bg-white shadow-2xl">
+        <header className="border-b border-[#eae7de] px-6 sm:px-10 py-6">
           <span className="text-xl tracking-[0.2em] font-serif text-[#b1632f]">SANAYA</span>
           <h1 className="mt-2 text-2xl sm:text-3xl font-serif text-[#1c1c1a]">Your custom journal design</h1>
           <p className="mt-1 text-sm text-[#6b6a63]">This is exactly what was designed — front, back, side, and what ships inside.</p>
         </header>
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-8 overflow-y-auto px-6 py-6 sm:px-10 sm:py-8 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-10 px-6 py-8 sm:px-10 md:grid-cols-2">
           {/* visuals */}
-          <div className="flex flex-col gap-6">
-            <div className="grid grid-cols-3 gap-4">
-              {(
-                [
-                  { label: "Front", image: frontImage, charms: frontCharms },
-                  { label: "Back", image: backImage, charms: backCharms },
-                  { label: "Side", image: sideImage, charms: sideCharms },
-                ] as const
-              ).map(({ label, image, charms }) => (
-                <div key={label} className="flex flex-col items-center gap-2">
-                  <span className="text-xs font-medium uppercase tracking-wide text-[#a89a80]">{label}</span>
-                  <div className="relative aspect-square w-full overflow-hidden rounded-xl border border-[#eae7de] bg-[#f7f4ee] shadow-md">
-                    {image && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={image} alt={`${label} of journal`} className="h-full w-full object-contain p-2" />
-                    )}
-                    {charms.map((c) => (
-                      <img
-                        key={c.instanceId}
-                        src={charmEntries.find((e) => e.variantId === c.variantId)?.imageUrl}
-                        alt={c.design}
-                        className="absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 object-contain drop-shadow-md"
-                        style={{ left: `${c.x}%`, top: `${c.y}%` }}
-                      />
-                    ))}
-                  </div>
+          <div className="flex flex-col gap-8">
+            {views.map(({ label, image, charms, aspect, maxWidth, charmSize }) => (
+              <div key={label} className="flex flex-col items-center gap-2">
+                <span className="text-xs font-medium uppercase tracking-wide text-[#a89a80]">{label}</span>
+                <div className={`relative ${aspect} w-full ${maxWidth} overflow-hidden rounded-2xl border border-[#eae7de] bg-[#f7f4ee] shadow-md`}>
+                  {image && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={image} alt={`${label} of journal`} className="h-full w-full object-contain p-4" />
+                  )}
+                  {charms.map((c) => (
+                    <img
+                      key={c.instanceId}
+                      src={charmEntries.find((e) => e.variantId === c.variantId)?.imageUrl}
+                      alt={c.design}
+                      className={`absolute ${charmSize} -translate-x-1/2 -translate-y-1/2 object-contain drop-shadow-md`}
+                      style={{ left: `${c.x}%`, top: `${c.y}%` }}
+                    />
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
 
             <div>
               <span className="text-xs font-medium uppercase tracking-wide text-[#a89a80]">Inside</span>
@@ -149,8 +147,8 @@ export default async function DesignPage({ searchParams }: DesignPageProps) {
           </div>
 
           {/* details */}
-          <div className="flex min-h-0 flex-col gap-6">
-            <dl className="shrink-0 divide-y divide-[#eae7de] rounded-xl bg-[#f7f5f0] px-6">
+          <div className="flex flex-col gap-6">
+            <dl className="divide-y divide-[#eae7de] rounded-xl bg-[#f7f5f0] px-6">
               {rows.map((r) => (
                 <div key={r.label} className="flex items-center justify-between py-3.5">
                   <dt className="text-sm text-[#6b6a63]">{r.label}</dt>
@@ -160,9 +158,9 @@ export default async function DesignPage({ searchParams }: DesignPageProps) {
             </dl>
 
             {selection.charms.length > 0 && (
-              <div className="flex min-h-0 flex-1 flex-col">
-                <h2 className="shrink-0 text-sm font-medium text-[#1c1c1a]">Charms ({selection.charms.length})</h2>
-                <ul className="design-charms-scroll mt-2 flex-1 space-y-2 overflow-y-auto rounded-xl border border-[#eae7de] bg-[#f7f5f0] p-3">
+              <div className="flex flex-col">
+                <h2 className="text-sm font-medium text-[#1c1c1a]">Charms ({selection.charms.length})</h2>
+                <ul className="design-charms-scroll mt-2 max-h-80 space-y-2 overflow-y-auto rounded-xl border border-[#eae7de] bg-[#f7f5f0] p-3">
                   {selection.charms.map((c) => {
                     const entry = charmEntries.find((e) => e.variantId === c.variantId);
                     return (
