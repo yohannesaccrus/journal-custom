@@ -28,7 +28,7 @@ export default async function DesignPage({ searchParams }: DesignPageProps) {
 
   if (!selection || !charmProduct) {
     return (
-      <main className="flex min-h-[600px] items-center justify-center bg-[#0f3d34] p-8 text-center text-white">
+      <main className="flex h-screen items-center justify-center bg-[#0f3d34] p-8 text-center text-white">
         <p>This design link is invalid or has expired.</p>
       </main>
     );
@@ -37,7 +37,7 @@ export default async function DesignPage({ searchParams }: DesignPageProps) {
   const product = products.find((p) => p.handle === selection.cover);
   if (!product) {
     return (
-      <main className="flex min-h-[600px] items-center justify-center bg-[#0f3d34] p-8 text-center text-white">
+      <main className="flex h-screen items-center justify-center bg-[#0f3d34] p-8 text-center text-white">
         <p>This design link is invalid or has expired.</p>
       </main>
     );
@@ -79,18 +79,18 @@ export default async function DesignPage({ searchParams }: DesignPageProps) {
   ];
 
   return (
-    <main className="min-h-[600px] bg-[#0f3d34] p-4 sm:p-8 flex items-center justify-center">
-      <div className="w-full max-w-4xl rounded-3xl bg-white shadow-2xl overflow-hidden">
-        <header className="border-b border-[#eae7de] px-6 sm:px-10 py-6">
+    <main className="flex h-screen items-center justify-center overflow-hidden bg-[#0f3d34] p-4 sm:p-8">
+      <div className="flex h-full max-h-[900px] w-full max-w-5xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+        <header className="shrink-0 border-b border-[#eae7de] px-6 sm:px-10 py-5">
           <span className="text-xl tracking-[0.2em] font-serif text-[#b1632f]">SANAYA</span>
-          <h1 className="mt-3 text-3xl font-serif text-[#1c1c1a]">Your custom journal design</h1>
-          <p className="mt-1 text-[#6b6a63]">This is exactly what was designed — front, back, side, and what ships inside.</p>
+          <h1 className="mt-2 text-2xl sm:text-3xl font-serif text-[#1c1c1a]">Your custom journal design</h1>
+          <p className="mt-1 text-sm text-[#6b6a63]">This is exactly what was designed — front, back, side, and what ships inside.</p>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 px-6 sm:px-10 py-8">
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-8 overflow-y-auto px-6 py-6 sm:px-10 sm:py-8 md:grid-cols-2">
           {/* visuals */}
-          <div className="flex flex-col items-center gap-6">
-            <div className="grid w-full grid-cols-3 gap-3">
+          <div className="flex flex-col gap-6">
+            <div className="grid grid-cols-3 gap-4">
               {(
                 [
                   { label: "Front", image: frontImage, charms: frontCharms },
@@ -98,12 +98,12 @@ export default async function DesignPage({ searchParams }: DesignPageProps) {
                   { label: "Side", image: sideImage, charms: sideCharms },
                 ] as const
               ).map(({ label, image, charms }) => (
-                <div key={label} className="flex flex-col items-center gap-1.5">
-                  <span className="text-[11px] font-medium uppercase tracking-wide text-[#a89a80]">{label}</span>
-                  <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-[#f7f4ee] shadow-md">
+                <div key={label} className="flex flex-col items-center gap-2">
+                  <span className="text-xs font-medium uppercase tracking-wide text-[#a89a80]">{label}</span>
+                  <div className="relative aspect-square w-full overflow-hidden rounded-xl border border-[#eae7de] bg-[#f7f4ee] shadow-md">
                     {image && (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={image} alt={`${label} of journal`} className="h-full w-full object-contain p-3" />
+                      <img src={image} alt={`${label} of journal`} className="h-full w-full object-contain p-2" />
                     )}
                     {charms.map((c) => (
                       <img
@@ -119,12 +119,12 @@ export default async function DesignPage({ searchParams }: DesignPageProps) {
               ))}
             </div>
 
-            <div className="w-full max-w-[320px]">
-              <span className="text-[11px] font-medium uppercase tracking-wide text-[#a89a80]">Inside</span>
+            <div>
+              <span className="text-xs font-medium uppercase tracking-wide text-[#a89a80]">Inside</span>
               <div className="mt-2 grid grid-cols-3 items-start gap-4 rounded-lg bg-[#efeae0] p-4">
                 {notebookSlots.map((design, i) => (
                   <div key={i} className="flex flex-col items-center gap-2">
-                    <div className="relative h-36 w-full">
+                    <div className="relative h-28 w-full">
                       {design ? (
                         <>
                           <div className="absolute inset-x-1.5 top-1.5 h-full rounded-md bg-[#e7e1d3]" />
@@ -149,10 +149,10 @@ export default async function DesignPage({ searchParams }: DesignPageProps) {
           </div>
 
           {/* details */}
-          <div>
-            <dl className="divide-y divide-[#eae7de] rounded-xl bg-[#f7f5f0] px-6">
+          <div className="flex min-h-0 flex-col gap-6">
+            <dl className="shrink-0 divide-y divide-[#eae7de] rounded-xl bg-[#f7f5f0] px-6">
               {rows.map((r) => (
-                <div key={r.label} className="flex items-center justify-between py-4">
+                <div key={r.label} className="flex items-center justify-between py-3.5">
                   <dt className="text-sm text-[#6b6a63]">{r.label}</dt>
                   <dd className="text-sm font-medium text-[#1c1c1a] text-right">{r.value}</dd>
                 </div>
@@ -160,16 +160,19 @@ export default async function DesignPage({ searchParams }: DesignPageProps) {
             </dl>
 
             {selection.charms.length > 0 && (
-              <div className="mt-6">
-                <h2 className="text-sm font-medium text-[#1c1c1a]">Charms</h2>
-                <ul className="mt-2 space-y-2">
+              <div className="flex min-h-0 flex-1 flex-col">
+                <h2 className="shrink-0 text-sm font-medium text-[#1c1c1a]">Charms ({selection.charms.length})</h2>
+                <ul className="design-charms-scroll mt-2 flex-1 space-y-2 overflow-y-auto rounded-xl border border-[#eae7de] bg-[#f7f5f0] p-3">
                   {selection.charms.map((c) => {
                     const entry = charmEntries.find((e) => e.variantId === c.variantId);
                     return (
-                      <li key={c.instanceId} className="flex items-center gap-3 text-sm text-[#6b6a63]">
+                      <li
+                        key={c.instanceId}
+                        className="flex items-center gap-3 rounded-lg bg-white px-3 py-2 text-sm text-[#6b6a63] shadow-sm"
+                      >
                         {entry && (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={entry.imageUrl} alt="" className="h-6 w-6 object-contain" />
+                          <img src={entry.imageUrl} alt="" className="h-6 w-6 shrink-0 object-contain" />
                         )}
                         <span>
                           {c.design} — {c.side.charAt(0).toUpperCase() + c.side.slice(1)}
