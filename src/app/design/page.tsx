@@ -131,34 +131,6 @@ export default async function DesignPage({ searchParams }: DesignPageProps) {
                 </div>
               </div>
             ))}
-
-            <div>
-              <span className="text-xs font-medium uppercase tracking-wide text-[#a89a80]">Inside</span>
-              <div className="mt-2 grid grid-cols-3 items-start gap-4 rounded-lg bg-[#efeae0] p-4">
-                {notebookSlots.map((design, i) => (
-                  <div key={i} className="flex flex-col items-center gap-2">
-                    <div className="relative h-28 w-full">
-                      {design ? (
-                        <>
-                          <div className="absolute inset-x-1.5 top-1.5 h-full rounded-md bg-[#e7e1d3]" />
-                          <div className="absolute inset-x-[3px] top-[3px] h-full rounded-md bg-[#f2ede2]" />
-                          <div className="relative h-full w-full">
-                            <NotebookIcon design={design} size="lg" />
-                          </div>
-                        </>
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center rounded-md border border-dashed border-[#c8c2b3] text-center text-[9px] text-[#a89a80]">
-                          —
-                        </div>
-                      )}
-                    </div>
-                    <span className="text-[11px] font-medium text-[#6b6a63]">
-                      {design ? design.replace(" Notebook", "") : "—"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
 
           {/* details */}
@@ -197,6 +169,34 @@ export default async function DesignPage({ searchParams }: DesignPageProps) {
                 </ul>
               </div>
             )}
+
+            <div>
+              <h2 className="text-sm font-medium text-[#1c1c1a]">Inside</h2>
+              <div className="mt-2 grid grid-cols-3 gap-3 rounded-xl border border-[#eae7de] bg-[#f7f5f0] p-4">
+                {notebookSlots.map((design, i) => (
+                  <div key={i} className="flex flex-col items-center gap-2">
+                    <div className="relative h-40 w-full">
+                      {design ? (
+                        <>
+                          <div className="absolute inset-x-1.5 top-1.5 h-full rounded-md bg-[#e7e1d3]" />
+                          <div className="absolute inset-x-[3px] top-[3px] h-full rounded-md bg-[#f2ede2]" />
+                          <div className="relative h-full w-full">
+                            <NotebookIcon design={design} size="lg" />
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center rounded-md border border-dashed border-[#c8c2b3] text-center text-[9px] text-[#a89a80]">
+                          —
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-[11px] font-medium text-[#6b6a63]">
+                      {design ? design.replace(" Notebook", "") : "—"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>
