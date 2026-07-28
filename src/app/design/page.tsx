@@ -1,10 +1,9 @@
+import { DesignSlider } from "@/components/DesignSlider";
 import { NotebookIcon } from "@/components/NotebookIcon";
-import { PatchIcon } from "@/components/PatchIcon";
 import {
   buildCharmEntries,
   buildCoverEntries,
   NOTEBOOKS_PER_JOURNAL,
-  PATCH_POSITION,
   resolveFrontImage,
   resolveSideImage,
   resolveVariant,
@@ -81,10 +80,10 @@ export default async function DesignPage({ searchParams }: DesignPageProps) {
   ];
 
   const views = [
-    { label: "Front", image: frontImage, charms: frontCharms, aspect: "aspect-[560/660]", maxWidth: "max-w-md", charmSize: "h-10 w-10" },
-    { label: "Back", image: backImage, charms: backCharms, aspect: "aspect-[560/660]", maxWidth: "max-w-md", charmSize: "h-8 w-8" },
-    { label: "Side", image: sideImage, charms: sideCharms, aspect: "aspect-[200/660]", maxWidth: "max-w-[180px]", charmSize: "h-6 w-6" },
-  ] as const;
+    { label: "Front", image: frontImage, charms: frontCharms, charmSize: "h-10 w-10" },
+    { label: "Back", image: backImage, charms: backCharms, charmSize: "h-8 w-8" },
+    { label: "Side", image: sideImage, charms: sideCharms, charmSize: "h-6 w-6" },
+  ];
 
   return (
     <main className="min-h-screen bg-[#0f3d34] p-4 sm:p-8">
@@ -98,39 +97,7 @@ export default async function DesignPage({ searchParams }: DesignPageProps) {
         <div className="grid grid-cols-1 gap-10 px-6 py-8 sm:px-10 md:grid-cols-2">
           {/* visuals */}
           <div className="flex flex-col gap-8">
-            {views.map(({ label, image, charms, aspect, maxWidth, charmSize }) => (
-              <div key={label} className="flex flex-col items-center gap-2">
-                <span className="text-xs font-medium uppercase tracking-wide text-[#a89a80]">{label}</span>
-                <div className={`relative ${aspect} w-full ${maxWidth} overflow-hidden rounded-2xl border border-[#eae7de] bg-[#f7f4ee] shadow-md`}>
-                  {image && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={image} alt={`${label} of journal`} className="h-full w-full object-contain p-4" />
-                  )}
-                  {label === "Front" && selection.patch !== "none" && (
-                    <div
-                      className="absolute -translate-x-1/2 -translate-y-1/2"
-                      style={{
-                        left: `${PATCH_POSITION.x}%`,
-                        top: `${PATCH_POSITION.y}%`,
-                        width: `${PATCH_POSITION.sizePercent}%`,
-                        aspectRatio: "1",
-                      }}
-                    >
-                      <PatchIcon shape={selection.patch} className="h-full w-full drop-shadow-md" />
-                    </div>
-                  )}
-                  {charms.map((c) => (
-                    <img
-                      key={c.instanceId}
-                      src={charmEntries.find((e) => e.variantId === c.variantId)?.imageUrl}
-                      alt={c.design}
-                      className={`absolute ${charmSize} -translate-x-1/2 -translate-y-1/2 object-contain drop-shadow-md`}
-                      style={{ left: `${c.x}%`, top: `${c.y}%` }}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
+            <DesignSlider views={views} charmEntries={charmEntries} patch={selection.patch} />
           </div>
 
           {/* details */}
