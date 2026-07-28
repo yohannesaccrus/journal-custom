@@ -76,7 +76,6 @@ export default async function DesignPage({ searchParams }: DesignPageProps) {
               .map(([design, count]) => `${count}× ${design}`)
               .join(", "),
     },
-    { label: "SKU", value: variant.sku },
   ];
 
   return (
@@ -91,57 +90,33 @@ export default async function DesignPage({ searchParams }: DesignPageProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 px-6 sm:px-10 py-8">
           {/* visuals */}
           <div className="flex flex-col items-center gap-6">
-            <div className="relative w-full max-w-[280px] aspect-[560/660]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={frontImage} alt="Front of journal" className="h-full w-full object-contain drop-shadow-xl" />
-              {frontCharms.map((c) => (
-                <img
-                  key={c.instanceId}
-                  src={charmEntries.find((e) => e.variantId === c.variantId)?.imageUrl}
-                  alt={c.design}
-                  className="absolute h-8 w-8 -translate-x-1/2 -translate-y-1/2 object-contain drop-shadow-md"
-                  style={{ left: `${c.x}%`, top: `${c.y}%` }}
-                />
+            <div className="grid w-full grid-cols-3 gap-3">
+              {(
+                [
+                  { label: "Front", image: frontImage, charms: frontCharms },
+                  { label: "Back", image: backImage, charms: backCharms },
+                  { label: "Side", image: sideImage, charms: sideCharms },
+                ] as const
+              ).map(({ label, image, charms }) => (
+                <div key={label} className="flex flex-col items-center gap-1.5">
+                  <span className="text-[11px] font-medium uppercase tracking-wide text-[#a89a80]">{label}</span>
+                  <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-[#f7f4ee] shadow-md">
+                    {image && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={image} alt={`${label} of journal`} className="h-full w-full object-contain p-3" />
+                    )}
+                    {charms.map((c) => (
+                      <img
+                        key={c.instanceId}
+                        src={charmEntries.find((e) => e.variantId === c.variantId)?.imageUrl}
+                        alt={c.design}
+                        className="absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 object-contain drop-shadow-md"
+                        style={{ left: `${c.x}%`, top: `${c.y}%` }}
+                      />
+                    ))}
+                  </div>
+                </div>
               ))}
-            </div>
-
-            <div className="flex items-start gap-6">
-              <div className="flex flex-col items-center gap-1.5">
-                <span className="text-[11px] font-medium uppercase tracking-wide text-[#a89a80]">Back</span>
-                <div className="relative w-[100px] aspect-[560/660] rounded-lg overflow-hidden shadow-md">
-                  {backImage && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={backImage} alt="Back of journal" className="h-full w-full object-contain" />
-                  )}
-                  {backCharms.map((c) => (
-                    <img
-                      key={c.instanceId}
-                      src={charmEntries.find((e) => e.variantId === c.variantId)?.imageUrl}
-                      alt={c.design}
-                      className="absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 object-contain drop-shadow"
-                      style={{ left: `${c.x}%`, top: `${c.y}%` }}
-                    />
-                  ))}
-                </div>
-              </div>
-              <div className="flex flex-col items-center gap-1.5">
-                <span className="text-[11px] font-medium uppercase tracking-wide text-[#a89a80]">Side</span>
-                <div className="relative w-[52px] aspect-[200/660] rounded-lg overflow-hidden shadow-md">
-                  {sideImage && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={sideImage} alt="Side of journal" className="h-full w-full object-contain" />
-                  )}
-                  {sideCharms.map((c) => (
-                    <img
-                      key={c.instanceId}
-                      src={charmEntries.find((e) => e.variantId === c.variantId)?.imageUrl}
-                      alt={c.design}
-                      className="absolute h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 object-contain drop-shadow"
-                      style={{ left: `${c.x}%`, top: `${c.y}%` }}
-                    />
-                  ))}
-                </div>
-              </div>
             </div>
 
             <div className="w-full max-w-[320px]">
