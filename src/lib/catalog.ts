@@ -192,9 +192,9 @@ const CORD_SLUG: Record<string, string> = {
  * stand-in renders — no back/side photography exists — uploaded as extra
  * product media tagged e.g. "back-cord-red-edge" / "side-cord-none".
  *
- * On the back view specifically, a chosen patch takes priority over edge
- * (falls back to the plain cord image if that patch+cord combo has no
- * dedicated render) since patch and edge weren't both generated together.
+ * The patch sits on the cord's front-facing knot only, so it never affects
+ * back/side — those views always use the plain cord[+edge] render regardless
+ * of `selection.patch`.
  */
 export function resolveSideImage(
   product: ShopifyJournalProduct,
@@ -202,12 +202,6 @@ export function resolveSideImage(
   selection: Pick<JournalSelection, "cord" | "edge" | "patch">
 ): string | undefined {
   const cordSlug = selection.cord === "none" ? "none" : (CORD_SLUG[selection.cord] ?? "none");
-
-  if (view === "back" && selection.patch !== "none" && selection.cord !== "none") {
-    const patchAlt = `back-cord-${cordSlug}-patch-${selection.patch}`;
-    const patchMedia = product.media.find((m) => m.alt === patchAlt);
-    if (patchMedia) return patchMedia.url;
-  }
 
   const edgeSuffix = selection.edge && selection.cord !== "none" ? "-edge" : "";
   const alt = `${view}-cord-${cordSlug}${edgeSuffix}`;
