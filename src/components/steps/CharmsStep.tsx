@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef } from "react";
-import { buildCharmEntries, resolveSideImage, type CharmEntry } from "@/lib/catalog";
+import { buildCharmEntries, PATCH_POSITION, resolveSideImage, type CharmEntry } from "@/lib/catalog";
 import { useCurrencyFormat } from "@/components/CurrencyContext";
+import { PatchIcon } from "@/components/PatchIcon";
 import type { ShopifyJournalProduct } from "@/lib/shopify-admin";
 import type { CharmSide, JournalSelection, PlacedCharm } from "@/lib/types";
 import { DisabledHint } from "@/components/DisabledHint";
@@ -45,6 +46,7 @@ interface CharmCanvasProps {
   label: string;
   wide: boolean;
   imageUrl: string | undefined;
+  patch?: JournalSelection["patch"];
   charms: PlacedCharm[];
   entries: CharmEntry[];
   active: boolean;
@@ -54,7 +56,7 @@ interface CharmCanvasProps {
   onRemove: (instanceId: string) => void;
 }
 
-function CharmCanvas({ label, wide, imageUrl, charms, entries, active, onSelect, onDropCharm, onMove, onRemove }: CharmCanvasProps) {
+function CharmCanvas({ label, wide, imageUrl, patch, charms, entries, active, onSelect, onDropCharm, onMove, onRemove }: CharmCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragId = useRef<string | null>(null);
 
@@ -123,6 +125,20 @@ function CharmCanvas({ label, wide, imageUrl, charms, entries, active, onSelect,
         {imageUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={imageUrl} alt="" className="absolute inset-0 h-full w-full object-contain pointer-events-none" />
+        )}
+
+        {patch && patch !== "none" && (
+          <div
+            className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
+            style={{
+              left: `${PATCH_POSITION.x}%`,
+              top: `${PATCH_POSITION.y}%`,
+              width: `${PATCH_POSITION.sizePercent}%`,
+              aspectRatio: "1",
+            }}
+          >
+            <PatchIcon shape={patch} className="h-full w-full drop-shadow-md" />
+          </div>
         )}
 
         {charms.map((c) => (
@@ -235,6 +251,7 @@ export function CharmsStep({
             label={v.label}
             wide={v.wide}
             imageUrl={imageFor(v.key)}
+            patch={v.key === "front" ? selection.patch : undefined}
             charms={charms.filter((c) => c.side === v.key)}
             entries={entries}
             active={activeSide === v.key}

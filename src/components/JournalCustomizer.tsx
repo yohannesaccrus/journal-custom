@@ -10,6 +10,7 @@ import { NotebooksStep } from "@/components/steps/NotebooksStep";
 import { PreviewStep } from "@/components/steps/PreviewStep";
 import { OrderConfirmModal } from "@/components/OrderConfirmModal";
 import { NotebookIcon } from "@/components/NotebookIcon";
+import { PatchIcon } from "@/components/PatchIcon";
 import { ThemeSwitcher, THEMES, type Theme } from "@/components/ThemeSwitcher";
 import { BackgroundSwitcher, type BackgroundMode } from "@/components/BackgroundSwitcher";
 import { MobileViewSwitcher } from "@/components/MobileViewSwitcher";
@@ -24,6 +25,7 @@ import {
   NOTEBOOKS_PER_JOURNAL,
   notebookCount,
   patchPrice,
+  PATCH_POSITION,
   resolveFrontImage,
   resolveSideImage,
   resolveVariant,
@@ -219,7 +221,7 @@ function JournalCustomizerContent({
     [products, selection.cover]
   );
   const variant = useMemo(() => resolveVariant(product, selection), [product, selection]);
-  const imageSrc = resolveFrontImage(product, variant, selection);
+  const imageSrc = resolveFrontImage(variant);
   const charmEntries = useMemo(() => buildCharmEntries(charmProduct), [charmProduct]);
   const total =
     Number(variant.price) + charmsTotal(charmProduct, selection.charms) + patchPrice(patchProduct, selection.patch);
@@ -608,6 +610,19 @@ function JournalCustomizerContent({
                     alt="Journal preview"
                     className="h-full w-full object-contain preview-shadow transition-opacity duration-200 pointer-events-none"
                   />
+                  {mainView === "front" && selection.patch !== "none" && (
+                    <div
+                      className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
+                      style={{
+                        left: `${PATCH_POSITION.x}%`,
+                        top: `${PATCH_POSITION.y}%`,
+                        width: `${PATCH_POSITION.sizePercent}%`,
+                        aspectRatio: "1",
+                      }}
+                    >
+                      <PatchIcon shape={selection.patch} className="h-full w-full drop-shadow-md" />
+                    </div>
+                  )}
                   {mainCharms.map(renderMainCharmMarker)}
                 </div>
               )}
@@ -869,6 +884,7 @@ function JournalCustomizerContent({
       {orderConfirm && (
         <OrderConfirmModal
           imageSrc={imageSrc}
+          patch={selection.patch}
           frontCharms={frontCharms}
           charmEntries={charmEntries}
           rows={orderConfirmRows}

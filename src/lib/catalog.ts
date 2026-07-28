@@ -254,25 +254,15 @@ export function patchPrice(patchProduct: ShopifyJournalProduct, patch: JournalSe
 }
 
 /**
- * Resolves the front-cover image for the current selection. When a patch is
- * chosen, the cord must be re-rendered with the patch layered underneath it
- * (the cord visibly crosses over the patch), which can't be done as a simple
- * overlay on the existing variant photo — so we swap in a pre-composited
- * "front-cord-{color}-patch-{shape}" media image instead. That composite
- * doesn't include pen holder/edge, so once those are also chosen the preview
- * falls back to the normal variant photo (patch omitted) rather than showing
- * a mismatched combination.
+ * Resolves the front-cover image for the current selection. The patch is no
+ * longer baked into a pre-composited photo (that only ever existed without a
+ * pen holder, so choosing both made the patch disappear) — it's now drawn as
+ * a floating marker on top of whichever variant photo is showing (see
+ * PATCH_POSITION below), so patch and pen holder can be combined freely.
  */
-export function resolveFrontImage(
-  product: ShopifyJournalProduct,
-  variant: ShopifyVariant,
-  selection: Pick<JournalSelection, "cord" | "patch" | "penHolder" | "edge">
-): string {
-  if (selection.patch !== "none" && selection.cord !== "none" && selection.penHolder === "none") {
-    const cordSlug = CORD_SLUG[selection.cord] ?? "none";
-    const alt = `front-cord-${cordSlug}-patch-${selection.patch}`;
-    const media = product.media.find((m) => m.alt === alt);
-    if (media) return media.url;
-  }
+export function resolveFrontImage(variant: ShopifyVariant): string {
   return variant.image?.url ?? "";
 }
+
+/** Where the patch marker sits on the front cover, as % of the preview box — matches the cord knot position in the original composited photos. */
+export const PATCH_POSITION = { x: 50, y: 44, sizePercent: 17 };

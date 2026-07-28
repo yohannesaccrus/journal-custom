@@ -1,7 +1,8 @@
 "use client";
 
-import type { CharmEntry } from "@/lib/catalog";
-import type { PlacedCharm } from "@/lib/types";
+import { PATCH_POSITION, type CharmEntry } from "@/lib/catalog";
+import { PatchIcon } from "@/components/PatchIcon";
+import type { JournalSelection, PlacedCharm } from "@/lib/types";
 
 interface SummaryRow {
   label: string;
@@ -10,6 +11,7 @@ interface SummaryRow {
 
 interface OrderConfirmModalProps {
   imageSrc: string;
+  patch: JournalSelection["patch"];
   frontCharms: PlacedCharm[];
   charmEntries: CharmEntry[];
   rows: SummaryRow[];
@@ -23,6 +25,7 @@ interface OrderConfirmModalProps {
 
 export function OrderConfirmModal({
   imageSrc,
+  patch,
   frontCharms,
   charmEntries,
   rows,
@@ -59,6 +62,19 @@ export function OrderConfirmModal({
           <div className="relative mx-auto aspect-square w-full max-w-[260px] overflow-hidden rounded-[var(--radius-panel)] bg-[var(--surface-soft)]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={imageSrc} alt="Your custom journal" className="h-full w-full object-cover" />
+            {patch !== "none" && (
+              <div
+                className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
+                style={{
+                  left: `${PATCH_POSITION.x}%`,
+                  top: `${PATCH_POSITION.y}%`,
+                  width: `${PATCH_POSITION.sizePercent}%`,
+                  aspectRatio: "1",
+                }}
+              >
+                <PatchIcon shape={patch} className="h-full w-full drop-shadow-md" />
+              </div>
+            )}
             {frontCharms.map((c) => (
               <div
                 key={c.instanceId}

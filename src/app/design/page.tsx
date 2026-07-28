@@ -1,8 +1,10 @@
 import { NotebookIcon } from "@/components/NotebookIcon";
+import { PatchIcon } from "@/components/PatchIcon";
 import {
   buildCharmEntries,
   buildCoverEntries,
   NOTEBOOKS_PER_JOURNAL,
+  PATCH_POSITION,
   resolveFrontImage,
   resolveSideImage,
   resolveVariant,
@@ -46,7 +48,7 @@ export default async function DesignPage({ searchParams }: DesignPageProps) {
   const cover = buildCoverEntries(products).find((c) => c.handle === product.handle);
   const variant = resolveVariant(product, selection);
   const charmEntries = buildCharmEntries(charmProduct);
-  const frontImage = resolveFrontImage(product, variant, selection);
+  const frontImage = resolveFrontImage(variant);
   const backImage = resolveSideImage(product, "back", selection);
   const sideImage = resolveSideImage(product, "side", selection);
   const frontCharms = selection.charms.filter((c) => c.side === "front");
@@ -103,6 +105,19 @@ export default async function DesignPage({ searchParams }: DesignPageProps) {
                   {image && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={image} alt={`${label} of journal`} className="h-full w-full object-contain p-4" />
+                  )}
+                  {label === "Front" && selection.patch !== "none" && (
+                    <div
+                      className="absolute -translate-x-1/2 -translate-y-1/2"
+                      style={{
+                        left: `${PATCH_POSITION.x}%`,
+                        top: `${PATCH_POSITION.y}%`,
+                        width: `${PATCH_POSITION.sizePercent}%`,
+                        aspectRatio: "1",
+                      }}
+                    >
+                      <PatchIcon shape={selection.patch} className="h-full w-full drop-shadow-md" />
+                    </div>
                   )}
                   {charms.map((c) => (
                     <img
