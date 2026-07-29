@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminProduct } from "@/lib/admin/shopify-admin-data";
+import VariantThumbnail from "./VariantThumbnail";
 import { useCurrency } from "../CurrencyContext";
 import {
   CURRENCIES,
@@ -82,6 +83,7 @@ export default function JournalVariantsPanel({
         <table className="w-full text-xs">
           <thead>
             <tr className="sticky top-0 bg-[#f2ece1] text-left text-[10px] uppercase tracking-wide text-[#6b6a63]">
+              <th className="px-5 py-2 font-medium">Image</th>
               <th className="px-5 py-2 font-medium">String / Pen Holder</th>
               <th className="px-5 py-2 font-medium">SKU</th>
               <th className="px-5 py-2 font-medium">Price</th>
@@ -95,7 +97,7 @@ export default function JournalVariantsPanel({
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-5 py-6 text-center text-[#a89a80]">
+                <td colSpan={6} className="px-5 py-6 text-center text-[#a89a80]">
                   No variants match &ldquo;{query}&rdquo;.
                 </td>
               </tr>
@@ -176,6 +178,14 @@ function JournalComboRow({ productId, variant }: { productId: string; variant: V
 
   return (
     <tr className={`border-t border-[#eee7d8] ${dirty ? "bg-[#fdf8f0]" : "hover:bg-white/60"}`}>
+      <td className="px-5 py-2">
+        <VariantThumbnail
+          productId={productId}
+          variantId={variant.id}
+          imageUrl={variant.image?.url ?? null}
+          onUploaded={() => router.refresh()}
+        />
+      </td>
       <td className="px-5 py-2 font-medium text-[#1c1c1a]">{comboLabel(variant)}</td>
       <td className="px-5 py-2">
         <input

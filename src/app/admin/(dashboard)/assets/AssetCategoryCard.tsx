@@ -60,6 +60,11 @@ export default function AssetCategoryCard({
   // (and renaming the product itself, which would desync from the customizer
   // copy that already says "Sanaya Charm") don't apply here.
   const isCharm = product.tags.includes("charm");
+  // Cover rows are read-only / swatch-less for the same reasons as Charm:
+  // renaming would desync from the "Cover" option value the accordion below
+  // matches by, and covers are identified by photo, not a color.
+  const hideSwatch = isCharm || isCoverTracker;
+  const titleReadOnly = isCharm || isCoverTracker;
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
 
@@ -221,7 +226,7 @@ export default function AssetCategoryCard({
     <div className="group/card rounded-xl border border-white/70 bg-white/45 backdrop-blur-2xl ring-1 ring-inset ring-white/50 overflow-hidden shadow-[0_8px_30px_-14px_rgba(15,61,52,0.15)] transition-shadow hover:shadow-[0_12px_36px_-14px_rgba(15,61,52,0.22)]">
       <div className="flex items-center justify-between gap-4 border-b border-[#f0ece0]/80 bg-gradient-to-r from-white/40 to-transparent px-5 py-4">
         <div className="min-w-0">
-          <EditableTitle value={product.title} onSave={saveTitle} readOnly={isCharm} />
+          <EditableTitle value={product.title} onSave={saveTitle} readOnly={titleReadOnly} />
           <p className="mt-0.5 text-xs text-[#a89a80]">
             {product.handle} · {product.status} · {product.tags.join(", ")}
           </p>
@@ -398,7 +403,7 @@ export default function AssetCategoryCard({
             <th className="px-5 py-2.5 font-medium">Variant</th>
             <th className="px-5 py-2.5 font-medium">SKU</th>
             <th className="px-5 py-2.5 font-medium">Price ({currency})</th>
-            {!isCharm && <th className="px-5 py-2.5 font-medium">Swatch</th>}
+            {!hideSwatch && <th className="px-5 py-2.5 font-medium">Swatch</th>}
             <th className="px-5 py-2.5 font-medium">Stock</th>
             <th className="px-5 py-2.5 font-medium" />
           </tr>
@@ -411,7 +416,7 @@ export default function AssetCategoryCard({
                 variant={variant}
                 onSave={saveVariant}
                 onDelete={removeVariant}
-                hideSwatch={isCharm}
+                hideSwatch={hideSwatch}
                 expandable={isCoverTracker}
                 expanded={expandedVariantId === variant.id}
                 onToggleExpand={() => setExpandedVariantId((cur) => (cur === variant.id ? null : variant.id))}
@@ -430,7 +435,7 @@ export default function AssetCategoryCard({
           ))}
           {isPaginated && visibleVariants.length === 0 && (
             <tr>
-              <td colSpan={isCharm ? 6 : 7} className="px-5 py-8 text-center text-sm text-[#a89a80]">
+              <td colSpan={hideSwatch ? 6 : 7} className="px-5 py-8 text-center text-sm text-[#a89a80]">
                 No variants match “{query}”.
               </td>
             </tr>
