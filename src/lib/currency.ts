@@ -46,9 +46,21 @@ export const CURRENCIES: Record<string, CurrencyConfig> = {
     groupSeparator: ",",
     pattern: "!#",
   },
+  EUR: {
+    code: "EUR",
+    symbol: "€",
+    label: "Euro",
+    // Approximate — update here (or wire to a live rate) as needed; every
+    // display and edit path reads from this single source of truth.
+    decimals: 2,
+    rateFromIDR: 1 / 17200,
+    decimalSeparator: ",",
+    groupSeparator: ".",
+    pattern: "!#",
+  },
 };
 
-export const DEFAULT_CURRENCY = "IDR";
+export const DEFAULT_CURRENCY = "EUR";
 
 function money(amount: number, cfg: CurrencyConfig) {
   return currency(amount, {
