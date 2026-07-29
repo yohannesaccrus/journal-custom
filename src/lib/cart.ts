@@ -1,6 +1,6 @@
 import type { ShopifyJournalProduct, ShopifyVariant } from "./shopify-admin";
 import type { JournalSelection } from "./types";
-import { buildDesignUrl } from "./design-link";
+import { buildDesignUrl, encodeDesign } from "./design-link";
 
 export interface CartLineItem {
   id: number;
@@ -114,8 +114,20 @@ export function buildCartItems(
     });
   }
 
-  return {
-    items,
-    attributes: { [`✨ Design page Link — ${bundleId}`]: designUrl },
+  // Static per-view thumbnails for the order-confirmation email — it can't run
+  // the interactive slider's absolutely-positioned charm/patch overlays, so
+  // these point at a route that composites the same thing server-side into a
+  // plain PNG. Derived from the same encoded payload as the design link
+  // itself, so no extra data needs to survive the bundle explosion.
+  const encoded = encodeDesign(selection);
+  const imageBase = `${designPageOrigin.replace(/\/$/, "")}/api/design-image?d=${encoded}`;
+
+  const attributes: Record<string, string> = {
+    [`✨ Design page Link — ${bundleId}`]: designUrl,
+    [`✨ Design Front — ${bundleId}`]: `${imageBase}&view=front`,
+    [`✨ Design Back — ${bundleId}`]: `${imageBase}&view=back`,
+    [`✨ Design Side — ${bundleId}`]: `${imageBase}&view=side`,
   };
+
+  return { items, attributes };
 }
