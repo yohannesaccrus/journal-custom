@@ -185,27 +185,42 @@ export async function setVariantSwatchColor(variantId: string, hex: string | nul
 
 // ---------- Inventory mutations ----------
 
+const NOT_STOCKED_ERROR = /not stocked at the location/i;
+
+/** Runs `fn`; if it fails because the inventory item was never activated at this location (e.g. a variant created before `activateInventoryAtPrimaryLocation` existed, or created some other way), activates it once and retries — instead of leaving the admin stuck with a permanently un-editable Stock field. */
+async function withInventoryActivationRetry<T>(inventoryItemId: string, fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    if (!(err instanceof Error) || !NOT_STOCKED_ERROR.test(err.message)) throw err;
+    await activateInventoryAtPrimaryLocation(inventoryItemId);
+    return fn();
+  }
+}
+
 export async function setVariantStock(inventoryItemId: string, quantity: number): Promise<void> {
-  const locationId = await getPrimaryLocationId();
-  const MUTATION = `
-    mutation SetStock($input: InventorySetQuantitiesInput!) {
-      inventorySetQuantities(input: $input) {
-        userErrors { field message }
+  await withInventoryActivationRetry(inventoryItemId, async () => {
+    const locationId = await getPrimaryLocationId();
+    const MUTATION = `
+      mutation SetStock($input: InventorySetQuantitiesInput!) {
+        inventorySetQuantities(input: $input) {
+          userErrors { field message }
+        }
       }
-    }
-  `;
-  const data = await shopifyAdmin<{
-    inventorySetQuantities: { userErrors: { field: string[]; message: string }[] };
-  }>(MUTATION, {
-    input: {
-      name: "available",
-      reason: "correction",
-      ignoreCompareQuantity: true,
-      quantities: [{ inventoryItemId, locationId, quantity }],
-    },
+    `;
+    const data = await shopifyAdmin<{
+      inventorySetQuantities: { userErrors: { field: string[]; message: string }[] };
+    }>(MUTATION, {
+      input: {
+        name: "available",
+        reason: "correction",
+        ignoreCompareQuantity: true,
+        quantities: [{ inventoryItemId, locationId, quantity }],
+      },
+    });
+    const errs = data.inventorySetQuantities.userErrors;
+    if (errs.length) throw new Error(errs.map((e) => e.message).join("; "));
   });
-  const errs = data.inventorySetQuantities.userErrors;
-  if (errs.length) throw new Error(errs.map((e) => e.message).join("; "));
 }
 
 /**
@@ -231,25 +246,27 @@ export async function activateInventoryAtPrimaryLocation(inventoryItemId: string
 }
 
 export async function adjustVariantStock(inventoryItemId: string, delta: number): Promise<void> {
-  const locationId = await getPrimaryLocationId();
-  const MUTATION = `
-    mutation AdjustStock($input: InventoryAdjustQuantitiesInput!) {
-      inventoryAdjustQuantities(input: $input) {
-        userErrors { field message }
+  await withInventoryActivationRetry(inventoryItemId, async () => {
+    const locationId = await getPrimaryLocationId();
+    const MUTATION = `
+      mutation AdjustStock($input: InventoryAdjustQuantitiesInput!) {
+        inventoryAdjustQuantities(input: $input) {
+          userErrors { field message }
+        }
       }
-    }
-  `;
-  const data = await shopifyAdmin<{
-    inventoryAdjustQuantities: { userErrors: { field: string[]; message: string }[] };
-  }>(MUTATION, {
-    input: {
-      name: "available",
-      reason: "correction",
-      changes: [{ inventoryItemId, locationId, delta }],
-    },
+    `;
+    const data = await shopifyAdmin<{
+      inventoryAdjustQuantities: { userErrors: { field: string[]; message: string }[] };
+    }>(MUTATION, {
+      input: {
+        name: "available",
+        reason: "correction",
+        changes: [{ inventoryItemId, locationId, delta }],
+      },
+    });
+    const errs = data.inventoryAdjustQuantities.userErrors;
+    if (errs.length) throw new Error(errs.map((e) => e.message).join("; "));
   });
-  const errs = data.inventoryAdjustQuantities.userErrors;
-  if (errs.length) throw new Error(errs.map((e) => e.message).join("; "));
 }
 
 export async function updateVariantDetails(
