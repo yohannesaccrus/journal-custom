@@ -1,4 +1,6 @@
 import "server-only";
+import { decodeDesign } from "@/lib/design-link";
+import type { JournalSelection } from "@/lib/types";
 
 const STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN;
 const ACCESS_TOKEN = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
@@ -582,6 +584,27 @@ export interface AdminOrder {
   journals: AdminOrderJournal[];
   /** Read-only design preview links, one per journal — see the `attributes` note in `cart.ts`. */
   designLinks: string[];
+  /**
+   * The full customization spec for each journal, decoded straight out of its
+   * design link's `d` query param — the link is a self-contained, base64url
+   * payload (see `design-link.ts`), so no extra order/line-item data is
+   * needed to recover cord/patch/pen holder/notebooks/charms. Index-aligned
+   * with `designLinks` (best-effort pairing: both lists are built in the same
+   * per-journal order at checkout, but nothing on the Shopify side formally
+   * guarantees it for orders with multiple journals). `null` where a link is
+   * missing/malformed (e.g. very old pre-design-link orders).
+   */
+  specs: (JournalSelection | null)[];
+}
+
+/** Pulls the `d` payload out of a design link URL and decodes it; tolerant of malformed/legacy links. */
+function decodeSpecFromLink(url: string): JournalSelection | null {
+  try {
+    const d = new URL(url).searchParams.get("d");
+    return d ? decodeDesign(d) : null;
+  } catch {
+    return null;
+  }
 }
 
 const ORDERS_QUERY = `
@@ -679,6 +702,9 @@ export async function fetchJournalOrders(cursor?: string): Promise<{
         // more than once, so pinning to an exact/prefix key string here just
         // breaks again on the next wording tweak.
         designLinks: o.customAttributes.filter((a) => /^https?:\/\//.test(a.value.trim())).map((a) => a.value),
+        specs: o.customAttributes
+          .filter((a) => /^https?:\/\//.test(a.value.trim()))
+          .map((a) => decodeSpecFromLink(a.value)),
       };
     });
 

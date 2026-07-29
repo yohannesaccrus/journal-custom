@@ -9,6 +9,10 @@ export default async function AdminOrdersPage() {
     products.flatMap((p) => p.variants).find((v) => v.image)?.image?.url ??
     null;
 
+  // Journal specs only store the cover's product *handle* — resolve it to a
+  // human title once here rather than per-row in the client.
+  const coverTitleByHandle = Object.fromEntries(products.map((p) => [p.handle, p.title]));
+
   return (
     <div>
       <h1 className="text-2xl font-serif">Orders</h1>
@@ -16,7 +20,7 @@ export default async function AdminOrdersPage() {
         Custom journal orders, with a direct link to each customer&apos;s final design preview.
       </p>
 
-      <OrdersPageBody orders={orders} coverImage={coverImage} />
+      <OrdersPageBody orders={orders} coverImage={coverImage} coverTitleByHandle={coverTitleByHandle} />
     </div>
   );
 }
