@@ -1,3 +1,4 @@
+import { fetchJournalOrders } from "@/lib/admin/shopify-admin-data";
 import { AdminNav } from "./AdminNav";
 import { CurrencyProvider } from "./CurrencyContext";
 import { CurrencySwitcher } from "./CurrencySwitcher";
@@ -7,7 +8,13 @@ export const metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  // Best-effort — the sidebar badge shouldn't break the whole admin shell if
+  // the Shopify Admin API call fails.
+  const orderCount = await fetchJournalOrders()
+    .then(({ orders }) => orders.length)
+    .catch(() => 0);
+
   return (
     <CurrencyProvider>
       <CurrencySwitcher />
@@ -28,7 +35,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <p className="mt-0.5 text-xs text-[#a89a80]">Admin panel</p>
             </div>
             <div className="relative flex-1 flex flex-col min-h-0">
-              <AdminNav />
+              <AdminNav orderCount={orderCount} />
               <form action="/api/admin/logout" method="POST" className="shrink-0 px-3 pb-6">
                 <button
                   type="submit"
