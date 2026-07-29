@@ -349,6 +349,191 @@ export async function syncJournalOptionRename(
   }
 }
 
+export interface JournalSyncResult {
+  coverHandle: string;
+  coverTitle: string;
+  created: number;
+  skipped: boolean;
+  error?: string;
+}
+
+async function addOptionValues(productId: string, optionId: string, names: string[]): Promise<void> {
+  const MUTATION = `
+    mutation AddOptionValues($productId: ID!, $option: OptionUpdateInput!, $optionValuesToAdd: [OptionValueCreateInput!]) {
+      productOptionUpdate(productId: $productId, option: $option, optionValuesToAdd: $optionValuesToAdd) {
+        userErrors { field message }
+      }
+    }
+  `;
+  const data = await shopifyAdmin<{
+    productOptionUpdate: { userErrors: { field: string[]; message: string }[] };
+  }>(MUTATION, { productId, option: { id: optionId }, optionValuesToAdd: names.map((name) => ({ name })) });
+  const errs = data.productOptionUpdate.userErrors;
+  if (errs.length) throw new Error(errs.map((e) => e.message).join("; "));
+}
+
+/** Mirrors the SKU pattern already used on real journal variants, e.g. `SANAYA-JRN-CLASSIC-BROWN-CORD-ORANGE-PH-BLACK-EDGE`. */
+function journalSku(handle: string, cord: string, pen: string): string {
+  const base = handle.replace(/^sanaya-journal-/, "sanaya-jrn-").toUpperCase();
+  const slug = (s: string) => s.toUpperCase().replace(/\s*\+\s*/g, "-").replace(/\s+/g, "-");
+  return `${base}-CORD-${slug(cord)}-PH-${slug(pen)}`;
+}
+
+async function bulkCreateJournalVariants(
+  productId: string,
+  handle: string,
+  coverOptionId: string,
+  coverValue: string,
+  cordOptionId: string,
+  penOptionId: string,
+  combos: { cord: string; pen: string }[],
+  price: string
+): Promise<number> {
+  if (combos.length === 0) return 0;
+  const MUTATION = `
+    mutation CreateJournalVariants($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+      productVariantsBulkCreate(productId: $productId, variants: $variants) {
+        userErrors { field message }
+      }
+    }
+  `;
+  const variants = combos.map(({ cord, pen }) => ({
+    price,
+    inventoryItem: { sku: journalSku(handle, cord, pen) },
+    optionValues: [
+      { optionId: coverOptionId, name: coverValue },
+      { optionId: cordOptionId, name: cord },
+      { optionId: penOptionId, name: pen },
+    ],
+  }));
+  const data = await shopifyAdmin<{
+    productVariantsBulkCreate: { userErrors: { field: string[]; message: string }[] };
+  }>(MUTATION, { productId, variants });
+  const errs = data.productVariantsBulkCreate.userErrors;
+  if (errs.length) throw new Error(errs.map((e) => e.message).join("; "));
+  return combos.length;
+}
+
+/**
+ * The counterpart to `syncJournalOptionRename` for brand-new Cord/Pen Holder
+ * colors: the "+Add variant" button on the matching internal component
+ * product only adds a variant *there* (for stock tracking) — customers can't
+ * actually pick the new color anywhere until it also exists as a real option
+ * value + variant on all 8 sellable "tag:journal" cover products. This
+ * generates every valid Cord × Pen Holder combination the customizer's own
+ * rule allows (see `catalog.ts` on the client): a real cord pairs with
+ * "None" plus every existing real pen holder value; "No Cord" never pairs
+ * with a real pen holder. New variants copy the price of that cover's
+ * existing variants (price doesn't vary by cord/pen holder within one cover)
+ * and start at 0 stock — the admin still sets opening stock per cover
+ * directly in Shopify (these combo variants aren't shown in Assets & Stock).
+ */
+export async function syncJournalOptionAdd(componentTags: string[], newValue: string): Promise<JournalSyncResult[]> {
+  const tag = componentTags.find((t) => t === "cord" || t === "pen-holder");
+  if (!tag) return [];
+
+  const JOURNAL_PRODUCTS_QUERY = `
+    query JournalProductsForAddSync {
+      products(first: 20, query: "tag:journal") {
+        nodes {
+          id
+          handle
+          title
+          options { id name optionValues { id name } }
+          variants(first: 1) { nodes { price } }
+        }
+      }
+    }
+  `;
+  const data = await shopifyAdmin<{
+    products: {
+      nodes: {
+        id: string;
+        handle: string;
+        title: string;
+        options: { id: string; name: string; optionValues: { id: string; name: string }[] }[];
+        variants: { nodes: { price: string }[] };
+      }[];
+    };
+  }>(JOURNAL_PRODUCTS_QUERY);
+
+  const results: JournalSyncResult[] = [];
+
+  for (const product of data.products.nodes) {
+    const coverOption = product.options.find((o) => o.name === "Cover");
+    const cordOption = product.options.find((o) => o.name === "Cord");
+    const penOption = product.options.find((o) => o.name === "Pen Holder");
+    const coverValue = coverOption?.optionValues[0]?.name;
+    if (!coverOption || !coverValue || !cordOption || !penOption) {
+      results.push({
+        coverHandle: product.handle,
+        coverTitle: product.title,
+        created: 0,
+        skipped: false,
+        error: "Missing Cover/Cord/Pen Holder option",
+      });
+      continue;
+    }
+    const price = product.variants.nodes[0]?.price ?? "0.00";
+
+    try {
+      if (tag === "cord") {
+        if (cordOption.optionValues.some((v) => v.name === newValue)) {
+          results.push({ coverHandle: product.handle, coverTitle: product.title, created: 0, skipped: true });
+          continue;
+        }
+        await addOptionValues(product.id, cordOption.id, [newValue]);
+        const penValues = penOption.optionValues.filter((v) => v.name !== "None").map((v) => v.name);
+        const combos = ["None", ...penValues].map((pen) => ({ cord: newValue, pen }));
+        const created = await bulkCreateJournalVariants(
+          product.id,
+          product.handle,
+          coverOption.id,
+          coverValue,
+          cordOption.id,
+          penOption.id,
+          combos,
+          price
+        );
+        results.push({ coverHandle: product.handle, coverTitle: product.title, created, skipped: false });
+      } else {
+        const edgeValue = `${newValue} + Edge`;
+        if (penOption.optionValues.some((v) => v.name === newValue || v.name === edgeValue)) {
+          results.push({ coverHandle: product.handle, coverTitle: product.title, created: 0, skipped: true });
+          continue;
+        }
+        await addOptionValues(product.id, penOption.id, [newValue, edgeValue]);
+        const cordValues = cordOption.optionValues.filter((v) => v.name !== "No Cord").map((v) => v.name);
+        const combos = cordValues.flatMap((cord) => [
+          { cord, pen: newValue },
+          { cord, pen: edgeValue },
+        ]);
+        const created = await bulkCreateJournalVariants(
+          product.id,
+          product.handle,
+          coverOption.id,
+          coverValue,
+          cordOption.id,
+          penOption.id,
+          combos,
+          price
+        );
+        results.push({ coverHandle: product.handle, coverTitle: product.title, created, skipped: false });
+      }
+    } catch (err) {
+      results.push({
+        coverHandle: product.handle,
+        coverTitle: product.title,
+        created: 0,
+        skipped: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  return results;
+}
+
 export async function updateProductTitle(productId: string, title: string): Promise<void> {
   const MUTATION = `
     mutation UpdateProductTitle($input: ProductUpdateInput!) {

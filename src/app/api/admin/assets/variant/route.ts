@@ -4,19 +4,21 @@ import {
   addAssetVariant,
   deleteAssetVariant,
   renameOptionValue,
+  syncJournalOptionAdd,
   syncJournalOptionRename,
   updateVariantDetails,
 } from "@/lib/admin/shopify-admin-data";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { productId, optionId, optionName, value, price, sku } = body as {
+  const { productId, optionId, optionName, value, price, sku, productTags } = body as {
     productId?: string;
     optionId?: string;
     optionName?: string;
     value?: string;
     price?: string;
     sku?: string;
+    productTags?: string[];
   };
 
   if (!productId || !optionId || !optionName || !value) {
@@ -25,7 +27,8 @@ export async function POST(request: NextRequest) {
 
   try {
     await addAssetVariant(productId, optionId, optionName, value, price ?? "0.00", sku ?? "");
-    return NextResponse.json({ ok: true });
+    const journalSync = productTags ? await syncJournalOptionAdd(productTags, value) : [];
+    return NextResponse.json({ ok: true, journalSync });
   } catch (err) {
     return NextResponse.json({ error: String(err instanceof Error ? err.message : err) }, { status: 500 });
   }

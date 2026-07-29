@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import type { AdminProduct } from "@/lib/admin/shopify-admin-data";
+import type { AdminProduct, JournalSyncResult } from "@/lib/admin/shopify-admin-data";
 import EditableTitle from "./EditableTitle";
 import VariantRow from "./VariantRow";
 import { useCurrency } from "../CurrencyContext";
@@ -32,6 +32,13 @@ export default function AssetCategoryCard({ product }: { product: AdminProduct }
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [newPriceInput, setNewPriceInput] = useState("0");
+  const [submittingVariant, setSubmittingVariant] = useState(false);
+  const [journalSync, setJournalSync] = useState<JournalSyncResult[] | null>(null);
+
+  // Cord and Pen Holder colors also live as option values on all 8 sellable
+  // journal cover products — adding one here needs to propagate there too, or
+  // customers can never actually pick the new color.
+  const syncsToJournal = product.tags.includes("cord") || product.tags.includes("pen-holder");
 
   // Charm and cover catalogs can grow to dozens of variants — search + paginate
   // just those two instead of the whole assets page.
@@ -154,31 +161,41 @@ export default function AssetCategoryCard({ product }: { product: AdminProduct }
   async function addVariant(formData: FormData) {
     if (!primaryOption) return;
     setError(null);
+    setJournalSync(null);
     const value = String(formData.get("value") ?? "").trim();
     const price = String(formData.get("price") ?? "0.00").trim();
     const sku = String(formData.get("sku") ?? "").trim();
     if (!value) return;
 
-    const res = await fetch("/api/admin/assets/variant", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        productId: product.id,
-        optionId: primaryOption.id,
-        optionName: primaryOption.name,
-        value,
-        price,
-        sku,
-      }),
-    });
-    const json = await res.json();
-    if (!res.ok) {
-      setError(json.error ?? "Failed to add variant");
-      return;
+    setSubmittingVariant(true);
+    try {
+      const res = await fetch("/api/admin/assets/variant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId: product.id,
+          optionId: primaryOption.id,
+          optionName: primaryOption.name,
+          value,
+          price,
+          sku,
+          productTags: product.tags,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Failed to add variant");
+        return;
+      }
+      setAdding(false);
+      setNewPriceInput("0");
+      if (Array.isArray(json.journalSync) && json.journalSync.length > 0) {
+        setJournalSync(json.journalSync);
+      }
+      refresh();
+    } finally {
+      setSubmittingVariant(false);
     }
-    setAdding(false);
-    setNewPriceInput("0");
-    refresh();
   }
 
   return (
@@ -236,37 +253,92 @@ export default function AssetCategoryCard({ product }: { product: AdminProduct }
       {adding && primaryOption && (
         <form
           action={addVariant}
-          className="flex flex-wrap items-end gap-3 border-b border-[#f0ece0] bg-gradient-to-r from-[#f7f5f0] to-[#f0ebe0] px-5 py-4 animate-[fadeIn_0.15s_ease-out]"
+          className="border-b border-[#f0ece0] bg-gradient-to-r from-[#f7f5f0] to-[#f0ebe0] px-5 py-4 animate-[fadeIn_0.15s_ease-out]"
         >
-          <Field label={primaryOption.name}>
-            <input name="value" required autoFocus className="admin-input" placeholder="e.g. Navy" />
-          </Field>
-          <Field label={`Price (${currency})`}>
-            <div className="admin-input-group w-28">
-              <span className="admin-input-prefix">{currencyCfg.symbol}</span>
+          <div className="flex flex-wrap items-end gap-3">
+            <Field label={primaryOption.name}>
+              <input name="value" required autoFocus className="admin-input" placeholder="e.g. Navy" />
+            </Field>
+            <Field label={`Price (${currency})`}>
+              <div className="admin-input-group w-28">
+                <span className="admin-input-prefix">{currencyCfg.symbol}</span>
+                <input
+                  inputMode="decimal"
+                  value={formatAmountInput(newPriceInput, currency)}
+                  onChange={(e) => setNewPriceInput(sanitizeAmountInput(e.target.value, currency))}
+                  className="admin-input-bare"
+                />
+              </div>
               <input
-                inputMode="decimal"
-                value={formatAmountInput(newPriceInput, currency)}
-                onChange={(e) => setNewPriceInput(sanitizeAmountInput(e.target.value, currency))}
-                className="admin-input-bare"
+                type="hidden"
+                name="price"
+                value={toShopifyPriceString(convertToIDR(parseAmountInput(newPriceInput, currency), currency))}
               />
-            </div>
-            <input
-              type="hidden"
-              name="price"
-              value={toShopifyPriceString(convertToIDR(parseAmountInput(newPriceInput, currency), currency))}
-            />
-          </Field>
-          <Field label="SKU">
-            <input name="sku" className="admin-input w-32" />
-          </Field>
-          <button
-            type="submit"
-            className="rounded-full bg-gradient-to-r from-[#154a3f] to-[#0f3d34] px-4 py-2 text-xs font-medium text-white shadow-sm transition-all hover:from-[#0f3d34] hover:to-[#0a2b25]"
-          >
-            Add
-          </button>
+            </Field>
+            <Field label="SKU">
+              <input name="sku" className="admin-input w-32" />
+            </Field>
+            <button
+              type="submit"
+              disabled={submittingVariant}
+              className="rounded-full bg-gradient-to-r from-[#154a3f] to-[#0f3d34] px-4 py-2 text-xs font-medium text-white shadow-sm transition-all hover:from-[#0f3d34] hover:to-[#0a2b25] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {submittingVariant ? (syncsToJournal ? "Generating across 8 covers…" : "Adding…") : "Add"}
+            </button>
+          </div>
+
+          {syncsToJournal && (
+            <p className="mt-3 flex items-start gap-1.5 text-xs text-[#8a6a3a]">
+              <svg viewBox="0 0 20 20" fill="currentColor" className="mt-0.5 h-3.5 w-3.5 shrink-0">
+                <path d="M10 2a1 1 0 01.894.553l1.382 2.764 3.05.443a1 1 0 01.554 1.706l-2.207 2.152.521 3.038a1 1 0 01-1.451 1.054L10 12.202l-2.743 1.508a1 1 0 01-1.451-1.054l.521-3.038-2.207-2.152a1 1 0 01.554-1.706l3.05-.443L9.106 2.553A1 1 0 0110 2z" />
+              </svg>
+              This will also create matching variants for every color combination across all 8 cover products.
+            </p>
+          )}
         </form>
+      )}
+
+      {journalSync && (
+        <div className="animate-[fadeIn_0.15s_ease-out] border-b border-[#eae7de] bg-gradient-to-r from-[#f7f9f6] to-[#eef4ef] px-5 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-xs font-medium text-[#1c1c1a]">
+              Synced to {journalSync.filter((r) => r.created > 0).length}/{journalSync.length} covers
+              {journalSync.some((r) => r.error) && (
+                <span className="ml-1.5 text-[#b5342c]">
+                  · {journalSync.filter((r) => r.error).length} failed
+                </span>
+              )}
+              {journalSync.some((r) => r.skipped) && (
+                <span className="ml-1.5 text-[#b1632f]">
+                  · {journalSync.filter((r) => r.skipped).length} already had it
+                </span>
+              )}
+            </p>
+            <button
+              type="button"
+              onClick={() => setJournalSync(null)}
+              className="shrink-0 text-xs text-[#a89a80] hover:text-[#1c1c1a]"
+            >
+              Dismiss
+            </button>
+          </div>
+          <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+            {journalSync.map((r) => (
+              <li key={r.coverHandle} className="flex items-center gap-1.5 text-xs text-[#6b6a63]">
+                <span
+                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                    r.error ? "bg-[#b5342c]" : r.skipped ? "bg-[#b1632f]" : "bg-[#1f7a4d]"
+                  }`}
+                />
+                {r.coverTitle}
+                {r.error ? ` — ${r.error}` : r.skipped ? " — already exists" : ` — ${r.created} variants`}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2.5 text-[11px] text-[#a89a80]">
+            New variants start at 0 stock — set opening stock for each cover directly in Shopify Admin.
+          </p>
+        </div>
       )}
 
       <table className="w-full text-sm">
