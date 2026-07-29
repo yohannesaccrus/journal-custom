@@ -210,7 +210,8 @@ export default function AssetCategoryCard({ product }: { product: AdminProduct }
         {primaryOption && (
           <button
             onClick={() => setAdding((v) => !v)}
-            className={`shrink-0 rounded-full border px-4 py-1.5 text-xs font-medium transition-all duration-150 ${
+            disabled={submittingVariant}
+            className={`shrink-0 rounded-full border px-4 py-1.5 text-xs font-medium transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${
               adding
                 ? "border-[#d8d5cb] text-[#6b6a63] hover:bg-[#f2ece1]"
                 : "border-transparent bg-gradient-to-r from-[#154a3f] to-[#0f3d34] text-white shadow-sm hover:from-[#0f3d34] hover:to-[#0a2b25]"
@@ -255,45 +256,52 @@ export default function AssetCategoryCard({ product }: { product: AdminProduct }
           action={addVariant}
           className="border-b border-[#f0ece0] bg-gradient-to-r from-[#f7f5f0] to-[#f0ebe0] px-5 py-4 animate-[fadeIn_0.15s_ease-out]"
         >
-          <div className="flex flex-wrap items-end gap-3">
-            <Field label={primaryOption.name}>
-              <input name="value" required autoFocus className="admin-input" placeholder="e.g. Navy" />
-            </Field>
-            <Field label={`Price (${currency})`}>
-              <div className="admin-input-group w-28">
-                <span className="admin-input-prefix">{currencyCfg.symbol}</span>
-                <input
-                  inputMode="decimal"
-                  value={formatAmountInput(newPriceInput, currency)}
-                  onChange={(e) => setNewPriceInput(sanitizeAmountInput(e.target.value, currency))}
-                  className="admin-input-bare"
-                />
+          {submittingVariant ? (
+            <VariantFormSkeleton
+              label={syncsToJournal ? "Generating variants across all 8 covers…" : "Adding variant…"}
+            />
+          ) : (
+            <>
+              <div className="flex flex-wrap items-end gap-3">
+                <Field label={primaryOption.name}>
+                  <input name="value" required autoFocus className="admin-input" placeholder="e.g. Navy" />
+                </Field>
+                <Field label={`Price (${currency})`}>
+                  <div className="admin-input-group w-28">
+                    <span className="admin-input-prefix">{currencyCfg.symbol}</span>
+                    <input
+                      inputMode="decimal"
+                      value={formatAmountInput(newPriceInput, currency)}
+                      onChange={(e) => setNewPriceInput(sanitizeAmountInput(e.target.value, currency))}
+                      className="admin-input-bare"
+                    />
+                  </div>
+                  <input
+                    type="hidden"
+                    name="price"
+                    value={toShopifyPriceString(convertToIDR(parseAmountInput(newPriceInput, currency), currency))}
+                  />
+                </Field>
+                <Field label="SKU">
+                  <input name="sku" className="admin-input w-32" />
+                </Field>
+                <button
+                  type="submit"
+                  className="rounded-full bg-gradient-to-r from-[#154a3f] to-[#0f3d34] px-4 py-2 text-xs font-medium text-white shadow-sm transition-all hover:from-[#0f3d34] hover:to-[#0a2b25]"
+                >
+                  Add
+                </button>
               </div>
-              <input
-                type="hidden"
-                name="price"
-                value={toShopifyPriceString(convertToIDR(parseAmountInput(newPriceInput, currency), currency))}
-              />
-            </Field>
-            <Field label="SKU">
-              <input name="sku" className="admin-input w-32" />
-            </Field>
-            <button
-              type="submit"
-              disabled={submittingVariant}
-              className="rounded-full bg-gradient-to-r from-[#154a3f] to-[#0f3d34] px-4 py-2 text-xs font-medium text-white shadow-sm transition-all hover:from-[#0f3d34] hover:to-[#0a2b25] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {submittingVariant ? (syncsToJournal ? "Generating across 8 covers…" : "Adding…") : "Add"}
-            </button>
-          </div>
 
-          {syncsToJournal && (
-            <p className="mt-3 flex items-start gap-1.5 text-xs text-[#8a6a3a]">
-              <svg viewBox="0 0 20 20" fill="currentColor" className="mt-0.5 h-3.5 w-3.5 shrink-0">
-                <path d="M10 2a1 1 0 01.894.553l1.382 2.764 3.05.443a1 1 0 01.554 1.706l-2.207 2.152.521 3.038a1 1 0 01-1.451 1.054L10 12.202l-2.743 1.508a1 1 0 01-1.451-1.054l.521-3.038-2.207-2.152a1 1 0 01.554-1.706l3.05-.443L9.106 2.553A1 1 0 0110 2z" />
-              </svg>
-              This will also create matching variants for every color combination across all 8 cover products.
-            </p>
+              {syncsToJournal && (
+                <p className="mt-3 flex items-start gap-1.5 text-xs text-[#8a6a3a]">
+                  <svg viewBox="0 0 20 20" fill="currentColor" className="mt-0.5 h-3.5 w-3.5 shrink-0">
+                    <path d="M10 2a1 1 0 01.894.553l1.382 2.764 3.05.443a1 1 0 01.554 1.706l-2.207 2.152.521 3.038a1 1 0 01-1.451 1.054L10 12.202l-2.743 1.508a1 1 0 01-1.451-1.054l.521-3.038-2.207-2.152a1 1 0 01.554-1.706l3.05-.443L9.106 2.553A1 1 0 0110 2z" />
+                  </svg>
+                  This will also create matching variants for every color combination across all 8 cover products.
+                </p>
+              )}
+            </>
           )}
         </form>
       )}
@@ -499,5 +507,38 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <span className="text-[11px] text-[#6b6a63]">{label}</span>
       {children}
     </label>
+  );
+}
+
+/** Stands in for the add-variant form while its request is in flight — most
+ * useful for the cord/pen-holder case, where the request can take several
+ * seconds (option + variant creation across all 8 covers), and there was
+ * previously no feedback at all beyond a static "Add" button. */
+function VariantFormSkeleton({ label }: { label: string }) {
+  return (
+    <div aria-live="polite" aria-busy="true">
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-col gap-1">
+          <span className="h-[11px] w-14 animate-pulse rounded bg-[#e3ddcd]" />
+          <span className="h-[30px] w-32 animate-pulse rounded-lg bg-[#e3ddcd]" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="h-[11px] w-16 animate-pulse rounded bg-[#e3ddcd]" />
+          <span className="h-[30px] w-28 animate-pulse rounded-lg bg-[#e3ddcd]" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="h-[11px] w-8 animate-pulse rounded bg-[#e3ddcd]" />
+          <span className="h-[30px] w-32 animate-pulse rounded-lg bg-[#e3ddcd]" />
+        </div>
+        <span className="h-[30px] w-24 shrink-0 animate-pulse rounded-full bg-[#c9c0a8]" />
+      </div>
+      <p className="mt-3 flex items-center gap-2 text-xs text-[#8a6a3a]">
+        <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5 shrink-0 animate-spin text-[#8a6a3a]">
+          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" strokeOpacity="0.25" />
+          <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+        </svg>
+        {label}
+      </p>
+    </div>
   );
 }
