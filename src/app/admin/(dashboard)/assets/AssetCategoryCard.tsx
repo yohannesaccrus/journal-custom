@@ -56,6 +56,10 @@ export default function AssetCategoryCard({
   // Charm and cover catalogs can grow to dozens of variants — search + paginate
   // just those two instead of the whole assets page.
   const isPaginated = product.tags.includes("charm") || product.tags.includes("cover");
+  // Charms are identified by their photo, not a color — the Swatch column
+  // (and renaming the product itself, which would desync from the customizer
+  // copy that already says "Sanaya Charm") don't apply here.
+  const isCharm = product.tags.includes("charm");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
 
@@ -217,7 +221,7 @@ export default function AssetCategoryCard({
     <div className="group/card rounded-xl border border-white/70 bg-white/45 backdrop-blur-2xl ring-1 ring-inset ring-white/50 overflow-hidden shadow-[0_8px_30px_-14px_rgba(15,61,52,0.15)] transition-shadow hover:shadow-[0_12px_36px_-14px_rgba(15,61,52,0.22)]">
       <div className="flex items-center justify-between gap-4 border-b border-[#f0ece0]/80 bg-gradient-to-r from-white/40 to-transparent px-5 py-4">
         <div className="min-w-0">
-          <EditableTitle value={product.title} onSave={saveTitle} />
+          <EditableTitle value={product.title} onSave={saveTitle} readOnly={isCharm} />
           <p className="mt-0.5 text-xs text-[#a89a80]">
             {product.handle} · {product.status} · {product.tags.join(", ")}
           </p>
@@ -244,23 +248,37 @@ export default function AssetCategoryCard({
       )}
 
       {isPaginated && (
-        <div className="flex items-center gap-2 border-b border-[#f0ece0]/80 bg-white/30 px-5 py-3">
-          <svg
-            className="h-4 w-4 shrink-0 text-[#a89a80]"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
-          </svg>
-          <input
-            value={query}
-            onChange={(e) => handleQueryChange(e.target.value)}
-            placeholder="Search by variant name or SKU…"
-            className="w-full max-w-xs bg-transparent text-sm text-[#1c1c1a] placeholder:text-[#a89a80] focus:outline-none"
-          />
-          <span className="ml-auto shrink-0 text-xs text-[#a89a80]">
+        <div className="flex items-center gap-3 border-b border-[#f0ece0]/80 bg-[#f7f5f0] px-5 py-3">
+          <div className="flex w-full max-w-sm items-center gap-2 rounded-full border border-[#d8d5cb] bg-white px-3.5 py-2 shadow-sm transition-all focus-within:border-[#0f3d34] focus-within:ring-2 focus-within:ring-[#0f3d34]/10">
+            <svg
+              className="h-4 w-4 shrink-0 text-[#8a8880]"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+            </svg>
+            <input
+              value={query}
+              onChange={(e) => handleQueryChange(e.target.value)}
+              placeholder="Search by variant name or SKU…"
+              className="w-full bg-transparent text-sm text-[#1c1c1a] placeholder:text-[#a89a80] focus:outline-none"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => handleQueryChange("")}
+                aria-label="Clear search"
+                className="shrink-0 rounded-full p-0.5 text-[#a89a80] transition-colors hover:bg-[#f2ece1] hover:text-[#1c1c1a]"
+              >
+                <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                  <path d="M6 6l8 8M14 6l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                </svg>
+              </button>
+            )}
+          </div>
+          <span className="ml-auto shrink-0 text-xs font-medium text-[#6b6a63]">
             {filteredVariants.length} variant{filteredVariants.length === 1 ? "" : "s"}
           </span>
         </div>
@@ -380,7 +398,7 @@ export default function AssetCategoryCard({
             <th className="px-5 py-2.5 font-medium">Variant</th>
             <th className="px-5 py-2.5 font-medium">SKU</th>
             <th className="px-5 py-2.5 font-medium">Price ({currency})</th>
-            <th className="px-5 py-2.5 font-medium">Swatch</th>
+            {!isCharm && <th className="px-5 py-2.5 font-medium">Swatch</th>}
             <th className="px-5 py-2.5 font-medium">Stock</th>
             <th className="px-5 py-2.5 font-medium" />
           </tr>
@@ -393,6 +411,7 @@ export default function AssetCategoryCard({
                 variant={variant}
                 onSave={saveVariant}
                 onDelete={removeVariant}
+                hideSwatch={isCharm}
                 expandable={isCoverTracker}
                 expanded={expandedVariantId === variant.id}
                 onToggleExpand={() => setExpandedVariantId((cur) => (cur === variant.id ? null : variant.id))}
@@ -411,7 +430,7 @@ export default function AssetCategoryCard({
           ))}
           {isPaginated && visibleVariants.length === 0 && (
             <tr>
-              <td colSpan={7} className="px-5 py-8 text-center text-sm text-[#a89a80]">
+              <td colSpan={isCharm ? 6 : 7} className="px-5 py-8 text-center text-sm text-[#a89a80]">
                 No variants match “{query}”.
               </td>
             </tr>

@@ -25,6 +25,7 @@ export default function VariantRow({
   expandable,
   expanded,
   onToggleExpand,
+  hideSwatch,
 }: {
   productId: string;
   variant: Variant;
@@ -37,6 +38,8 @@ export default function VariantRow({
   expandable?: boolean;
   expanded?: boolean;
   onToggleExpand?: () => void;
+  /** Charms are identified by their photo, not a color swatch. */
+  hideSwatch?: boolean;
 }) {
   const router = useRouter();
   const { currency } = useCurrency();
@@ -167,35 +170,37 @@ export default function VariantRow({
           />
         </div>
       </td>
-      <td className="px-5 py-2.5">
-        <div className="flex items-center gap-1.5">
-          <label
-            className={`relative h-7 w-7 shrink-0 cursor-pointer rounded-full border transition-colors ${
-              swatchColor !== variant.swatchColor ? "border-[#b1632f]" : "border-[#e8e3d8]"
-            }`}
-            style={{ backgroundColor: swatchColor ?? "transparent" }}
-            title={swatchColor ?? "No swatch color set"}
-          >
-            {!swatchColor && (
-              <span className="absolute inset-0 rounded-full bg-[repeating-linear-gradient(45deg,#e8e3d8,#e8e3d8_3px,transparent_3px,transparent_6px)]" />
-            )}
+      {!hideSwatch && (
+        <td className="px-5 py-2.5">
+          <div className="flex items-center gap-1.5">
+            <label
+              className={`relative h-7 w-7 shrink-0 cursor-pointer rounded-full border transition-colors ${
+                swatchColor !== variant.swatchColor ? "border-[#b1632f]" : "border-[#e8e3d8]"
+              }`}
+              style={{ backgroundColor: swatchColor ?? "transparent" }}
+              title={swatchColor ?? "No swatch color set"}
+            >
+              {!swatchColor && (
+                <span className="absolute inset-0 rounded-full bg-[repeating-linear-gradient(45deg,#e8e3d8,#e8e3d8_3px,transparent_3px,transparent_6px)]" />
+              )}
+              <input
+                type="color"
+                disabled={saving || deleting}
+                value={swatchColor ?? "#cccccc"}
+                onChange={(e) => setSwatchColor(e.target.value)}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              />
+            </label>
             <input
-              type="color"
+              value={swatchColor ?? ""}
               disabled={saving || deleting}
-              value={swatchColor ?? "#cccccc"}
-              onChange={(e) => setSwatchColor(e.target.value)}
-              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              onChange={(e) => setSwatchColor(e.target.value || null)}
+              placeholder="none"
+              className={`admin-input w-20 ${swatchColor !== variant.swatchColor ? "dirty" : ""}`}
             />
-          </label>
-          <input
-            value={swatchColor ?? ""}
-            disabled={saving || deleting}
-            onChange={(e) => setSwatchColor(e.target.value || null)}
-            placeholder="none"
-            className={`admin-input w-20 ${swatchColor !== variant.swatchColor ? "dirty" : ""}`}
-          />
-        </div>
-      </td>
+          </div>
+        </td>
+      )}
       <td className="px-5 py-2.5">
         <div className="flex items-center gap-2">
           <input

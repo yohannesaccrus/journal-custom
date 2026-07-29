@@ -5,9 +5,11 @@ import { useRef, useState } from "react";
 export default function EditableTitle({
   value,
   onSave,
+  readOnly,
 }: {
   value: string;
   onSave: (title: string) => Promise<void>;
+  readOnly?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -30,6 +32,10 @@ export default function EditableTitle({
     } finally {
       setSaving(false);
     }
+  }
+
+  if (readOnly) {
+    return <span className="font-medium">{value}</span>;
   }
 
   if (editing) {
