@@ -8,6 +8,22 @@ import VariantRow from "./VariantRow";
 import { useCurrency } from "../CurrencyContext";
 import { CURRENCIES, convertToIDR, formatAmountInput, parseAmountInput, sanitizeAmountInput, toShopifyPriceString } from "@/lib/currency";
 
+const PAGE_SIZE = 5;
+
+/** Subsequence-based fuzzy match — every character of `query` must appear in
+ * `target`, in order, with any gaps between them. Good enough for short
+ * variant names/SKUs without pulling in a fuzzy-search dependency. */
+function fuzzyMatch(query: string, target: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const t = target.toLowerCase();
+  let qi = 0;
+  for (let ti = 0; ti < t.length && qi < q.length; ti++) {
+    if (t[ti] === q[qi]) qi++;
+  }
+  return qi === q.length;
+}
+
 export default function AssetCategoryCard({ product }: { product: AdminProduct }) {
   const router = useRouter();
   const { currency } = useCurrency();
@@ -16,6 +32,27 @@ export default function AssetCategoryCard({ product }: { product: AdminProduct }
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [newPriceInput, setNewPriceInput] = useState("0");
+
+  // Charm and cover catalogs can grow to dozens of variants — search + paginate
+  // just those two instead of the whole assets page.
+  const isPaginated = product.tags.includes("charm") || product.tags.includes("cover");
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+
+  const filteredVariants = isPaginated
+    ? product.variants.filter((v) => fuzzyMatch(query, `${v.title} ${v.sku}`))
+    : product.variants;
+
+  const totalPages = Math.max(1, Math.ceil(filteredVariants.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const visibleVariants = isPaginated
+    ? filteredVariants.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+    : filteredVariants;
+
+  function handleQueryChange(value: string) {
+    setQuery(value);
+    setPage(1);
+  }
 
   const primaryOption = product.options[0];
 
@@ -173,6 +210,29 @@ export default function AssetCategoryCard({ product }: { product: AdminProduct }
         </p>
       )}
 
+      {isPaginated && (
+        <div className="flex items-center gap-2 border-b border-[#f0ece0]/80 bg-white/30 px-5 py-3">
+          <svg
+            className="h-4 w-4 shrink-0 text-[#a89a80]"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+          </svg>
+          <input
+            value={query}
+            onChange={(e) => handleQueryChange(e.target.value)}
+            placeholder="Search by variant name or SKU…"
+            className="w-full max-w-xs bg-transparent text-sm text-[#1c1c1a] placeholder:text-[#a89a80] focus:outline-none"
+          />
+          <span className="ml-auto shrink-0 text-xs text-[#a89a80]">
+            {filteredVariants.length} variant{filteredVariants.length === 1 ? "" : "s"}
+          </span>
+        </div>
+      )}
+
       {adding && primaryOption && (
         <form
           action={addVariant}
@@ -222,7 +282,7 @@ export default function AssetCategoryCard({ product }: { product: AdminProduct }
           </tr>
         </thead>
         <tbody>
-          {product.variants.map((variant) => (
+          {visibleVariants.map((variant) => (
             <VariantRow
               key={variant.id}
               productId={product.id}
@@ -231,8 +291,55 @@ export default function AssetCategoryCard({ product }: { product: AdminProduct }
               onDelete={removeVariant}
             />
           ))}
+          {isPaginated && visibleVariants.length === 0 && (
+            <tr>
+              <td colSpan={7} className="px-5 py-8 text-center text-sm text-[#a89a80]">
+                No variants match “{query}”.
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
+
+      {isPaginated && totalPages > 1 && (
+        <div className="flex items-center justify-between gap-4 border-t border-[#f0ece0]/80 bg-white/30 px-5 py-3">
+          <p className="text-xs text-[#a89a80]">
+            Page {currentPage} of {totalPages}
+          </p>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="rounded-full border border-[#d8d5cb] px-3 py-1 text-xs font-medium text-[#6b6a63] transition-colors hover:bg-[#f2ece1] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+            >
+              Prev
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPage(p)}
+                className={`h-6 w-6 rounded-full text-xs font-medium transition-colors ${
+                  p === currentPage
+                    ? "bg-gradient-to-r from-[#154a3f] to-[#0f3d34] text-white shadow-sm"
+                    : "text-[#6b6a63] hover:bg-[#f2ece1]"
+                }`}
+              >
+                {p}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="rounded-full border border-[#d8d5cb] px-3 py-1 text-xs font-medium text-[#6b6a63] transition-colors hover:bg-[#f2ece1] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       <style jsx global>{`
         .admin-input {
