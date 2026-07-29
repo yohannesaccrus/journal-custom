@@ -2,9 +2,13 @@
 
 import { useState } from "react";
 import type { AdminOrder } from "@/lib/admin/shopify-admin-data";
+import type { OrderJournalPreview } from "@/lib/admin/order-preview";
 import type { JournalSelection } from "@/lib/types";
 import { PriceDisplay } from "@/app/admin/(dashboard)/PriceDisplay";
 import { ProductLinePicker } from "@/components/admin/ProductLinePicker";
+import { JournalThumbnail } from "@/components/admin/JournalPreviewModal";
+
+type OrderWithPreviews = AdminOrder & { previews: (OrderJournalPreview | null)[] };
 
 function specSummary(spec: JournalSelection, coverTitleByHandle: Record<string, string>): string[] {
   const lines: string[] = [];
@@ -41,7 +45,7 @@ export function OrdersPageBody({
   coverImage,
   coverTitleByHandle,
 }: {
-  orders: AdminOrder[];
+  orders: OrderWithPreviews[];
   coverImage: string | null;
   coverTitleByHandle: Record<string, string>;
 }) {
@@ -111,7 +115,7 @@ function OrderTable({
   coverTitleByHandle,
 }: {
   title: string;
-  orders: AdminOrder[];
+  orders: OrderWithPreviews[];
   emptyMessage: string;
   coverTitleByHandle: Record<string, string>;
 }) {
@@ -160,17 +164,7 @@ function OrderTable({
                   <td className="px-5 py-3 align-top">
                     <div className="flex flex-col gap-2">
                       {order.journals.map((j, i) => (
-                        <div key={i} className="flex items-center gap-2 whitespace-nowrap">
-                          <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#eae7de] bg-[#f7f5f0]">
-                            {j.imageUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={j.imageUrl} alt="" className="h-full w-full object-cover" />
-                            ) : (
-                              <span className="text-[10px] text-[#c8c2b3]">—</span>
-                            )}
-                          </span>
-                          <span className="text-xs text-[#1c1c1a]">{j.title}</span>
-                        </div>
+                        <JournalThumbnail key={i} imageUrl={j.imageUrl} title={j.title} preview={order.previews[i] ?? null} />
                       ))}
                     </div>
                   </td>

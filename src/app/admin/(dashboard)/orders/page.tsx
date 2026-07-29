@@ -1,8 +1,15 @@
 import { fetchAssetProducts, fetchJournalOrders } from "@/lib/admin/shopify-admin-data";
+import { buildOrderJournalPreview } from "@/lib/admin/order-preview";
+import { fetchCharmProduct, fetchJournalProducts } from "@/lib/shopify-admin";
 import { OrdersPageBody } from "@/components/admin/OrdersPageBody";
 
 export default async function AdminOrdersPage() {
-  const [{ orders }, products] = await Promise.all([fetchJournalOrders(), fetchAssetProducts()]);
+  const [{ orders }, products, journalProducts, charmProduct] = await Promise.all([
+    fetchJournalOrders(),
+    fetchAssetProducts(),
+    fetchJournalProducts(),
+    fetchCharmProduct(),
+  ]);
 
   const coverImage =
     products.find((p) => /cover/i.test(p.title))?.variants.find((v) => v.image)?.image?.url ??
@@ -13,6 +20,15 @@ export default async function AdminOrdersPage() {
   // human title once here rather than per-row in the client.
   const coverTitleByHandle = Object.fromEntries(products.map((p) => [p.handle, p.title]));
 
+  // Rebuild the same front/back/side view each order's design link points to,
+  // so the Orders table can preview it inline instead of only linking out.
+  const ordersWithPreviews = orders.map((order) => ({
+    ...order,
+    previews: order.specs.map((spec) =>
+      spec ? buildOrderJournalPreview(spec, journalProducts, charmProduct) : null
+    ),
+  }));
+
   return (
     <div>
       <h1 className="text-2xl font-serif">Orders</h1>
@@ -20,7 +36,7 @@ export default async function AdminOrdersPage() {
         Custom journal orders, with a direct link to each customer&apos;s final design preview.
       </p>
 
-      <OrdersPageBody orders={orders} coverImage={coverImage} coverTitleByHandle={coverTitleByHandle} />
+      <OrdersPageBody orders={ordersWithPreviews} coverImage={coverImage} coverTitleByHandle={coverTitleByHandle} />
     </div>
   );
 }
