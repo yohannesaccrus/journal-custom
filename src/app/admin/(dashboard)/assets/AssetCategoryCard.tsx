@@ -281,37 +281,51 @@ export default function AssetCategoryCard({
       )}
 
       {syncsToJournal && (
-        <div className="flex flex-col items-start gap-2 border-b border-[#f0d9a8] bg-gradient-to-r from-[#fdf3da] to-[#faecc6] px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-2.5">
-            <svg
-              className="mt-0.5 h-4 w-4 shrink-0 text-[#8a5f1f]"
-              viewBox="0 0 20 20"
-              fill="currentColor"
+        <div className="flex flex-col gap-3 border-b border-[#f0d9a8] bg-gradient-to-r from-[#fdf3da] to-[#faecc6] px-5 py-3.5">
+          <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-2.5">
+              <svg
+                className="mt-0.5 h-4 w-4 shrink-0 text-[#8a5f1f]"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 8a1 1 0 100-2 1 1 0 000 2z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              <p className="text-xs leading-relaxed text-[#6b4c14]">
+                <span className="font-semibold">The stock shown in this table is not real stock.</span>{" "}
+                The stock customers actually see comes from the per-cover variants in the{" "}
+                <span className="font-semibold">Cover</span> table. Update stock there for changes to
+                actually take effect.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                document
+                  .getElementById("asset-cover-card")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" })
+              }
+              className="shrink-0 rounded-full border border-[#e0b45c] bg-white/70 px-3.5 py-1.5 text-xs font-medium text-[#8a5f1f] shadow-sm transition-colors hover:bg-white"
             >
-              <path
-                fillRule="evenodd"
-                d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 8a1 1 0 100-2 1 1 0 000 2z"
-                clipRule="evenodd"
-              />
-            </svg>
-            <p className="text-xs leading-relaxed text-[#6b4c14]">
-              <span className="font-semibold">Stok di tabel ini bukan stok sebenarnya.</span>{" "}
-              Stok yang dilihat pelanggan berasal dari varian per-cover pada tabel{" "}
-              <span className="font-semibold">Cover</span>. Update stok di sana agar perubahan
-              benar-benar tersimpan.
-            </p>
+              Open Cover table ↓
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() =>
-              document
-                .getElementById("asset-cover-card")
-                ?.scrollIntoView({ behavior: "smooth", block: "start" })
-            }
-            className="shrink-0 rounded-full border border-[#e0b45c] bg-white/70 px-3.5 py-1.5 text-xs font-medium text-[#8a5f1f] shadow-sm transition-colors hover:bg-white"
-          >
-            Buka tabel Cover ↓
-          </button>
+
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1.5 pl-6 text-[11px] font-medium text-[#8a5f1f]">
+            <span className="rounded-full bg-white/70 px-2.5 py-1 shadow-sm">1. Open the Cover table</span>
+            <span className="text-[#c9a869]">→</span>
+            <span className="rounded-full bg-white/70 px-2.5 py-1 shadow-sm">2. Expand the cover row</span>
+            <span className="text-[#c9a869]">→</span>
+            <span className="rounded-full bg-white/70 px-2.5 py-1 shadow-sm">3. Find the String / Pen Holder combo</span>
+            <span className="text-[#c9a869]">→</span>
+            <span className="rounded-full bg-white/70 px-2.5 py-1 shadow-sm">4. Edit its Stock field</span>
+            <span className="text-[#c9a869]">→</span>
+            <span className="rounded-full bg-white/70 px-2.5 py-1 shadow-sm">5. Save</span>
+          </div>
         </div>
       )}
 
