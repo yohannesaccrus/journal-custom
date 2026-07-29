@@ -16,10 +16,6 @@ export default async function AdminOrdersPage() {
     products.flatMap((p) => p.variants).find((v) => v.image)?.image?.url ??
     null;
 
-  // Journal specs only store the cover's product *handle* — resolve it to a
-  // human title once here rather than per-row in the client.
-  const coverTitleByHandle = Object.fromEntries(products.map((p) => [p.handle, p.title]));
-
   // Rebuild the same front/back/side view each order's design link points to,
   // so the Orders table can preview it inline instead of only linking out.
   const ordersWithPreviews = orders.map((order) => ({
@@ -36,7 +32,7 @@ export default async function AdminOrdersPage() {
         Custom journal orders, with a direct link to each customer&apos;s final design preview.
       </p>
 
-      <OrdersPageBody orders={ordersWithPreviews} coverImage={coverImage} coverTitleByHandle={coverTitleByHandle} />
+      <OrdersPageBody orders={ordersWithPreviews} coverImage={coverImage} />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { DesignSlider } from "@/components/DesignSlider";
 import { PriceDisplay } from "@/app/admin/(dashboard)/PriceDisplay";
 import type { OrderJournalPreview } from "@/lib/admin/order-preview";
@@ -46,6 +47,7 @@ export function JournalThumbnail({
       <button
         type="button"
         onClick={() => setOpen(true)}
+        title="Click to view the finished design"
         className="group flex items-center gap-2 whitespace-nowrap rounded-lg transition-colors hover:bg-white/60 -mx-1 px-1 py-0.5"
       >
         <span className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#eae7de] bg-[#f7f5f0] ring-0 ring-[#0f3d34]/0 transition-all group-hover:ring-2 group-hover:ring-[#0f3d34]/25">
@@ -66,9 +68,19 @@ export function JournalThumbnail({
               />
             </svg>
           </span>
+          {/* Always-visible clue (not just on hover) that this thumbnail opens a design preview. */}
+          <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border border-white bg-[#0f3d34] text-white shadow-sm">
+            <svg viewBox="0 0 24 24" fill="none" className="h-2.5 w-2.5">
+              <circle cx="11" cy="11" r="6" stroke="currentColor" strokeWidth="2" />
+              <path d="M20 20l-3.5-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </span>
         </span>
-        <span className="text-xs text-[#1c1c1a] underline decoration-[#d8d5cb] decoration-dotted underline-offset-4 group-hover:decoration-[#0f3d34]">
-          {title}
+        <span className="flex flex-col items-start">
+          <span className="text-xs text-[#1c1c1a] underline decoration-[#d8d5cb] decoration-dotted underline-offset-4 group-hover:decoration-[#0f3d34]">
+            {title}
+          </span>
+          <span className="text-[10px] text-[#a89a80] group-hover:text-[#0f3d34]">Click to view design</span>
         </span>
       </button>
 
@@ -94,7 +106,7 @@ function JournalPreviewModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-[#0a2b25]/60 backdrop-blur-sm" onClick={onClose} />
 
@@ -173,6 +185,7 @@ function JournalPreviewModal({
           }
         }
       `}</style>
-    </div>
+    </div>,
+    document.body
   );
 }

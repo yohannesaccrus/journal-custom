@@ -3,26 +3,11 @@
 import { useState } from "react";
 import type { AdminOrder } from "@/lib/admin/shopify-admin-data";
 import type { OrderJournalPreview } from "@/lib/admin/order-preview";
-import type { JournalSelection } from "@/lib/types";
 import { PriceDisplay } from "@/app/admin/(dashboard)/PriceDisplay";
 import { ProductLinePicker } from "@/components/admin/ProductLinePicker";
 import { JournalThumbnail } from "@/components/admin/JournalPreviewModal";
 
 type OrderWithPreviews = AdminOrder & { previews: (OrderJournalPreview | null)[] };
-
-function specSummary(spec: JournalSelection, coverTitleByHandle: Record<string, string>): string[] {
-  const lines: string[] = [];
-  lines.push(coverTitleByHandle[spec.cover] ?? spec.cover);
-  if (spec.cord !== "none") lines.push(`String: ${spec.cord}`);
-  if (spec.patch !== "none") lines.push(`Patch: ${spec.patch.charAt(0).toUpperCase() + spec.patch.slice(1)}`);
-  if (spec.penHolder !== "none") {
-    lines.push(`Pen holder: ${spec.penHolder === "black" ? "Black" : "Brown"}${spec.edge ? " + edge" : ""}`);
-  }
-  const notebookCount = Object.values(spec.notebooks).reduce((sum, n) => sum + n, 0);
-  if (notebookCount > 0) lines.push(`${notebookCount} notebook${notebookCount === 1 ? "" : "s"}`);
-  if (spec.charms.length > 0) lines.push(`${spec.charms.length} charm${spec.charms.length === 1 ? "" : "s"}`);
-  return lines;
-}
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString("en-US", {
@@ -43,11 +28,9 @@ function statusTone(status: string): string {
 export function OrdersPageBody({
   orders,
   coverImage,
-  coverTitleByHandle,
 }: {
   orders: OrderWithPreviews[];
   coverImage: string | null;
-  coverTitleByHandle: Record<string, string>;
 }) {
   const [selected, setSelected] = useState("journal");
 
@@ -88,19 +71,9 @@ export function OrdersPageBody({
 
       {selected === "journal" && (
         <div className="mt-8 flex flex-col gap-8">
-          <OrderTable
-            title="Orders"
-            orders={activeOrders}
-            emptyMessage="No custom journal orders yet."
-            coverTitleByHandle={coverTitleByHandle}
-          />
+          <OrderTable title="Orders" orders={activeOrders} emptyMessage="No custom journal orders yet." />
           {voidedOrders.length > 0 && (
-            <OrderTable
-              title="Voided"
-              orders={voidedOrders}
-              emptyMessage="No voided orders."
-              coverTitleByHandle={coverTitleByHandle}
-            />
+            <OrderTable title="Voided" orders={voidedOrders} emptyMessage="No voided orders." />
           )}
         </div>
       )}
@@ -112,12 +85,10 @@ function OrderTable({
   title,
   orders,
   emptyMessage,
-  coverTitleByHandle,
 }: {
   title: string;
   orders: OrderWithPreviews[];
   emptyMessage: string;
-  coverTitleByHandle: Record<string, string>;
 }) {
   return (
     <div>
@@ -138,7 +109,6 @@ function OrderTable({
                 <th className="px-5 py-2.5 font-medium whitespace-nowrap">Status</th>
                 <th className="px-5 py-2.5 font-medium whitespace-nowrap">Total</th>
                 <th className="px-5 py-2.5 font-medium whitespace-nowrap">Journal</th>
-                <th className="px-5 py-2.5 font-medium whitespace-nowrap">Spec</th>
                 <th className="px-5 py-2.5 font-medium whitespace-nowrap">Design</th>
               </tr>
             </thead>
@@ -166,30 +136,6 @@ function OrderTable({
                       {order.journals.map((j, i) => (
                         <JournalThumbnail key={i} imageUrl={j.imageUrl} title={j.title} preview={order.previews[i] ?? null} />
                       ))}
-                    </div>
-                  </td>
-                  <td className="px-5 py-3 align-top">
-                    <div className="flex flex-col gap-2">
-                      {order.journals.map((_, i) => {
-                        const spec = order.specs[i];
-                        if (!spec) {
-                          return (
-                            <p key={i} className="text-xs text-[#a89a80] whitespace-nowrap">
-                              No spec on file
-                            </p>
-                          );
-                        }
-                        const lines = specSummary(spec, coverTitleByHandle);
-                        return (
-                          <ul key={i} className="text-xs leading-relaxed text-[#4a4944]">
-                            {lines.map((line, li) => (
-                              <li key={li} className={li === 0 ? "font-medium text-[#1c1c1a]" : "text-[#6b6a63]"}>
-                                {line}
-                              </li>
-                            ))}
-                          </ul>
-                        );
-                      })}
                     </div>
                   </td>
                   <td className="px-5 py-3 whitespace-nowrap">
@@ -228,7 +174,7 @@ function OrderTable({
               ))}
               {orders.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-5 py-8 text-center text-sm text-[#a89a80]">
+                  <td colSpan={7} className="px-5 py-8 text-center text-sm text-[#a89a80]">
                     {emptyMessage}
                   </td>
                 </tr>
