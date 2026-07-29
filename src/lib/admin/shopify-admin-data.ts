@@ -614,6 +614,88 @@ export async function syncJournalOptionAdd(componentTags: string[], newValue: st
   return results;
 }
 
+/**
+ * String and Pen Holder colors are a shared physical component — the same
+ * spool/batch is used no matter which cover it ends up on — so unlike Cover
+ * (a real per-cover stock count), one Stock number on the component tracker
+ * should be the single source of truth, mirrored onto *every* matching
+ * variant across all 8 journal covers (e.g. every "…/ Orange / …" variant,
+ * regardless of cover or pen holder). Editing stock per-cover in the Cover
+ * card's accordion still works and simply gets overwritten the next time
+ * this runs.
+ */
+export async function syncJournalVariantStock(
+  componentTags: string[],
+  colorLabel: string,
+  quantity: number
+): Promise<JournalSyncResult[]> {
+  const tag = componentTags.find((t) => t === "string" || t === "pen-holder");
+  if (!tag) return [];
+
+  const JOURNAL_PRODUCTS_QUERY = `
+    query JournalProductsForStockSync {
+      products(first: 20, query: "tag:journal") {
+        nodes {
+          handle
+          title
+          variants(first: 100) {
+            nodes {
+              id
+              selectedOptions { name value }
+              inventoryItem { id }
+            }
+          }
+        }
+      }
+    }
+  `;
+  const data = await shopifyAdmin<{
+    products: {
+      nodes: {
+        handle: string;
+        title: string;
+        variants: {
+          nodes: {
+            id: string;
+            selectedOptions: { name: string; value: string }[];
+            inventoryItem: { id: string };
+          }[];
+        };
+      }[];
+    };
+  }>(JOURNAL_PRODUCTS_QUERY);
+
+  const optionName = tag === "string" ? "String" : "Pen Holder";
+  const matchesColor = (value: string) => value === colorLabel || value === `${colorLabel} + Edge`;
+
+  const results: JournalSyncResult[] = [];
+  for (const product of data.products.nodes) {
+    const matches = product.variants.nodes.filter((v) =>
+      v.selectedOptions.some((o) => o.name === optionName && matchesColor(o.value))
+    );
+    if (matches.length === 0) {
+      results.push({ coverHandle: product.handle, coverTitle: product.title, created: 0, skipped: true });
+      continue;
+    }
+    try {
+      for (const variant of matches) {
+        await setVariantStock(variant.inventoryItem.id, quantity);
+      }
+      results.push({ coverHandle: product.handle, coverTitle: product.title, created: matches.length, skipped: false });
+    } catch (err) {
+      results.push({
+        coverHandle: product.handle,
+        coverTitle: product.title,
+        created: 0,
+        skipped: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  return results;
+}
+
 export async function updateProductTitle(productId: string, title: string): Promise<void> {
   const MUTATION = `
     mutation UpdateProductTitle($input: ProductInput!) {

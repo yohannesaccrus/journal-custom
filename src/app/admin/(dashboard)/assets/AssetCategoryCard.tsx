@@ -42,6 +42,7 @@ export default function AssetCategoryCard({
   const [newPriceInput, setNewPriceInput] = useState("0");
   const [submittingVariant, setSubmittingVariant] = useState(false);
   const [journalSync, setJournalSync] = useState<JournalSyncResult[] | null>(null);
+  const [journalSyncKind, setJournalSyncKind] = useState<"variants" | "stock">("variants");
 
   // String and Pen Holder colors also live as option values on all 8 sellable
   // journal cover products — adding one here needs to propagate there too, or
@@ -128,6 +129,7 @@ export default function AssetCategoryCard({
     fields: { name?: string; sku?: string; price?: string; stock?: number; swatchColor?: string | null }
   ) {
     setError(null);
+    setJournalSync(null);
     const requests: Promise<Response>[] = [];
 
     if (fields.name !== undefined || fields.sku !== undefined || fields.price !== undefined) {
@@ -153,14 +155,22 @@ export default function AssetCategoryCard({
       );
     }
 
+    let stockRequest: Promise<Response> | undefined;
     if (fields.stock !== undefined) {
-      requests.push(
-        fetch("/api/admin/assets/stock", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ inventoryItemId: variant.inventoryItemId, quantity: fields.stock }),
-        })
-      );
+      // String/Pen Holder stock is a shared physical component, not
+      // per-cover — see `syncJournalVariantStock` — so the same number gets
+      // mirrored onto every matching variant across all 8 journal covers.
+      stockRequest = fetch("/api/admin/assets/stock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          inventoryItemId: variant.inventoryItemId,
+          quantity: fields.stock,
+          productTags: syncsToJournal ? product.tags : undefined,
+          colorLabel: syncsToJournal ? variant.title : undefined,
+        }),
+      });
+      requests.push(stockRequest);
     }
 
     if (fields.swatchColor !== undefined) {
@@ -179,6 +189,14 @@ export default function AssetCategoryCard({
         const json = await res.json();
         setError(json.error ?? "Failed to save variant");
         throw new Error(json.error);
+      }
+    }
+    if (stockRequest) {
+      const stockRes = await stockRequest;
+      const stockJson = await stockRes.json();
+      if (Array.isArray(stockJson.journalSync) && stockJson.journalSync.length > 0) {
+        setJournalSyncKind("stock");
+        setJournalSync(stockJson.journalSync);
       }
     }
     refresh();
@@ -233,6 +251,7 @@ export default function AssetCategoryCard({
       setAdding(false);
       setNewPriceInput("0");
       if (Array.isArray(json.journalSync) && json.journalSync.length > 0) {
+        setJournalSyncKind("variants");
         setJournalSync(json.journalSync);
       }
       refresh();
@@ -376,7 +395,8 @@ export default function AssetCategoryCard({
         <div className="animate-[fadeIn_0.15s_ease-out] border-b border-[#eae7de] bg-gradient-to-r from-[#f7f9f6] to-[#eef4ef] px-5 py-4">
           <div className="flex items-center justify-between gap-4">
             <p className="text-xs font-medium text-[#1c1c1a]">
-              Synced to {journalSync.filter((r) => r.created > 0).length}/{journalSync.length} covers
+              {journalSyncKind === "stock" ? "Stock updated on" : "Synced to"}{" "}
+              {journalSync.filter((r) => r.created > 0).length}/{journalSync.length} covers
               {journalSync.some((r) => r.error) && (
                 <span className="ml-1.5 text-[#b5342c]">
                   · {journalSync.filter((r) => r.error).length} failed
@@ -384,7 +404,9 @@ export default function AssetCategoryCard({
               )}
               {journalSync.some((r) => r.skipped) && (
                 <span className="ml-1.5 text-[#b1632f]">
-                  · {journalSync.filter((r) => r.skipped).length} already had it
+                  ·{" "}
+                  {journalSync.filter((r) => r.skipped).length}{" "}
+                  {journalSyncKind === "stock" ? "had no matching variant" : "already had it"}
                 </span>
               )}
             </p>
@@ -405,12 +427,22 @@ export default function AssetCategoryCard({
                   }`}
                 />
                 {r.coverTitle}
-                {r.error ? ` — ${r.error}` : r.skipped ? " — already exists" : ` — ${r.created} variants`}
+                {r.error
+                  ? ` — ${r.error}`
+                  : r.skipped
+                    ? journalSyncKind === "stock"
+                      ? " — no variant uses this color here"
+                      : " — already exists"
+                    : journalSyncKind === "stock"
+                      ? ` — ${r.created} variant${r.created === 1 ? "" : "s"} updated`
+                      : ` — ${r.created} variants`}
               </li>
             ))}
           </ul>
           <p className="mt-2.5 text-[11px] text-[#a89a80]">
-            New variants start at 0 stock — set opening stock for each cover directly in Shopify Admin.
+            {journalSyncKind === "stock"
+              ? "This stock number is shared — it now applies to every matching variant on all 8 covers."
+              : "New variants start at 0 stock — set opening stock for each cover directly in Shopify Admin."}
           </p>
         </div>
       )}
@@ -423,7 +455,27 @@ export default function AssetCategoryCard({
             <th className="px-5 py-2.5 font-medium">SKU</th>
             <th className="px-5 py-2.5 font-medium">Price ({currency})</th>
             {!hideSwatch && <th className="px-5 py-2.5 font-medium">Swatch</th>}
-            <th className="px-5 py-2.5 font-medium">Stock</th>
+            <th className="px-5 py-2.5 font-medium">
+              {syncsToJournal ? (
+                <span className="group/stockhint relative inline-flex items-center gap-1">
+                  Stock
+                  <svg viewBox="0 0 20 20" fill="currentColor" className="h-3 w-3 text-[#a89a80]">
+                    <path
+                      fillRule="evenodd"
+                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  <span className="pointer-events-none absolute left-0 top-full z-10 mt-2 w-64 rounded-lg border border-[#eae7de] bg-white p-3 text-[11px] font-normal normal-case leading-relaxed text-[#4a4944] opacity-0 shadow-lg transition-opacity duration-150 group-hover/stockhint:opacity-100">
+                    This is a shared component — the same {product.tags.includes("string") ? "string" : "pen holder"}{" "}
+                    stock is used no matter which cover it ships on. Saving a number here updates every matching
+                    variant across all 8 covers at once, instead of one cover at a time.
+                  </span>
+                </span>
+              ) : (
+                "Stock"
+              )}
+            </th>
             <th className="px-5 py-2.5 font-medium" />
           </tr>
         </thead>
