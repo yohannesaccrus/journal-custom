@@ -9,10 +9,11 @@ interface CordStepProps {
   product: ShopifyJournalProduct;
   cord: string;
   onCordChange: (value: string) => void;
+  swatchByLabel?: Record<string, string>;
 }
 
-export function CordStep({ product, cord, onCordChange }: CordStepProps) {
-  const entries = buildCordEntries(product);
+export function CordStep({ product, cord, onCordChange, swatchByLabel }: CordStepProps) {
+  const entries = buildCordEntries(product, swatchByLabel);
   const current = entries.find((c) => c.label === cord);
 
   return (

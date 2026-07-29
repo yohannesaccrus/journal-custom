@@ -82,7 +82,7 @@ export default function JournalVariantsPanel({
       <div className="max-h-96 overflow-y-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="sticky top-0 bg-[#f2ece1] text-left text-[10px] uppercase tracking-wide text-[#6b6a63]">
+            <tr className="bg-[#f2ece1] text-left text-[10px] uppercase tracking-wide text-[#6b6a63]">
               <th className="px-5 py-2 font-medium">Image</th>
               <th className="px-5 py-2 font-medium">String / Pen Holder</th>
               <th className="px-5 py-2 font-medium">SKU</th>

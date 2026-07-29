@@ -79,8 +79,13 @@ export interface CordEntry {
   inStock: boolean;
 }
 
-/** `product` is the currently selected cover — stock is per (cover, cord) variant. */
-export function buildCordEntries(product: ShopifyJournalProduct): CordEntry[] {
+/**
+ * `product` is the currently selected cover — stock is per (cover, string)
+ * variant. `swatchByLabel` is the live admin-edited swatch map (see
+ * `fetchSwatchColors` in `shopify-admin.ts`); `SWATCH_HEX` is only a fallback
+ * for colors that predate that metafield being set.
+ */
+export function buildCordEntries(product: ShopifyJournalProduct, swatchByLabel: Record<string, string> = {}): CordEntry[] {
   const values = new Set(
     product.variants.map((v) => optionValue(v, "String")).filter((v): v is string => !!v && v !== "No Cord")
   );
@@ -88,7 +93,7 @@ export function buildCordEntries(product: ShopifyJournalProduct): CordEntry[] {
     const variant = product.variants.find(
       (v) => optionValue(v, "String") === label && optionValue(v, "Pen Holder") === "None"
     );
-    return { label, swatch: SWATCH_HEX[label] ?? "#999999", inStock: inStock(variant) };
+    return { label, swatch: swatchByLabel[label] ?? SWATCH_HEX[label] ?? "#999999", inStock: inStock(variant) };
   });
 }
 
@@ -98,8 +103,12 @@ export interface PenHolderEntry {
   inStock: boolean;
 }
 
-/** `cord` is the currently selected/effective cord — stock is per (cover, cord, pen holder) variant. */
-export function buildPenHolderEntries(product: ShopifyJournalProduct, cord: string): PenHolderEntry[] {
+/** `cord` is the currently selected/effective cord — stock is per (cover, string, pen holder) variant. */
+export function buildPenHolderEntries(
+  product: ShopifyJournalProduct,
+  cord: string,
+  swatchByLabel: Record<string, string> = {}
+): PenHolderEntry[] {
   const cordValue = cord === "none" ? "No Cord" : cord;
   const values = new Set(
     product.variants
@@ -110,7 +119,7 @@ export function buildPenHolderEntries(product: ShopifyJournalProduct, cord: stri
     const variant = product.variants.find(
       (v) => optionValue(v, "String") === cordValue && optionValue(v, "Pen Holder") === label
     );
-    return { label, swatch: SWATCH_HEX[label] ?? "#999999", inStock: inStock(variant) };
+    return { label, swatch: swatchByLabel[label] ?? SWATCH_HEX[label] ?? "#999999", inStock: inStock(variant) };
   });
 }
 

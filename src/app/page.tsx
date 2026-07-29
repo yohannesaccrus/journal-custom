@@ -1,12 +1,19 @@
 import { JournalCustomizer } from "@/components/JournalCustomizer";
-import { fetchCharmProduct, fetchJournalProducts, fetchNotebookProduct, fetchPatchProduct } from "@/lib/shopify-admin";
+import {
+  fetchCharmProduct,
+  fetchJournalProducts,
+  fetchNotebookProduct,
+  fetchPatchProduct,
+  fetchSwatchColors,
+} from "@/lib/shopify-admin";
 
 export default async function Home() {
-  const [products, charmProduct, notebookProduct, patchProduct] = await Promise.all([
+  const [products, charmProduct, notebookProduct, patchProduct, swatchColors] = await Promise.all([
     fetchJournalProducts(),
     fetchCharmProduct(),
     fetchNotebookProduct(),
     fetchPatchProduct(),
+    fetchSwatchColors(),
   ]);
 
   if (!charmProduct) {
@@ -25,6 +32,7 @@ export default async function Home() {
       charmProduct={charmProduct}
       notebookProduct={notebookProduct}
       patchProduct={patchProduct}
+      swatchColors={swatchColors}
     />
   );
 }

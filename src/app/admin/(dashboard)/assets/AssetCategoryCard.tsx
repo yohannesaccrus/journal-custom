@@ -60,11 +60,30 @@ export default function AssetCategoryCard({
   // (and renaming the product itself, which would desync from the customizer
   // copy that already says "Sanaya Charm") don't apply here.
   const isCharm = product.tags.includes("charm");
+  // Patch shapes (star/heart/...) are identified by their photo too, same as Charm.
+  const isPatch = product.tags.includes("patch");
+  // A single non-color add-on kit — no swatch makes sense here either.
+  const isCornerEdge = product.tags.includes("edge");
+  // Notebook designs (To-Do List, Lined, Blank, Grid) are identified by their
+  // photo/pattern too, same as Charm/Patch.
+  const isNotebook = product.tags.includes("notebook");
   // Cover rows are read-only / swatch-less for the same reasons as Charm:
   // renaming would desync from the "Cover" option value the accordion below
   // matches by, and covers are identified by photo, not a color.
-  const hideSwatch = isCharm || isCoverTracker;
-  const titleReadOnly = isCharm || isCoverTracker;
+  const hideSwatch = isCharm || isCoverTracker || isPatch || isCornerEdge || isNotebook;
+  // String and Pen Holder's Swatch columns stay editable — they actually
+  // drive the live customizer's color pickers (see `fetchSwatchColors`) —
+  // but like Cover/Charm/Patch/Corner Edge/Notebook their titles shouldn't
+  // be renamed independently of the tag-based matching the rest of the app
+  // relies on.
+  const titleReadOnly =
+    isCharm ||
+    isCoverTracker ||
+    isPatch ||
+    isCornerEdge ||
+    isNotebook ||
+    product.tags.includes("string") ||
+    product.tags.includes("pen-holder");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
 

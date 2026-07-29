@@ -12,9 +12,18 @@ interface PenHolderStepProps {
   selection: JournalSelection;
   onPenHolderChange: (slug: JournalSelection["penHolder"]) => void;
   onEdgeChange: (edge: boolean) => void;
+  cordSwatchByLabel?: Record<string, string>;
+  penHolderSwatchByLabel?: Record<string, string>;
 }
 
-export function PenHolderStep({ product, selection, onPenHolderChange, onEdgeChange }: PenHolderStepProps) {
+export function PenHolderStep({
+  product,
+  selection,
+  onPenHolderChange,
+  onEdgeChange,
+  cordSwatchByLabel,
+  penHolderSwatchByLabel,
+}: PenHolderStepProps) {
   const { format } = useCurrencyFormat();
   const hasPenHolder = selection.penHolder !== "none";
 
@@ -23,8 +32,9 @@ export function PenHolderStep({ product, selection, onPenHolderChange, onEdgeCha
   // (see handlePenHolderChange in JournalCustomizer). Price previews here
   // need that same substitution, or resolving a "No Cord + Pen Holder"
   // variant that doesn't exist would throw before the user even clicks.
-  const effectiveCord = selection.cord !== "none" ? selection.cord : buildCordEntries(product)[0]?.label ?? selection.cord;
-  const entries = buildPenHolderEntries(product, effectiveCord);
+  const effectiveCord =
+    selection.cord !== "none" ? selection.cord : buildCordEntries(product, cordSwatchByLabel)[0]?.label ?? selection.cord;
+  const entries = buildPenHolderEntries(product, effectiveCord, penHolderSwatchByLabel);
   const edgeInStock = selection.penHolder !== "none" ? isEdgeInStock(product, effectiveCord, selection.penHolder) : true;
 
   const priceAt = (penHolder: JournalSelection["penHolder"], edge: boolean) => {

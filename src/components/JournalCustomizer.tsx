@@ -32,7 +32,7 @@ import {
 } from "@/lib/catalog";
 import { buildCartItems } from "@/lib/cart";
 import { buildDesignUrl } from "@/lib/design-link";
-import type { ShopifyJournalProduct } from "@/lib/shopify-admin";
+import type { ShopifyJournalProduct, SwatchColors } from "@/lib/shopify-admin";
 import type { CharmSide, CoverCategory, JournalSelection, PlacedCharm } from "@/lib/types";
 
 const STEPS = ["Journal Covers", "Charms", "Accessories", "Content", "Preview"] as const;
@@ -57,6 +57,8 @@ interface JournalCustomizerProps {
   charmProduct: ShopifyJournalProduct;
   notebookProduct: ShopifyJournalProduct;
   patchProduct: ShopifyJournalProduct;
+  /** Admin-edited swatch colors for String/Pen Holder — see `fetchSwatchColors`. */
+  swatchColors: SwatchColors;
   // Set when this render is the phone-sized <iframe> embed the "Mobile View"
   // toggle opens (see page.tsx) — suppresses all the dev-only style controls
   // so the embed just shows the customizer itself, seeded to match whatever
@@ -79,6 +81,7 @@ function JournalCustomizerContent({
   charmProduct,
   notebookProduct,
   patchProduct,
+  swatchColors,
   hideDevControls,
   initialTheme,
   initialBackground,
@@ -388,7 +391,7 @@ function JournalCustomizerContent({
     // the first one behind the scenes so a real variant always resolves.
     // Patch stays locked until the user picks a cord themselves.
     if (selection.cord === "none") {
-      const fallbackCord = buildCordEntries(product)[0]?.label;
+      const fallbackCord = buildCordEntries(product, swatchColors.string)[0]?.label;
       if (fallbackCord) {
         setCordAutoSelected(true);
         updateSelection({ penHolder, cord: fallbackCord });
@@ -721,7 +724,12 @@ function JournalCustomizerContent({
                   onCoverChange={(cover) => updateSelection({ cover })}
                 />
                 <div className="mt-6 border-t border-[var(--border)] pt-6">
-                  <CordStep product={product} cord={selection.cord} onCordChange={handleCordChange} />
+                  <CordStep
+                    product={product}
+                    cord={selection.cord}
+                    onCordChange={handleCordChange}
+                    swatchByLabel={swatchColors.string}
+                  />
                 </div>
                 <div className="mt-6 border-t border-[var(--border)] pt-6">
                   <PatchStep
@@ -750,6 +758,8 @@ function JournalCustomizerContent({
                 selection={selection}
                 onPenHolderChange={handlePenHolderChange}
                 onEdgeChange={(edge) => updateSelection({ edge })}
+                cordSwatchByLabel={swatchColors.string}
+                penHolderSwatchByLabel={swatchColors.penHolder}
               />
             )}
             {step === NOTEBOOKS_STEP && (

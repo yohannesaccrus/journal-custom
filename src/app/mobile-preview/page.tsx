@@ -1,5 +1,11 @@
 import { JournalCustomizer } from "@/components/JournalCustomizer";
-import { fetchCharmProduct, fetchJournalProducts, fetchNotebookProduct, fetchPatchProduct } from "@/lib/shopify-admin";
+import {
+  fetchCharmProduct,
+  fetchJournalProducts,
+  fetchNotebookProduct,
+  fetchPatchProduct,
+  fetchSwatchColors,
+} from "@/lib/shopify-admin";
 import type { BackgroundMode } from "@/components/BackgroundSwitcher";
 import type { Theme } from "@/components/ThemeSwitcher";
 
@@ -16,11 +22,12 @@ interface MobilePreviewProps {
  * dynamically per request.
  */
 export default async function MobilePreview({ searchParams }: MobilePreviewProps) {
-  const [products, charmProduct, notebookProduct, patchProduct, params] = await Promise.all([
+  const [products, charmProduct, notebookProduct, patchProduct, swatchColors, params] = await Promise.all([
     fetchJournalProducts(),
     fetchCharmProduct(),
     fetchNotebookProduct(),
     fetchPatchProduct(),
+    fetchSwatchColors(),
     searchParams,
   ]);
 
@@ -53,6 +60,7 @@ export default async function MobilePreview({ searchParams }: MobilePreviewProps
         charmProduct={charmProduct}
         notebookProduct={notebookProduct}
         patchProduct={patchProduct}
+        swatchColors={swatchColors}
         hideDevControls
         initialTheme={initialTheme}
         initialBackground={initialBackground}
