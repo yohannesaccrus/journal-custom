@@ -35,10 +35,10 @@ export default function AssetCategoryCard({ product }: { product: AdminProduct }
   const [submittingVariant, setSubmittingVariant] = useState(false);
   const [journalSync, setJournalSync] = useState<JournalSyncResult[] | null>(null);
 
-  // Cord and Pen Holder colors also live as option values on all 8 sellable
+  // String and Pen Holder colors also live as option values on all 8 sellable
   // journal cover products — adding one here needs to propagate there too, or
   // customers can never actually pick the new color.
-  const syncsToJournal = product.tags.includes("cord") || product.tags.includes("pen-holder");
+  const syncsToJournal = product.tags.includes("string") || product.tags.includes("pen-holder");
 
   // Charm and cover catalogs can grow to dozens of variants — search + paginate
   // just those two instead of the whole assets page.

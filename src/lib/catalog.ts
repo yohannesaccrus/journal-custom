@@ -47,7 +47,7 @@ function inStock(variant: ShopifyVariant | undefined): boolean {
 
 function baseVariant(product: ShopifyJournalProduct): ShopifyVariant {
   const found = product.variants.find(
-    (v) => optionValue(v, "Cord") === "No Cord" && optionValue(v, "Pen Holder") === "None"
+    (v) => optionValue(v, "String") === "No Cord" && optionValue(v, "Pen Holder") === "None"
   );
   if (!found) throw new Error(`No base (No Cord / None) variant found for ${product.handle}`);
   return found;
@@ -82,11 +82,11 @@ export interface CordEntry {
 /** `product` is the currently selected cover — stock is per (cover, cord) variant. */
 export function buildCordEntries(product: ShopifyJournalProduct): CordEntry[] {
   const values = new Set(
-    product.variants.map((v) => optionValue(v, "Cord")).filter((v): v is string => !!v && v !== "No Cord")
+    product.variants.map((v) => optionValue(v, "String")).filter((v): v is string => !!v && v !== "No Cord")
   );
   return Array.from(values).map((label) => {
     const variant = product.variants.find(
-      (v) => optionValue(v, "Cord") === label && optionValue(v, "Pen Holder") === "None"
+      (v) => optionValue(v, "String") === label && optionValue(v, "Pen Holder") === "None"
     );
     return { label, swatch: SWATCH_HEX[label] ?? "#999999", inStock: inStock(variant) };
   });
@@ -108,7 +108,7 @@ export function buildPenHolderEntries(product: ShopifyJournalProduct, cord: stri
   );
   return Array.from(values).map((label) => {
     const variant = product.variants.find(
-      (v) => optionValue(v, "Cord") === cordValue && optionValue(v, "Pen Holder") === label
+      (v) => optionValue(v, "String") === cordValue && optionValue(v, "Pen Holder") === label
     );
     return { label, swatch: SWATCH_HEX[label] ?? "#999999", inStock: inStock(variant) };
   });
@@ -123,7 +123,7 @@ export function isEdgeInStock(
   const cordValue = cord === "none" ? "No Cord" : cord;
   const cap = penHolder === "black" ? "Black" : "Brown";
   const variant = product.variants.find(
-    (v) => optionValue(v, "Cord") === cordValue && optionValue(v, "Pen Holder") === `${cap} + Edge`
+    (v) => optionValue(v, "String") === cordValue && optionValue(v, "Pen Holder") === `${cap} + Edge`
   );
   return inStock(variant);
 }
@@ -142,7 +142,7 @@ export function resolveVariant(
 
   const match = product.variants.find(
     (v) =>
-      optionValue(v, "Cord") === cordValue &&
+      optionValue(v, "String") === cordValue &&
       optionValue(v, "Pen Holder") === penValue
   );
   if (!match) {

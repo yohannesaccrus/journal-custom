@@ -320,17 +320,22 @@ export async function renameOptionValue(
 }
 
 /**
- * Some internal component products (Cover, Cord, Pen Holder) exist purely for
- * admin stock/price tracking, but the customer-facing customizer actually
+ * Some internal component products (Cover, String, Pen Holder) exist purely
+ * for admin stock/price tracking, but the customer-facing customizer actually
  * reads its option labels from the separate sellable "tag:journal" products.
  * Renaming a component variant would otherwise silently desync from what
  * customers see, so mirror the rename onto every matching journal option
  * value. Charm/Patch/Notebook components are the same product the customer
  * sees (no separate sellable copy), so they never need this.
+ *
+ * Note: this used to be called "Cord" everywhere (option name, product tag,
+ * SKUs) — fully renamed to "String" as of 2026-07-29. The component
+ * product's handle (`sanaya-component-cord`) is the one thing left alone,
+ * since changing it would break any existing links/references to that URL.
  */
 const JOURNAL_OPTION_SYNC: Record<string, { optionName: string; allowPlusEdgeSuffix: boolean }> = {
   cover: { optionName: "Cover", allowPlusEdgeSuffix: false },
-  cord: { optionName: "Cord", allowPlusEdgeSuffix: false },
+  string: { optionName: "String", allowPlusEdgeSuffix: false },
   "pen-holder": { optionName: "Pen Holder", allowPlusEdgeSuffix: true },
 };
 
@@ -411,11 +416,11 @@ async function addOptionValues(productId: string, optionId: string, names: strin
   if (errs.length) throw new Error(errs.map((e) => e.message).join("; "));
 }
 
-/** Mirrors the SKU pattern already used on real journal variants, e.g. `SANAYA-JRN-CLASSIC-BROWN-CORD-ORANGE-PH-BLACK-EDGE`. */
+/** Mirrors the SKU pattern already used on real journal variants, e.g. `SANAYA-JRN-CLASSIC-BROWN-STRING-ORANGE-PH-BLACK-EDGE`. */
 function journalSku(handle: string, cord: string, pen: string): string {
   const base = handle.replace(/^sanaya-journal-/, "sanaya-jrn-").toUpperCase();
   const slug = (s: string) => s.toUpperCase().replace(/\s*\+\s*/g, "-").replace(/\s+/g, "-");
-  return `${base}-CORD-${slug(cord)}-PH-${slug(pen)}`;
+  return `${base}-STRING-${slug(cord)}-PH-${slug(pen)}`;
 }
 
 async function bulkCreateJournalVariants(
@@ -479,7 +484,7 @@ async function bulkCreateJournalVariants(
  * directly in Shopify (these combo variants aren't shown in Assets & Stock).
  */
 export async function syncJournalOptionAdd(componentTags: string[], newValue: string): Promise<JournalSyncResult[]> {
-  const tag = componentTags.find((t) => t === "cord" || t === "pen-holder");
+  const tag = componentTags.find((t) => t === "string" || t === "pen-holder");
   if (!tag) return [];
 
   const JOURNAL_PRODUCTS_QUERY = `
@@ -511,7 +516,7 @@ export async function syncJournalOptionAdd(componentTags: string[], newValue: st
 
   for (const product of data.products.nodes) {
     const coverOption = product.options.find((o) => o.name === "Cover");
-    const cordOption = product.options.find((o) => o.name === "Cord");
+    const cordOption = product.options.find((o) => o.name === "String");
     const penOption = product.options.find((o) => o.name === "Pen Holder");
     const coverValue = coverOption?.optionValues[0]?.name;
     if (!coverOption || !coverValue || !cordOption || !penOption) {
@@ -520,14 +525,14 @@ export async function syncJournalOptionAdd(componentTags: string[], newValue: st
         coverTitle: product.title,
         created: 0,
         skipped: false,
-        error: "Missing Cover/Cord/Pen Holder option",
+        error: "Missing Cover/String/Pen Holder option",
       });
       continue;
     }
     const price = product.variants.nodes[0]?.price ?? "0.00";
 
     try {
-      if (tag === "cord") {
+      if (tag === "string") {
         if (cordOption.optionValues.some((v) => v.name === newValue)) {
           results.push({ coverHandle: product.handle, coverTitle: product.title, created: 0, skipped: true });
           continue;
@@ -586,7 +591,7 @@ export async function syncJournalOptionAdd(componentTags: string[], newValue: st
 
 export async function updateProductTitle(productId: string, title: string): Promise<void> {
   const MUTATION = `
-    mutation UpdateProductTitle($input: ProductUpdateInput!) {
+    mutation UpdateProductTitle($input: ProductInput!) {
       productUpdate(input: $input) {
         userErrors { field message }
       }
