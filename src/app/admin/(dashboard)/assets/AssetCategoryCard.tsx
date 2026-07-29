@@ -71,12 +71,13 @@ export default function AssetCategoryCard({
   // renaming would desync from the "Cover" option value the accordion below
   // matches by, and covers are identified by photo, not a color.
   const hideSwatch = isCharm || isCoverTracker || isPatch || isCornerEdge || isNotebook;
-  // String/Pen Holder Stock here would be misleading — the real,
-  // customer-facing stock lives per (cover, string, pen holder) combo on the
-  // 8 journal cover products, not on this tracker. Stock is only ever
-  // editable from the Cover card's per-cover accordion — see the banner
-  // rendered below instead of a Stock column for these two.
+  // String/Pen Holder Stock AND Price here would be misleading — the real,
+  // customer-facing stock and price live per (cover, string, pen holder)
+  // combo on the 8 journal cover products, not on this tracker. Both are
+  // only ever editable from the Cover card's per-cover accordion — see the
+  // banner rendered below instead of these two columns.
   const hideStock = syncsToJournal;
+  const hidePrice = syncsToJournal;
   // String and Pen Holder's Swatch columns stay editable — they actually
   // drive the live customizer's color pickers (see `fetchSwatchColors`) —
   // but like Cover/Charm/Patch/Corner Edge/Notebook their titles shouldn't
@@ -296,10 +297,10 @@ export default function AssetCategoryCard({
                 />
               </svg>
               <p className="text-xs leading-relaxed text-[#6b4c14]">
-                <span className="font-semibold">The stock shown in this table is not real stock.</span>{" "}
-                The stock customers actually see comes from the per-cover variants in the{" "}
-                <span className="font-semibold">Cover</span> table. Update stock there for changes to
-                actually take effect.
+                <span className="font-semibold">To update stock or price, use the Cover table.</span>{" "}
+                This table doesn&apos;t show stock or price — the stock and price customers actually
+                see come from the per-cover variants in the <span className="font-semibold">Cover</span>{" "}
+                table.
               </p>
             </div>
             <button
@@ -311,7 +312,7 @@ export default function AssetCategoryCard({
               }
               className="shrink-0 rounded-full border border-[#e0b45c] bg-white/70 px-3.5 py-1.5 text-xs font-medium text-[#8a5f1f] shadow-sm transition-colors hover:bg-white"
             >
-              Open Cover table ↓
+              Open Cover table
             </button>
           </div>
 
@@ -322,7 +323,7 @@ export default function AssetCategoryCard({
             <span className="text-[#c9a869]">→</span>
             <span className="rounded-full bg-white/70 px-2.5 py-1 shadow-sm">3. Find the String / Pen Holder combo</span>
             <span className="text-[#c9a869]">→</span>
-            <span className="rounded-full bg-white/70 px-2.5 py-1 shadow-sm">4. Edit its Stock field</span>
+            <span className="rounded-full bg-white/70 px-2.5 py-1 shadow-sm">4. Edit its Stock / Price field</span>
             <span className="text-[#c9a869]">→</span>
             <span className="rounded-full bg-white/70 px-2.5 py-1 shadow-sm">5. Save</span>
           </div>
@@ -479,7 +480,7 @@ export default function AssetCategoryCard({
             <th className="px-5 py-2.5 font-medium">Image</th>
             <th className="px-5 py-2.5 font-medium">Variant</th>
             <th className="px-5 py-2.5 font-medium">SKU</th>
-            <th className="px-5 py-2.5 font-medium">Price ({currency})</th>
+            {!hidePrice && <th className="px-5 py-2.5 font-medium">Price ({currency})</th>}
             {!hideSwatch && <th className="px-5 py-2.5 font-medium">Swatch</th>}
             {!hideStock && <th className="px-5 py-2.5 font-medium">Stock</th>}
             <th className="px-5 py-2.5 font-medium" />
@@ -495,6 +496,7 @@ export default function AssetCategoryCard({
                 onDelete={removeVariant}
                 hideSwatch={hideSwatch}
                 hideStock={hideStock}
+                hidePrice={hidePrice}
                 expandable={isCoverTracker}
                 expanded={expandedVariantId === variant.id}
                 onToggleExpand={() => setExpandedVariantId((cur) => (cur === variant.id ? null : variant.id))}
@@ -514,7 +516,7 @@ export default function AssetCategoryCard({
           {isPaginated && visibleVariants.length === 0 && (
             <tr>
               <td
-                colSpan={7 - (hideSwatch ? 1 : 0) - (hideStock ? 1 : 0)}
+                colSpan={7 - (hideSwatch ? 1 : 0) - (hideStock ? 1 : 0) - (hidePrice ? 1 : 0)}
                 className="px-5 py-8 text-center text-sm text-[#a89a80]"
               >
                 No variants match “{query}”.

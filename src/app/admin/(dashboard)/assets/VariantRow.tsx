@@ -27,6 +27,7 @@ export default function VariantRow({
   onToggleExpand,
   hideSwatch,
   hideStock,
+  hidePrice,
 }: {
   productId: string;
   variant: Variant;
@@ -43,6 +44,8 @@ export default function VariantRow({
   hideSwatch?: boolean;
   /** String/Pen Holder: real stock lives per-cover, not here — see the banner in AssetCategoryCard. */
   hideStock?: boolean;
+  /** String/Pen Holder: real price lives per-cover, not here — see the banner in AssetCategoryCard. */
+  hidePrice?: boolean;
 }) {
   const router = useRouter();
   const { currency } = useCurrency();
@@ -158,21 +161,23 @@ export default function VariantRow({
           className={`admin-input w-32 ${sku !== variant.sku ? "dirty" : ""}`}
         />
       </td>
-      <td className="px-5 py-2.5">
-        <div className={`admin-input-group w-28 ${priceIDR !== initialPriceIDR ? "dirty" : ""}`}>
-          <span className="admin-input-prefix">{currencyCfg.symbol}</span>
-          <input
-            inputMode="decimal"
-            value={priceDisplay}
-            disabled={saving || deleting}
-            onChange={(e) => {
-              const sanitized = sanitizeAmountInput(e.target.value, currency);
-              setPriceIDR(convertToIDR(parseAmountInput(sanitized, currency), currency));
-            }}
-            className="admin-input-bare"
-          />
-        </div>
-      </td>
+      {!hidePrice && (
+        <td className="px-5 py-2.5">
+          <div className={`admin-input-group w-28 ${priceIDR !== initialPriceIDR ? "dirty" : ""}`}>
+            <span className="admin-input-prefix">{currencyCfg.symbol}</span>
+            <input
+              inputMode="decimal"
+              value={priceDisplay}
+              disabled={saving || deleting}
+              onChange={(e) => {
+                const sanitized = sanitizeAmountInput(e.target.value, currency);
+                setPriceIDR(convertToIDR(parseAmountInput(sanitized, currency), currency));
+              }}
+              className="admin-input-bare"
+            />
+          </div>
+        </td>
+      )}
       {!hideSwatch && (
         <td className="px-5 py-2.5">
           <div className="flex items-center gap-1.5">
