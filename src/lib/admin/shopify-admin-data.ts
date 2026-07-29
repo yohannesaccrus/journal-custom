@@ -92,7 +92,7 @@ const ASSET_PRODUCTS_QUERY = `
         status
         tags
         options { id name optionValues { id name } }
-        variants(first: 50) {
+        variants(first: 100) {
           nodes {
             id
             title
@@ -123,6 +123,31 @@ interface RawAssetProduct extends Omit<AdminProduct, "variants"> {
 export async function fetchAssetProducts(): Promise<AdminProduct[]> {
   const data = await shopifyAdmin<{ products: { nodes: RawAssetProduct[] } }>(ASSET_PRODUCTS_QUERY, {
     query: "tag:component OR tag:charm OR tag:patch",
+    swatchNamespace: SWATCH_METAFIELD_NAMESPACE,
+    swatchKey: SWATCH_METAFIELD_KEY,
+  });
+
+  return data.products.nodes.map((p) => ({
+    ...p,
+    variants: p.variants.nodes.map((v) => ({
+      ...v,
+      inventoryItemId: v.inventoryItem.id,
+      inventoryQuantity: v.inventoryQuantity,
+      swatchColor: v.swatchMetafield?.value ?? null,
+    })),
+  }));
+}
+
+/**
+ * The 8 real sellable "tag:journal" cover products — each can carry dozens of
+ * String × Pen Holder variant combinations (see `syncJournalOptionAdd`), none
+ * of which show up anywhere in Assets & Stock today. Used to power the
+ * per-cover accordion on the "Sanaya Component — Cover" card so the admin can
+ * actually edit price/SKU/stock for those combos without leaving this page.
+ */
+export async function fetchJournalCoverProducts(): Promise<AdminProduct[]> {
+  const data = await shopifyAdmin<{ products: { nodes: RawAssetProduct[] } }>(ASSET_PRODUCTS_QUERY, {
+    query: "tag:journal",
     swatchNamespace: SWATCH_METAFIELD_NAMESPACE,
     swatchKey: SWATCH_METAFIELD_KEY,
   });

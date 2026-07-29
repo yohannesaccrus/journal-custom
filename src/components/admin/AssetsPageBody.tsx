@@ -5,7 +5,15 @@ import type { AdminProduct } from "@/lib/admin/shopify-admin-data";
 import { ProductLinePicker } from "@/components/admin/ProductLinePicker";
 import AssetCategoryCard from "@/app/admin/(dashboard)/assets/AssetCategoryCard";
 
-export function AssetsPageBody({ products, coverImage }: { products: AdminProduct[]; coverImage: string | null }) {
+export function AssetsPageBody({
+  products,
+  coverImage,
+  journalByCoverName,
+}: {
+  products: AdminProduct[];
+  coverImage: string | null;
+  journalByCoverName: Record<string, AdminProduct>;
+}) {
   const [selected, setSelected] = useState("journal");
 
   return (
@@ -43,7 +51,7 @@ export function AssetsPageBody({ products, coverImage }: { products: AdminProduc
       {selected === "journal" && (
         <div className="mt-8 space-y-6">
           {products.map((product) => (
-            <AssetCategoryCard key={product.id} product={product} />
+            <AssetCategoryCard key={product.id} product={product} journalByCoverName={journalByCoverName} />
           ))}
         </div>
       )}

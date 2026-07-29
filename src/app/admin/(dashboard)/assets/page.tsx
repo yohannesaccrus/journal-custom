@@ -1,13 +1,22 @@
-import { fetchAssetProducts } from "@/lib/admin/shopify-admin-data";
+import { fetchAssetProducts, fetchJournalCoverProducts } from "@/lib/admin/shopify-admin-data";
 import { AssetsPageBody } from "@/components/admin/AssetsPageBody";
 
 export default async function AdminAssetsPage() {
-  const products = await fetchAssetProducts();
+  const [products, journalCoverProducts] = await Promise.all([fetchAssetProducts(), fetchJournalCoverProducts()]);
 
   const coverImage =
     products.find((p) => /cover/i.test(p.title))?.variants.find((v) => v.image)?.image?.url ??
     products.flatMap((p) => p.variants).find((v) => v.image)?.image?.url ??
     null;
+
+  // The "Cover" tracker's variant title (e.g. "Classic Black A") is exactly
+  // the value of the real journal product's own "Cover" option — the only
+  // reliable link between the two, since they're otherwise unrelated products.
+  const journalByCoverName: Record<string, (typeof journalCoverProducts)[number]> = {};
+  for (const jp of journalCoverProducts) {
+    const coverValue = jp.options.find((o) => o.name === "Cover")?.optionValues[0]?.name;
+    if (coverValue) journalByCoverName[coverValue] = jp;
+  }
 
   return (
     <div>
@@ -17,7 +26,7 @@ export default async function AdminAssetsPage() {
         variants.
       </p>
 
-      <AssetsPageBody products={products} coverImage={coverImage} />
+      <AssetsPageBody products={products} coverImage={coverImage} journalByCoverName={journalByCoverName} />
     </div>
   );
 }

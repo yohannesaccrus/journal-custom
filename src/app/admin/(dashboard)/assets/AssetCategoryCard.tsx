@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminProduct, JournalSyncResult } from "@/lib/admin/shopify-admin-data";
 import EditableTitle from "./EditableTitle";
 import VariantRow from "./VariantRow";
+import JournalVariantsPanel from "./JournalVariantsPanel";
 import { useCurrency } from "../CurrencyContext";
 import { CURRENCIES, convertToIDR, formatAmountInput, parseAmountInput, sanitizeAmountInput, toShopifyPriceString } from "@/lib/currency";
 
@@ -24,7 +25,14 @@ function fuzzyMatch(query: string, target: string): boolean {
   return qi === q.length;
 }
 
-export default function AssetCategoryCard({ product }: { product: AdminProduct }) {
+export default function AssetCategoryCard({
+  product,
+  journalByCoverName,
+}: {
+  product: AdminProduct;
+  /** Cover option value (e.g. "Classic Black A") -> that cover's real sellable journal product. Only used on the "Sanaya Component — Cover" card. */
+  journalByCoverName?: Record<string, AdminProduct>;
+}) {
   const router = useRouter();
   const { currency } = useCurrency();
   const currencyCfg = CURRENCIES[currency];
@@ -39,6 +47,11 @@ export default function AssetCategoryCard({ product }: { product: AdminProduct }
   // journal cover products — adding one here needs to propagate there too, or
   // customers can never actually pick the new color.
   const syncsToJournal = product.tags.includes("string") || product.tags.includes("pen-holder");
+
+  // Each Cover row can expand into an accordion showing that cover's real
+  // journal variants (String × Pen Holder combos) — only one open at a time.
+  const isCoverTracker = product.tags.includes("cover") && !!journalByCoverName;
+  const [expandedVariantId, setExpandedVariantId] = useState<string | null>(null);
 
   // Charm and cover catalogs can grow to dozens of variants — search + paginate
   // just those two instead of the whole assets page.
@@ -374,13 +387,27 @@ export default function AssetCategoryCard({ product }: { product: AdminProduct }
         </thead>
         <tbody>
           {visibleVariants.map((variant) => (
-            <VariantRow
-              key={variant.id}
-              productId={product.id}
-              variant={variant}
-              onSave={saveVariant}
-              onDelete={removeVariant}
-            />
+            <Fragment key={variant.id}>
+              <VariantRow
+                productId={product.id}
+                variant={variant}
+                onSave={saveVariant}
+                onDelete={removeVariant}
+                expandable={isCoverTracker}
+                expanded={expandedVariantId === variant.id}
+                onToggleExpand={() => setExpandedVariantId((cur) => (cur === variant.id ? null : variant.id))}
+              />
+              {isCoverTracker && expandedVariantId === variant.id && (
+                <tr>
+                  <td colSpan={7} className="p-0">
+                    <JournalVariantsPanel
+                      journalProduct={journalByCoverName?.[variant.title]}
+                      coverLabel={variant.title}
+                    />
+                  </td>
+                </tr>
+              )}
+            </Fragment>
           ))}
           {isPaginated && visibleVariants.length === 0 && (
             <tr>

@@ -22,6 +22,9 @@ export default function VariantRow({
   variant,
   onSave,
   onDelete,
+  expandable,
+  expanded,
+  onToggleExpand,
 }: {
   productId: string;
   variant: Variant;
@@ -30,6 +33,10 @@ export default function VariantRow({
     fields: { name?: string; sku?: string; price?: string; stock?: number; swatchColor?: string | null }
   ) => Promise<void>;
   onDelete: (variantId: string) => Promise<void>;
+  /** Shows a chevron toggle before the variant name — used on the Cover tracker to reveal that cover's real journal String × Pen Holder variants. */
+  expandable?: boolean;
+  expanded?: boolean;
+  onToggleExpand?: () => void;
 }) {
   const router = useRouter();
   const { currency } = useCurrency();
@@ -109,12 +116,33 @@ export default function VariantRow({
         />
       </td>
       <td className="px-5 py-2.5">
-        <input
-          value={name}
-          disabled={saving || deleting}
-          onChange={(e) => setName(e.target.value)}
-          className={`admin-input w-32 ${name !== variant.title ? "dirty" : ""}`}
-        />
+        <div className="flex items-center gap-1.5">
+          {expandable && (
+            <button
+              type="button"
+              onClick={onToggleExpand}
+              aria-label={expanded ? "Collapse variants" : "Expand variants"}
+              aria-expanded={expanded}
+              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[#6b6a63] transition-all hover:bg-[#f0ece0] ${
+                expanded ? "rotate-90 text-[#0f3d34]" : ""
+              }`}
+            >
+              <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                <path
+                  fillRule="evenodd"
+                  d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
+          )}
+          <input
+            value={name}
+            disabled={saving || deleting}
+            onChange={(e) => setName(e.target.value)}
+            className={`admin-input w-32 ${name !== variant.title ? "dirty" : ""}`}
+          />
+        </div>
       </td>
       <td className="px-5 py-2.5">
         <input
