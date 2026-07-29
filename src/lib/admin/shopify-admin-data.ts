@@ -208,6 +208,28 @@ export async function setVariantStock(inventoryItemId: string, quantity: number)
   if (errs.length) throw new Error(errs.map((e) => e.message).join("; "));
 }
 
+/**
+ * A brand-new variant's inventory item isn't "stocked" at any location by
+ * default — `inventorySetQuantities`/`inventoryAdjustQuantities` (used by the
+ * Stock field and by `setVariantStock` below) both fail with "The specified
+ * inventory item is not stocked at the location" until this runs once.
+ */
+export async function activateInventoryAtPrimaryLocation(inventoryItemId: string): Promise<void> {
+  const locationId = await getPrimaryLocationId();
+  const MUTATION = `
+    mutation ActivateInventory($inventoryItemId: ID!, $locationId: ID!) {
+      inventoryActivate(inventoryItemId: $inventoryItemId, locationId: $locationId, available: 0) {
+        userErrors { field message }
+      }
+    }
+  `;
+  const data = await shopifyAdmin<{
+    inventoryActivate: { userErrors: { field: string[]; message: string }[] };
+  }>(MUTATION, { inventoryItemId, locationId });
+  const errs = data.inventoryActivate.userErrors;
+  if (errs.length) throw new Error(errs.map((e) => e.message).join("; "));
+}
+
 export async function adjustVariantStock(inventoryItemId: string, delta: number): Promise<void> {
   const locationId = await getPrimaryLocationId();
   const MUTATION = `
@@ -393,6 +415,7 @@ async function bulkCreateJournalVariants(
   const MUTATION = `
     mutation CreateJournalVariants($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
       productVariantsBulkCreate(productId: $productId, variants: $variants) {
+        productVariants { id inventoryItem { id } }
         userErrors { field message }
       }
     }
@@ -407,10 +430,20 @@ async function bulkCreateJournalVariants(
     ],
   }));
   const data = await shopifyAdmin<{
-    productVariantsBulkCreate: { userErrors: { field: string[]; message: string }[] };
+    productVariantsBulkCreate: {
+      productVariants: { id: string; inventoryItem: { id: string } }[];
+      userErrors: { field: string[]; message: string }[];
+    };
   }>(MUTATION, { productId, variants });
   const errs = data.productVariantsBulkCreate.userErrors;
   if (errs.length) throw new Error(errs.map((e) => e.message).join("; "));
+
+  // So the admin can set opening stock per cover in Shopify right away,
+  // instead of hitting the same "not stocked at the location" error there too.
+  for (const v of data.productVariantsBulkCreate.productVariants) {
+    await activateInventoryAtPrimaryLocation(v.inventoryItem.id);
+  }
+
   return combos.length;
 }
 
@@ -592,12 +625,16 @@ export async function addAssetVariant(
   const VARIANT_CREATE = `
     mutation CreateVariant($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
       productVariantsBulkCreate(productId: $productId, variants: $variants) {
+        productVariants { id inventoryItem { id } }
         userErrors { field message }
       }
     }
   `;
   const varRes = await shopifyAdmin<{
-    productVariantsBulkCreate: { userErrors: { field: string[]; message: string }[] };
+    productVariantsBulkCreate: {
+      productVariants: { id: string; inventoryItem: { id: string } }[];
+      userErrors: { field: string[]; message: string }[];
+    };
   }>(VARIANT_CREATE, {
     productId,
     variants: [
@@ -610,6 +647,9 @@ export async function addAssetVariant(
   });
   const varErrs = varRes.productVariantsBulkCreate.userErrors;
   if (varErrs.length) throw new Error(varErrs.map((e) => e.message).join("; "));
+
+  const inventoryItemId = varRes.productVariantsBulkCreate.productVariants[0]?.inventoryItem.id;
+  if (inventoryItemId) await activateInventoryAtPrimaryLocation(inventoryItemId);
 }
 
 // ---------- Variant image upload ----------
