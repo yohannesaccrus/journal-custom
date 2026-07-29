@@ -158,8 +158,10 @@ export default function AssetCategoryCard({ product }: { product: AdminProduct }
     refresh();
   }
 
-  async function addVariant(formData: FormData) {
+  async function addVariant(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     if (!primaryOption) return;
+    const formData = new FormData(event.currentTarget);
     setError(null);
     setJournalSync(null);
     const value = String(formData.get("value") ?? "").trim();
@@ -253,7 +255,7 @@ export default function AssetCategoryCard({ product }: { product: AdminProduct }
 
       {adding && primaryOption && (
         <form
-          action={addVariant}
+          onSubmit={addVariant}
           className="border-b border-[#f0ece0] bg-gradient-to-r from-[#f7f5f0] to-[#f0ebe0] px-5 py-4 animate-[fadeIn_0.15s_ease-out]"
         >
           <div className="flex flex-wrap items-end gap-3">
