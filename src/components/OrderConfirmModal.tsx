@@ -21,6 +21,7 @@ interface OrderConfirmModalProps {
   onCopyLink: () => void;
   onEdit: () => void;
   onConfirm: () => void;
+  confirming?: boolean;
 }
 
 export function OrderConfirmModal({
@@ -35,6 +36,7 @@ export function OrderConfirmModal({
   onCopyLink,
   onEdit,
   onConfirm,
+  confirming,
 }: OrderConfirmModalProps) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
@@ -158,9 +160,10 @@ export function OrderConfirmModal({
           <button
             type="button"
             onClick={onConfirm}
-            className="btn-continue rounded-[var(--radius-button)] bg-[var(--accent)] px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-hover)]"
+            disabled={confirming}
+            className="btn-continue rounded-[var(--radius-button)] bg-[var(--accent)] px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Continue to payment →
+            {confirming ? "Adding to cart…" : "Continue to payment →"}
           </button>
         </div>
       </div>

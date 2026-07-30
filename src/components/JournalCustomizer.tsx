@@ -162,9 +162,8 @@ function JournalCustomizerContent({
     charms: [],
     notebooks: {},
   });
-  const [addingToCart, setAddingToCart] = useState(false);
-  const [cartError, setCartError] = useState<string | null>(null);
-  const [orderConfirm, setOrderConfirm] = useState<{ invoiceUrl: string; designUrl: string } | null>(null);
+  const [orderConfirm, setOrderConfirm] = useState<{ designUrl: string } | null>(null);
+  const [confirmingCheckout, setConfirmingCheckout] = useState(false);
   const [designLinkCopied, setDesignLinkCopied] = useState(false);
   // True when `selection.cord` was auto-picked by handlePenHolderChange
   // (only so a real Shopify variant resolves) rather than chosen by the
@@ -406,46 +405,29 @@ function JournalCustomizerContent({
     setStep((s) => Math.max(s - 1, 0));
   }
 
-  // The journal/notebook products are intentionally kept unpublished (Draft)
-  // in Shopify — they're internal components, not meant to be found or
-  // bought outside this customizer. That means the storefront's regular
-  // /cart/add.js rejects them. Instead we create a Shopify Draft Order via
-  // the Admin API (which can include draft/unpublished variants) and send
-  // the customer straight to its hosted invoice/payment page.
-  async function handleAddToCart() {
-    const { items, attributes } = buildCartItems(variant, charmProduct, selection, window.location.origin);
-
-    setCartError(null);
-    setAddingToCart(true);
-    try {
-      const res = await fetch("/api/draft-order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items, attributes }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.invoiceUrl) {
-        setAddingToCart(false);
-        setCartError(data.message ?? "Something went wrong adding your journal to the cart. Please try again.");
-        return;
-      }
-      // Show a confirmation modal (preview + design link) before sending the
-      // customer off to pay, rather than redirecting immediately.
-      setAddingToCart(false);
-      setDesignLinkCopied(false);
-      setOrderConfirm({ invoiceUrl: data.invoiceUrl, designUrl: buildDesignUrl(window.location.origin, selection) });
-    } catch {
-      setAddingToCart(false);
-      setCartError("Something went wrong adding your journal to the cart. Please try again.");
-    }
+  // The journal/notebook products now live on Shopify's real Online Store
+  // channel (published, not Draft), so the real storefront cart works for
+  // them — no need to go through a Shopify Draft Order + hosted invoice page
+  // anymore (that path skipped the native cart/checkout entirely, which also
+  // meant no discount-code field). Just show the confirmation preview here;
+  // the real add-to-cart happens on confirm, in `handleConfirmCheckout`.
+  function handleAddToCart() {
+    setDesignLinkCopied(false);
+    setOrderConfirm({ designUrl: buildDesignUrl(window.location.origin, selection) });
   }
 
   function handleConfirmCheckout() {
     if (!orderConfirm) return;
-    // Navigate the top-level page (not just this iframe) to the hosted
-    // Shopify checkout page for the draft order.
+    const { items, attributes } = buildCartItems(variant, charmProduct, selection, window.location.origin);
+    setConfirmingCheckout(true);
+    // The iframe is cross-origin from the shop, so it can't call
+    // /cart/add.js itself — it messages the parent page instead. The parent
+    // (sections/jc-embed.liquid, same-origin with the shop) listens for this,
+    // performs the real /cart/add.js + /cart/update.js calls, and redirects
+    // to /cart on success (or alerts on failure) — see that file for the
+    // other half of this handshake.
     const target = window.parent === window ? window : window.top ?? window;
-    target.location.href = orderConfirm.invoiceUrl;
+    target.postMessage({ type: "sanaya-journal-add-to-cart", items, attributes }, "*");
   }
 
   async function handleCopyDesignLink() {
@@ -780,8 +762,6 @@ function JournalCustomizerContent({
                 charmProduct={charmProduct}
                 selection={selection}
                 onAddToCart={handleAddToCart}
-                adding={addingToCart}
-                error={cartError}
               />
             )}
           </div>
@@ -907,6 +887,7 @@ function JournalCustomizerContent({
           onCopyLink={handleCopyDesignLink}
           onEdit={() => setOrderConfirm(null)}
           onConfirm={handleConfirmCheckout}
+          confirming={confirmingCheckout}
         />
       )}
     </div>
