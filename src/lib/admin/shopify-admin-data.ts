@@ -371,23 +371,24 @@ export async function renameOptionValue(
  * SKUs) — fully renamed to "String" as of 2026-07-29. The component
  * product's handle (`sanaya-component-cord`) is the one thing left alone,
  * since changing it would break any existing links/references to that URL.
- * Patch joined this list once it became a real 4th option on every journal
- * variant instead of its own sellable product — see `createJournalCoverProduct`.
+ *
+ * Patch has no option of its own on the journal product (Shopify caps
+ * products at 3 options, already used by Cover/String/Pen Holder) — it's
+ * encoded as a "<cord> + <patch>" suffix on String's own values instead
+ * (see `stringValueFor` in catalog.ts). So renaming a cord (tag "string")
+ * must also rename every "<oldName> + <patch>" value alongside it, and
+ * renaming a patch shape (tag "patch") must rename "<cord> + <oldName>" to
+ * "<cord> + <newName>" across every cord that has one.
  */
-const JOURNAL_OPTION_SYNC: Record<string, { optionName: string; allowPlusEdgeSuffix: boolean }> = {
-  cover: { optionName: "Cover", allowPlusEdgeSuffix: false },
-  string: { optionName: "String", allowPlusEdgeSuffix: false },
-  "pen-holder": { optionName: "Pen Holder", allowPlusEdgeSuffix: true },
-  patch: { optionName: "Patch", allowPlusEdgeSuffix: false },
-};
-
 export async function syncJournalOptionRename(
   componentTags: string[],
   oldName: string,
   newName: string
 ): Promise<void> {
-  const rule = componentTags.map((t) => JOURNAL_OPTION_SYNC[t]).find(Boolean);
-  if (!rule || oldName === newName) return;
+  const tag = componentTags.find((t) => t === "cover" || t === "string" || t === "pen-holder" || t === "patch");
+  if (!tag || oldName === newName) return;
+
+  const optionName = tag === "pen-holder" ? "Pen Holder" : tag === "cover" ? "Cover" : "String";
 
   const JOURNAL_PRODUCTS_QUERY = `
     query JournalProductOptions {
@@ -405,17 +406,27 @@ export async function syncJournalOptionRename(
     };
   }>(JOURNAL_PRODUCTS_QUERY);
 
-  const suffix = " + Edge";
   for (const product of data.products.nodes) {
-    const option = product.options.find((o) => o.name === rule.optionName);
+    const option = product.options.find((o) => o.name === optionName);
     if (!option) continue;
 
     const updates: { id: string; name: string }[] = [];
     for (const value of option.optionValues) {
-      if (value.name === oldName) {
-        updates.push({ id: value.id, name: newName });
-      } else if (rule.allowPlusEdgeSuffix && value.name === oldName + suffix) {
-        updates.push({ id: value.id, name: newName + suffix });
+      if (tag === "pen-holder") {
+        if (value.name === oldName) updates.push({ id: value.id, name: newName });
+        else if (value.name === `${oldName} + Edge`) updates.push({ id: value.id, name: `${newName} + Edge` });
+      } else if (tag === "cover") {
+        if (value.name === oldName) updates.push({ id: value.id, name: newName });
+      } else if (tag === "string") {
+        if (value.name === oldName) updates.push({ id: value.id, name: newName });
+        else if (value.name.startsWith(`${oldName} + `)) {
+          updates.push({ id: value.id, name: value.name.replace(`${oldName} + `, `${newName} + `) });
+        }
+      } else {
+        // tag === "patch"
+        if (value.name.endsWith(` + ${oldName}`)) {
+          updates.push({ id: value.id, name: value.name.replace(new RegExp(` \\+ ${oldName}$`), ` + ${newName}`) });
+        }
       }
     }
     if (updates.length === 0) continue;
@@ -458,12 +469,16 @@ async function addOptionValues(productId: string, optionId: string, names: strin
   if (errs.length) throw new Error(errs.map((e) => e.message).join("; "));
 }
 
-/** Mirrors the SKU pattern already used on real journal variants, e.g. `SANAYA-JRN-CLASSIC-BROWN-STRING-ORANGE-PH-BLACK-EDGE-PATCH-STAR`. */
-function journalSku(handle: string, cord: string, pen: string, patch: string = "None"): string {
+/**
+ * Mirrors the SKU pattern already used on real journal variants, e.g.
+ * `SANAYA-JRN-CLASSIC-BROWN-STRING-ORANGE-PH-BLACK-EDGE`. `cord` may itself
+ * carry a patch suffix (e.g. "Orange + Star" -- see `stringValueFor` in
+ * catalog.ts), which `slug()` already turns into `-ORANGE-STAR` for free.
+ */
+function journalSku(handle: string, cord: string, pen: string): string {
   const base = handle.replace(/^sanaya-journal-/, "sanaya-jrn-").toUpperCase();
   const slug = (s: string) => s.toUpperCase().replace(/\s*\+\s*/g, "-").replace(/\s+/g, "-");
-  const patchSuffix = patch !== "None" ? `-PATCH-${slug(patch)}` : "";
-  return `${base}-STRING-${slug(cord)}-PH-${slug(pen)}${patchSuffix}`;
+  return `${base}-STRING-${slug(cord)}-PH-${slug(pen)}`;
 }
 
 async function bulkCreateJournalVariants(
@@ -473,8 +488,7 @@ async function bulkCreateJournalVariants(
   coverValue: string,
   cordOptionId: string,
   penOptionId: string,
-  patchOptionId: string,
-  combos: { cord: string; pen: string; patch: string }[],
+  combos: { cord: string; pen: string }[],
   price: string
 ): Promise<number> {
   if (combos.length === 0) return 0;
@@ -486,14 +500,13 @@ async function bulkCreateJournalVariants(
       }
     }
   `;
-  const variants = combos.map(({ cord, pen, patch }) => ({
+  const variants = combos.map(({ cord, pen }) => ({
     price,
-    inventoryItem: { sku: journalSku(handle, cord, pen, patch) },
+    inventoryItem: { sku: journalSku(handle, cord, pen) },
     optionValues: [
       { optionId: coverOptionId, name: coverValue },
       { optionId: cordOptionId, name: cord },
       { optionId: penOptionId, name: pen },
-      { optionId: patchOptionId, name: patch },
     ],
   }));
   const data = await shopifyAdmin<{
@@ -523,17 +536,21 @@ function slugify(s: string): string {
 }
 
 /**
- * Unlike String/Pen Holder (which are just an option value added onto 8
+ * Unlike String/Pen Holder (which are just an option value added onto
  * already-existing sellable products), a new Cover has no product to attach
- * to yet — this creates a brand-new "tag:journal" product from scratch, with
- * every String × Pen Holder combination that already exists elsewhere in the
- * catalog (copied from an existing journal product's option values, so a new
- * String/Pen Holder color added earlier is automatically included). Category
- * ("classic" vs "pattern") is persisted as a `category:*` tag — see
- * `COVER_CATEGORY_TAG` in catalog.ts — so it can be set here without a code
- * change. New variants start at 0 stock and get a price from
- * `syncJournalPricing` (base = this cover's own price, same additive model as
- * every other cover) — call that right after this returns.
+ * to yet -- this creates a brand-new "tag:journal" product from scratch,
+ * with every valid String x Pen Holder combination that already exists
+ * elsewhere in the catalog (copied from an existing journal product's
+ * option values, so a new String/Pen Holder color -- or Patch shape --
+ * added earlier is automatically included). Patch is encoded as a suffix on
+ * String's own values ("Light Pink + Star") rather than its own option --
+ * Shopify caps products at 3 options total, and Cover/String/Pen Holder
+ * already use all 3 (see `stringValueFor` in catalog.ts). Category
+ * ("classic" vs "pattern") is persisted as a `category:*` tag -- see
+ * `COVER_CATEGORY_TAG` in catalog.ts -- so it can be set here without a
+ * code change. New variants start at 0 stock and get a price from
+ * `syncJournalPricing` (base = this cover's own price, same additive model
+ * as every other cover) -- call that right after this returns.
  */
 export async function createJournalCoverProduct(
   style: string,
@@ -561,27 +578,17 @@ export async function createJournalCoverProduct(
   if (stringValues.length === 0 || penHolderValues.length === 0) {
     throw new Error("Reference journal product is missing String/Pen Holder option values");
   }
-  let patchValues = refProduct.options.find((o) => o.name === "Patch")?.optionValues.map((v) => v.name);
-  if (!patchValues || patchValues.length === 0) {
-    // No journal product has been migrated to include "Patch" yet — fall
-    // back to the "[JC] Sanaya Patch" tracker's own variant labels.
-    const patchRef = await shopifyAdmin<{
-      products: { nodes: { variants: { nodes: { title: string }[] } }[] };
-    }>(`query PatchTrackerReference { products(first: 1, query: "tag:patch") { nodes { variants(first: 50) { nodes { title } } } } }`);
-    const trackerLabels = patchRef.products.nodes[0]?.variants.nodes.map((v) => v.title) ?? [];
-    patchValues = ["None", ...trackerLabels];
-  }
 
   const handle = `sanaya-journal-${slugify(style)}`;
 
   // A previous attempt at this same style may have died partway through and
   // left a broken product squatting on this handle (rollback only covers
-  // failures *after* this function creates the product — not a process that
-  // got interrupted, or ran before rollback existed). If it's genuinely
-  // broken (no "No Cord"/"None" base variant), clear it out automatically
-  // instead of making the admin hunt it down in Shopify by hand; if it's a
-  // real, complete cover, this is a genuine name clash — fail with a clear
-  // message instead.
+  // failures *after* this function creates the product -- not a process
+  // that got interrupted, or ran before rollback existed). If it's
+  // genuinely broken (no "No Cord"/"None" base variant), clear it out
+  // automatically instead of making the admin hunt it down in Shopify by
+  // hand; if it's a real, complete cover, this is a genuine name clash --
+  // fail with a clear message instead.
   const EXISTING_QUERY = `
     query JournalCoverHandleCheck($query: String!) {
       products(first: 1, query: $query) {
@@ -603,12 +610,12 @@ export async function createJournalCoverProduct(
         v.selectedOptions.some((o) => o.name === "Pen Holder" && o.value === "None")
     );
     if (hasBase) {
-      throw new Error(`A cover named "${style}" already exists — choose a different name.`);
+      throw new Error(`A cover named "${style}" already exists -- choose a different name.`);
     }
     await deleteProduct(existingProduct.id);
   }
 
-  // Step 1: create the product with only its Cover option — guarantees
+  // Step 1: create the product with only its Cover option -- guarantees
   // exactly one default variant, no ambiguity about auto-generated combos.
   const PRODUCT_CREATE = `
     mutation CreateJournalCover($product: ProductCreateInput!) {
@@ -625,7 +632,7 @@ export async function createJournalCoverProduct(
     };
   }>(PRODUCT_CREATE, {
     product: {
-      title: `Sanaya Journal — ${style}`,
+      title: `Sanaya Journal -- ${style}`,
       handle,
       tags: ["journal", COVER_CATEGORY_TAG[category]],
       productOptions: [{ name: "Cover", values: [{ name: style }] }],
@@ -637,12 +644,12 @@ export async function createJournalCoverProduct(
   if (!productId) throw new Error("Shopify did not return the created product");
 
   try {
-    return await finishJournalCoverProduct(productId, handle, style, price, stringValues, penHolderValues, patchValues);
+    return await finishJournalCoverProduct(productId, handle, style, price, stringValues, penHolderValues);
   } catch (err) {
     // Anything short of a fully-formed base ("No Cord" / "None") variant
     // would otherwise sit around tagged "journal" and crash the whole
     // storefront build (catalog.ts requires every journal product to have
-    // one) — better to undo the partial product than leave debris behind.
+    // one) -- better to undo the partial product than leave debris behind.
     await deleteProduct(productId).catch(() => {});
     throw err;
   }
@@ -669,14 +676,12 @@ async function finishJournalCoverProduct(
   style: string,
   price: string,
   stringValues: string[],
-  penHolderValues: string[],
-  patchValues: string[]
+  penHolderValues: string[]
 ): Promise<{ productId: string; handle: string; created: number }> {
-  // Step 2: add String, Pen Holder and Patch as brand-new options on that
-  // product -- productOptionsCreate is the dedicated mutation for adding
-  // options after creation (productOptionUpdate, used elsewhere in this
-  // file, only adds values to an option that already exists, and can't
-  // create a new one).
+  // Step 2: add String and Pen Holder as brand-new options on that product --
+  // productOptionsCreate is the dedicated mutation for adding options after
+  // creation (productOptionUpdate, used elsewhere in this file, only adds
+  // values to an option that already exists, and can't create a new one).
   const OPTIONS_CREATE = `
     mutation AddCoverOptions($productId: ID!, $options: [OptionCreateInput!]!) {
       productOptionsCreate(productId: $productId, options: $options) {
@@ -691,12 +696,10 @@ async function finishJournalCoverProduct(
     options: [
       { name: "String", values: stringValues.map((name) => ({ name })) },
       { name: "Pen Holder", values: penHolderValues.map((name) => ({ name })) },
-      { name: "Patch", values: patchValues.map((name) => ({ name })) },
     ],
   });
   const optionsErrs = optionsRes.productOptionsCreate.userErrors;
-  if (optionsErrs.length)
-    throw new Error(`Add String/Pen Holder/Patch options: ${optionsErrs.map((e) => e.message).join("; ")}`);
+  if (optionsErrs.length) throw new Error(`Add String/Pen Holder options: ${optionsErrs.map((e) => e.message).join("; ")}`);
 
   // Re-fetch fresh -- both steps above may have auto-generated placeholder
   // variants for the option value combinations Shopify computed on its own,
@@ -722,32 +725,27 @@ async function finishJournalCoverProduct(
   const coverOption = state.node.options.find((o) => o.name === "Cover");
   const cordOption = state.node.options.find((o) => o.name === "String");
   const penOption = state.node.options.find((o) => o.name === "Pen Holder");
-  const patchOption = state.node.options.find((o) => o.name === "Patch");
-  if (!coverOption || !cordOption || !penOption || !patchOption)
-    throw new Error("Created product is missing an expected option");
+  if (!coverOption || !cordOption || !penOption) throw new Error("Created product is missing an expected option");
 
-  // Same combo rule as syncJournalOptionAdd: a real cord pairs with every pen
-  // holder value x every patch value (a patch is stitched onto the string,
-  // so it can never apply without one); "No Cord" only ever pairs with
-  // "None"/"None".
-  const combos: { cord: string; pen: string; patch: string }[] = [];
+  // Same combo rule as syncJournalOptionAdd: any String value (a base cord,
+  // or "<cord> + <patch>") pairs with every pen holder value including
+  // "None"; "No Cord" only ever pairs with "None".
+  const combos: { cord: string; pen: string }[] = [];
   for (const cord of stringValues) {
     if (cord === "No Cord") {
-      combos.push({ cord, pen: "None", patch: "None" });
+      combos.push({ cord, pen: "None" });
     } else {
-      for (const pen of penHolderValues) {
-        for (const patch of patchValues) combos.push({ cord, pen, patch });
-      }
+      for (const pen of penHolderValues) combos.push({ cord, pen });
     }
   }
-  const comboKey = (cord: string, pen: string, patch: string) => `${cord} ${pen} ${patch}`;
-  const validKeys = new Set(combos.map((c) => comboKey(c.cord, c.pen, c.patch)));
+  const comboKey = (cord: string, pen: string) => `${cord} ${pen}`;
+  const validKeys = new Set(combos.map((c) => comboKey(c.cord, c.pen)));
 
-  // Shopify auto-generates the full cartesian product across all 3 options
-  // as placeholder variants once they all exist -- that includes invalid
-  // combos (e.g. "No Cord" + a real pen holder/patch) this catalog never
-  // allows. Only delete those; NEVER delete every variant in one call --
-  // wiping a product down to zero variants can make Shopify drop the options
+  // Shopify auto-generates the full cartesian product across both options
+  // as placeholder variants once they exist -- that includes invalid combos
+  // (e.g. "No Cord" + a real pen holder) this catalog never allows. Only
+  // delete those; NEVER delete every variant in one call -- wiping a
+  // product down to zero variants can make Shopify drop the options
   // themselves too, which then breaks the variant-create call right after
   // with "Option does not exist". Valid placeholders are updated in place
   // (price + SKU) instead of being replaced.
@@ -757,11 +755,10 @@ async function finishJournalCoverProduct(
   for (const v of state.node.variants.nodes) {
     const cord = v.selectedOptions.find((o) => o.name === "String")?.value;
     const pen = v.selectedOptions.find((o) => o.name === "Pen Holder")?.value;
-    const patch = v.selectedOptions.find((o) => o.name === "Patch")?.value;
-    const key = cord && pen && patch ? comboKey(cord, pen, patch) : null;
+    const key = cord && pen ? comboKey(cord, pen) : null;
     if (key && validKeys.has(key)) {
       existingValidKeys.add(key);
-      toUpdate.push({ id: v.id, price, sku: journalSku(handle, cord!, pen!, patch!) });
+      toUpdate.push({ id: v.id, price, sku: journalSku(handle, cord!, pen!) });
     } else {
       toDelete.push(v.id);
     }
@@ -791,7 +788,7 @@ async function finishJournalCoverProduct(
   // Create any valid combo Shopify didn't already generate a placeholder for
   // BEFORE deleting the invalid ones below -- so the product always has at
   // least one valid variant, and is never briefly reduced to zero.
-  const missingCombos = combos.filter((c) => !existingValidKeys.has(comboKey(c.cord, c.pen, c.patch)));
+  const missingCombos = combos.filter((c) => !existingValidKeys.has(comboKey(c.cord, c.pen)));
   const created = await bulkCreateJournalVariants(
     productId,
     handle,
@@ -799,7 +796,6 @@ async function finishJournalCoverProduct(
     style,
     cordOption.id,
     penOption.id,
-    patchOption.id,
     missingCombos,
     price
   );
@@ -826,22 +822,32 @@ async function finishJournalCoverProduct(
 }
 
 /**
- * The counterpart to `syncJournalOptionRename` for brand-new Cord/Pen Holder
- * colors: the "+Add variant" button on the matching internal component
- * product only adds a variant *there* (for stock tracking) — customers can't
- * actually pick the new color anywhere until it also exists as a real option
- * value + variant on all 8 sellable "tag:journal" cover products. This
- * generates every valid Cord × Pen Holder combination the customizer's own
- * rule allows (see `catalog.ts` on the client): a real cord pairs with
- * "None" plus every existing real pen holder value; "No Cord" never pairs
- * with a real pen holder. New variants copy the price of that cover's
- * existing variants (price doesn't vary by cord/pen holder within one cover)
- * and start at 0 stock — the admin still sets opening stock per cover
- * directly in Shopify (these combo variants aren't shown in Assets & Stock).
+ * The counterpart to `syncJournalOptionRename` for brand-new String colors,
+ * Pen Holder colors, and Patch shapes: the "+Add variant" button on the
+ * matching internal component product only adds a variant *there* (for
+ * stock/price tracking) -- customers can't actually pick the new value
+ * anywhere until it also exists as a real option value + variant on every
+ * sellable "tag:journal" cover product. Patch has no option of its own
+ * (Shopify caps products at 3 options, already used by Cover/String/Pen
+ * Holder) -- it's encoded as a "<cord> + <patch>" suffix on String's own
+ * values instead (see `stringValueFor` in catalog.ts), so adding a new
+ * String color also creates its patch-suffixed forms, and adding a new
+ * Patch shape adds a suffixed value for every real cord that already exists.
+ * New variants copy the price of that cover's existing variants and start
+ * at 0 stock -- the admin still sets opening stock per cover directly in
+ * Shopify (these combo variants aren't shown in Assets & Stock).
  */
 export async function syncJournalOptionAdd(componentTags: string[], newValue: string): Promise<JournalSyncResult[]> {
   const tag = componentTags.find((t) => t === "string" || t === "pen-holder" || t === "patch");
   if (!tag) return [];
+
+  let realPatchLabels: string[] = [];
+  if (tag === "string") {
+    const patchRef = await shopifyAdmin<{
+      products: { nodes: { variants: { nodes: { title: string }[] } }[] };
+    }>(`query PatchTrackerForAddSync { products(first: 1, query: "tag:patch") { nodes { variants(first: 50) { nodes { title } } } } }`);
+    realPatchLabels = patchRef.products.nodes[0]?.variants.nodes.map((v) => v.title) ?? [];
+  }
 
   const JOURNAL_PRODUCTS_QUERY = `
     query JournalProductsForAddSync {
@@ -874,20 +880,20 @@ export async function syncJournalOptionAdd(componentTags: string[], newValue: st
     const coverOption = product.options.find((o) => o.name === "Cover");
     const cordOption = product.options.find((o) => o.name === "String");
     const penOption = product.options.find((o) => o.name === "Pen Holder");
-    const patchOption = product.options.find((o) => o.name === "Patch");
     const coverValue = coverOption?.optionValues[0]?.name;
-    if (!coverOption || !coverValue || !cordOption || !penOption || !patchOption) {
+    if (!coverOption || !coverValue || !cordOption || !penOption) {
       results.push({
         coverHandle: product.handle,
         coverTitle: product.title,
         created: 0,
         skipped: false,
-        error: "Missing Cover/String/Pen Holder/Patch option -- run the Patch migration first",
+        error: "Missing Cover/String/Pen Holder option",
       });
       continue;
     }
     const price = product.variants.nodes[0]?.price ?? "0.00";
-    const patchValues = patchOption.optionValues.filter((v) => v.name !== "None").map((v) => v.name);
+    // Real (non "No Cord", non patch-suffixed) cord colors currently on this cover.
+    const baseCords = cordOption.optionValues.map((v) => v.name).filter((v) => v !== "No Cord" && !v.includes(" + "));
 
     try {
       if (tag === "string") {
@@ -895,11 +901,11 @@ export async function syncJournalOptionAdd(componentTags: string[], newValue: st
           results.push({ coverHandle: product.handle, coverTitle: product.title, created: 0, skipped: true });
           continue;
         }
-        await addOptionValues(product.id, cordOption.id, [newValue]);
-        const penValues = penOption.optionValues.filter((v) => v.name !== "None").map((v) => v.name);
-        const combos = ["None", ...penValues].flatMap((pen) =>
-          ["None", ...patchValues].map((patch) => ({ cord: newValue, pen, patch }))
-        );
+        // A new cord needs its plain form AND every "<cord> + <patch>" form.
+        const newStringValues = [newValue, ...realPatchLabels.map((p) => `${newValue} + ${p}`)];
+        await addOptionValues(product.id, cordOption.id, newStringValues);
+        const penValues = penOption.optionValues.map((v) => v.name);
+        const combos = newStringValues.flatMap((cord) => penValues.map((pen) => ({ cord, pen })));
         const created = await bulkCreateJournalVariants(
           product.id,
           product.handle,
@@ -907,7 +913,6 @@ export async function syncJournalOptionAdd(componentTags: string[], newValue: st
           coverValue,
           cordOption.id,
           penOption.id,
-          patchOption.id,
           combos,
           price
         );
@@ -919,10 +924,13 @@ export async function syncJournalOptionAdd(componentTags: string[], newValue: st
           continue;
         }
         await addOptionValues(product.id, penOption.id, [newValue, edgeValue]);
-        const cordValues = cordOption.optionValues.filter((v) => v.name !== "No Cord").map((v) => v.name);
-        const combos = cordValues.flatMap((cord) =>
-          [newValue, edgeValue].flatMap((pen) => ["None", ...patchValues].map((patch) => ({ cord, pen, patch })))
-        );
+        // Every non-"No Cord" String value (base cords AND their
+        // patch-suffixed forms) is a valid pairing.
+        const cordValues = cordOption.optionValues.map((v) => v.name).filter((v) => v !== "No Cord");
+        const combos = cordValues.flatMap((cord) => [
+          { cord, pen: newValue },
+          { cord, pen: edgeValue },
+        ]);
         const created = await bulkCreateJournalVariants(
           product.id,
           product.handle,
@@ -930,23 +938,22 @@ export async function syncJournalOptionAdd(componentTags: string[], newValue: st
           coverValue,
           cordOption.id,
           penOption.id,
-          patchOption.id,
           combos,
           price
         );
         results.push({ coverHandle: product.handle, coverTitle: product.title, created, skipped: false });
       } else {
-        // tag === "patch" -- a patch is stitched onto the string, so it only
-        // ever pairs with real cords (never "No Cord"), across every pen
-        // holder value (including "None").
-        if (patchOption.optionValues.some((v) => v.name === newValue)) {
+        // tag === "patch" -- a new shape needs a "<cord> + <newValue>" String
+        // value for every real base cord that doesn't already have one.
+        const missingCords = baseCords.filter((cord) => !cordOption.optionValues.some((v) => v.name === `${cord} + ${newValue}`));
+        if (missingCords.length === 0) {
           results.push({ coverHandle: product.handle, coverTitle: product.title, created: 0, skipped: true });
           continue;
         }
-        await addOptionValues(product.id, patchOption.id, [newValue]);
-        const cordValues = cordOption.optionValues.filter((v) => v.name !== "No Cord").map((v) => v.name);
+        const newStringValues = missingCords.map((cord) => `${cord} + ${newValue}`);
+        await addOptionValues(product.id, cordOption.id, newStringValues);
         const penValues = penOption.optionValues.map((v) => v.name);
-        const combos = cordValues.flatMap((cord) => penValues.map((pen) => ({ cord, pen, patch: newValue })));
+        const combos = newStringValues.flatMap((cord) => penValues.map((pen) => ({ cord, pen })));
         const created = await bulkCreateJournalVariants(
           product.id,
           product.handle,
@@ -954,7 +961,6 @@ export async function syncJournalOptionAdd(componentTags: string[], newValue: st
           coverValue,
           cordOption.id,
           penOption.id,
-          patchOption.id,
           combos,
           price
         );
@@ -975,11 +981,14 @@ export async function syncJournalOptionAdd(componentTags: string[], newValue: st
 }
 
 /**
- * Additive pricing model: Cover/String/Pen Holder tracker products each carry
- * their own `price` per option value — Cover's is the base price for that
- * cover (same for every String/Pen Holder combo), String/Pen Holder's are
- * pure add-on deltas on top of it ("No Cord"/"None" always contribute 0,
- * since they're the zero-cost default option, not a tracked variant).
+ * Additive pricing model: Cover/String/Pen Holder/Patch tracker products
+ * each carry their own `price` per option value -- Cover's is the base
+ * price for that cover (same for every combo), String/Pen Holder/Patch's
+ * are pure add-on deltas on top of it ("No Cord"/"None" always contribute
+ * 0, since they're the zero-cost default option, not a tracked variant).
+ * Patch has no option of its own on the journal product (see
+ * `stringValueFor` in catalog.ts) -- its delta is read off the "<cord> +
+ * <patch>" suffix on the String option's own value instead.
  */
 async function fetchPriceComponents(): Promise<{
   coverPrice: Record<string, number>;
@@ -1002,7 +1011,7 @@ async function fetchPriceComponents(): Promise<{
 
   const coverPrice: Record<string, number> = {};
   const stringDelta: Record<string, number> = { "No Cord": 0 };
-  // "+ Edge" combos aren't tracked as separate pen-holder rows — they carry
+  // "+ Edge" combos aren't tracked as separate pen-holder rows -- they carry
   // the same add-on price as their plain counterpart.
   const penHolderDelta: Record<string, number> = { None: 0 };
   const patchDelta: Record<string, number> = { None: 0 };
@@ -1025,10 +1034,10 @@ async function fetchPriceComponents(): Promise<{
 }
 
 /**
- * Recomputes every real (Cover × String × Pen Holder × Patch) journal
- * variant's price as `coverPrice + stringDelta + penHolderDelta + patchDelta`
- * from the four tracker products' own per-option prices, and pushes any
- * changed prices to Shopify. Call this any time a Cover/String/Pen
+ * Recomputes every real (Cover x String[+ Patch] x Pen Holder) journal
+ * variant's price as `coverPrice + stringDelta + penHolderDelta +
+ * patchDelta` from the four tracker products' own per-option prices, and
+ * pushes any changed prices to Shopify. Call this any time a Cover/String/Pen
  * Holder/Patch tracker price changes, or a new color/patch is synced onto
  * the journal products.
  */
@@ -1069,13 +1078,16 @@ export async function syncJournalPricing(): Promise<void> {
     for (const v of product.variants.nodes) {
       const cover = v.selectedOptions.find((o) => o.name === "Cover")?.value;
       if (!cover || !(cover in coverPrice)) continue;
-      const stringValue = v.selectedOptions.find((o) => o.name === "String")?.value;
+      const stringValue = v.selectedOptions.find((o) => o.name === "String")?.value ?? "";
       const penHolderValue = v.selectedOptions.find((o) => o.name === "Pen Holder")?.value;
-      const patchValue = v.selectedOptions.find((o) => o.name === "Patch")?.value;
+      // "<cord> + <patch>" suffix -- see `stringValueFor` in catalog.ts.
+      const plusIndex = stringValue.indexOf(" + ");
+      const baseCord = plusIndex === -1 ? stringValue : stringValue.slice(0, plusIndex);
+      const patchLabel = plusIndex === -1 ? "None" : stringValue.slice(plusIndex + 3);
       const delta =
-        (stringValue ? stringDelta[stringValue] ?? 0 : 0) +
+        (stringDelta[baseCord] ?? 0) +
         (penHolderValue ? penHolderDelta[penHolderValue] ?? 0 : 0) +
-        (patchValue ? patchDelta[patchValue] ?? 0 : 0);
+        (patchDelta[patchLabel] ?? 0);
       const newPrice = (coverPrice[cover] + delta).toFixed(2);
       if (newPrice !== Number(v.price).toFixed(2)) updates.push({ id: v.id, price: newPrice });
     }
@@ -1101,19 +1113,22 @@ export interface JournalDeleteResult {
 
 /**
  * The delete counterpart to `syncJournalOptionAdd`: removing a String/Pen
- * Holder color from its tracker product only deletes that bookkeeping row —
- * customers could still pick the color and orders could still price it at
- * Rp0 (see `syncJournalPricing`'s fallback) unless the option value and its
- * combo variants are also removed from all 8 real "tag:journal" products.
- * Deletes every variant matching this value first, then removes the option
- * value itself. Pen Holder also removes the paired "<value> + Edge" combo.
+ * Holder/Patch value from its tracker product only deletes that bookkeeping
+ * row — customers could still pick it and orders could still price it at
+ * Rp0 (see `syncJournalPricing`'s fallback) unless the option value(s) and
+ * their combo variants are also removed from every real "tag:journal"
+ * product. Deletes every matching variant first, then removes the option
+ * value(s) themselves. Pen Holder also removes the paired "<value> + Edge"
+ * combo. Patch has no option of its own (see `stringValueFor` in
+ * catalog.ts) — removing a shape removes every "<cord> + <value>" String
+ * value across every cord; removing a cord (tag "string") removes its plain
+ * form AND every "<value> + <patch>" form alongside it.
  */
 export async function syncJournalOptionDelete(componentTags: string[], value: string): Promise<JournalDeleteResult[]> {
   const tag = componentTags.find((t) => t === "string" || t === "pen-holder" || t === "patch");
   if (!tag) return [];
 
-  const optionName = tag === "string" ? "String" : tag === "pen-holder" ? "Pen Holder" : "Patch";
-  const valuesToRemove = tag === "pen-holder" ? [value, `${value} + Edge`] : [value];
+  const optionName = tag === "pen-holder" ? "Pen Holder" : "String";
 
   const JOURNAL_PRODUCTS_QUERY = `
     query JournalProductsForDeleteSync {
@@ -1144,6 +1159,12 @@ export async function syncJournalOptionDelete(componentTags: string[], value: st
 
   for (const product of data.products.nodes) {
     const option = product.options.find((o) => o.name === optionName);
+    const valuesToRemove =
+      tag === "pen-holder"
+        ? [value, `${value} + Edge`]
+        : tag === "string"
+          ? (option?.optionValues.map((v) => v.name).filter((n) => n === value || n.startsWith(`${value} + `)) ?? [])
+          : (option?.optionValues.map((v) => v.name).filter((n) => n.endsWith(` + ${value}`)) ?? []);
     const optionValueIds = option?.optionValues.filter((v) => valuesToRemove.includes(v.name)).map((v) => v.id) ?? [];
     if (!option || optionValueIds.length === 0) {
       results.push({ coverHandle: product.handle, coverTitle: product.title, removed: 0, skipped: true });
@@ -1214,20 +1235,16 @@ export interface PatchMigrationResult {
 }
 
 /**
- * One-time (but safe to re-run) migration for the 8 original covers, created
- * before Patch became a real 4th option on every journal variant (see
- * `createJournalCoverProduct`, which already does this for any cover created
- * from now on). Skips any product that already has a "Patch" option, so
- * running it again after adding a 9th/10th cover the old way is harmless.
- *
- * Adding a brand-new option to a product that already has variants makes
- * Shopify auto-assign the FIRST value in the new option's value list to
- * every existing variant -- passing ["None", ...real patch values] means
- * every existing (Cover, String, Pen Holder) variant becomes
- * (..., Patch: "None") for free, with no separate update step. This only
- * needs to create the *new* Star/Heart-etc. combos alongside them, for every
- * combo whose String isn't "No Cord" (a patch is stitched onto the string,
- * so it can never apply without one).
+ * One-time (but safe to re-run) migration for covers created before Patch
+ * existed at all -- adds every missing "<cord> + <patch>" String value (see
+ * `stringValueFor` in catalog.ts; Patch has no option of its own, Shopify
+ * caps products at 3 options and Cover/String/Pen Holder already use them)
+ * for each real cord already on the cover, then creates the matching combo
+ * variants across every Pen Holder value, priced the same as that cord's
+ * existing (no-patch) combo -- `syncJournalPricing` corrects it to the real
+ * additive price right after. Skips covers that already have every
+ * combination, so running it again after adding a new String color or Patch
+ * shape the old way is harmless.
  */
 export async function migratePatchOptionOntoExistingCovers(): Promise<PatchMigrationResult[]> {
   const PATCH_REF_QUERY = `
@@ -1241,7 +1258,6 @@ export async function migratePatchOptionOntoExistingCovers(): Promise<PatchMigra
     products: { nodes: { variants: { nodes: { title: string }[] } }[] };
   }>(PATCH_REF_QUERY);
   const realPatchValues = patchRef.products.nodes[0]?.variants.nodes.map((v) => v.title) ?? [];
-  const patchValues = ["None", ...realPatchValues];
 
   const JOURNAL_QUERY = `
     query JournalProductsForPatchMigration {
@@ -1251,7 +1267,7 @@ export async function migratePatchOptionOntoExistingCovers(): Promise<PatchMigra
           handle
           title
           options { id name optionValues { id name } }
-          variants(first: 250) { nodes { id price selectedOptions { name value } } }
+          variants(first: 250) { nodes { price selectedOptions { name value } } }
         }
       }
     }
@@ -1263,7 +1279,7 @@ export async function migratePatchOptionOntoExistingCovers(): Promise<PatchMigra
         handle: string;
         title: string;
         options: { id: string; name: string; optionValues: { id: string; name: string }[] }[];
-        variants: { nodes: { id: string; price: string; selectedOptions: { name: string; value: string }[] }[] };
+        variants: { nodes: { price: string; selectedOptions: { name: string; value: string }[] }[] };
       }[];
     };
   }>(JOURNAL_QUERY);
@@ -1271,10 +1287,6 @@ export async function migratePatchOptionOntoExistingCovers(): Promise<PatchMigra
   const results: PatchMigrationResult[] = [];
 
   for (const product of data.products.nodes) {
-    if (product.options.some((o) => o.name === "Patch")) {
-      results.push({ coverHandle: product.handle, coverTitle: product.title, created: 0, skipped: true });
-      continue;
-    }
     const coverOption = product.options.find((o) => o.name === "Cover");
     const cordOption = product.options.find((o) => o.name === "String");
     const penOption = product.options.find((o) => o.name === "Pen Holder");
@@ -1290,58 +1302,49 @@ export async function migratePatchOptionOntoExistingCovers(): Promise<PatchMigra
       continue;
     }
 
+    const existingStringValues = new Set(cordOption.optionValues.map((v) => v.name));
+    const baseCords = cordOption.optionValues.map((v) => v.name).filter((v) => v !== "No Cord" && !v.includes(" + "));
+    const missingStringValues: string[] = [];
+    for (const cord of baseCords) {
+      for (const patch of realPatchValues) {
+        const value = `${cord} + ${patch}`;
+        if (!existingStringValues.has(value)) missingStringValues.push(value);
+      }
+    }
+
+    if (missingStringValues.length === 0) {
+      results.push({ coverHandle: product.handle, coverTitle: product.title, created: 0, skipped: true });
+      continue;
+    }
+
     try {
-      const OPTIONS_CREATE = `
-        mutation AddPatchOption($productId: ID!, $options: [OptionCreateInput!]!) {
-          productOptionsCreate(productId: $productId, options: $options) {
-            userErrors { field message }
-          }
-        }
-      `;
-      const optRes = await shopifyAdmin<{
-        productOptionsCreate: { userErrors: { field: string[]; message: string }[] };
-      }>(OPTIONS_CREATE, { productId: product.id, options: [{ name: "Patch", values: patchValues.map((name) => ({ name })) }] });
-      const optErrs = optRes.productOptionsCreate.userErrors;
-      if (optErrs.length) throw new Error(`Add Patch option: ${optErrs.map((e) => e.message).join("; ")}`);
+      await addOptionValues(product.id, cordOption.id, missingStringValues);
 
-      const STATE_QUERY = `
-        query JournalCoverPatchState($id: ID!) {
-          node(id: $id) {
-            ... on Product {
-              options { id name optionValues { id name } }
-            }
-          }
-        }
-      `;
-      const state = await shopifyAdmin<{
-        node: { options: { id: string; name: string; optionValues: { id: string; name: string }[] }[] } | null;
-      }>(STATE_QUERY, { id: product.id });
-      const patchOption = state.node?.options.find((o) => o.name === "Patch");
-      if (!patchOption) throw new Error("Patch option missing right after creating it");
-
-      const realPatches = patchValues.filter((p) => p !== "None");
-      const combos: { cord: string; pen: string; patch: string }[] = [];
+      const penValues = penOption.optionValues.map((v) => v.name);
+      // Price each new "<cord> + <patch>" combo the same as that cord's
+      // existing (no-patch) combo with the same Pen Holder value.
       const priceByComboKey = new Map<string, string>();
       for (const v of product.variants.nodes) {
-        const cord = v.selectedOptions.find((o) => o.name === "String")?.value;
-        const pen = v.selectedOptions.find((o) => o.name === "Pen Holder")?.value;
-        if (!cord || !pen) continue;
-        priceByComboKey.set(`${cord} ${pen}`, v.price);
-        if (cord === "No Cord") continue;
-        for (const patch of realPatches) combos.push({ cord, pen, patch });
+        const s = v.selectedOptions.find((o) => o.name === "String")?.value;
+        const p = v.selectedOptions.find((o) => o.name === "Pen Holder")?.value;
+        if (s && p && !s.includes(" + ")) priceByComboKey.set(`${s} ${p}`, v.price);
+      }
+
+      const comboGroups = new Map<string, { cord: string; pen: string }[]>();
+      for (const cord of baseCords) {
+        for (const patch of realPatchValues) {
+          const stringValue = `${cord} + ${patch}`;
+          if (!missingStringValues.includes(stringValue)) continue;
+          for (const pen of penValues) {
+            const price = priceByComboKey.get(`${cord} ${pen}`) ?? "0.00";
+            const group = comboGroups.get(price) ?? [];
+            group.push({ cord: stringValue, pen });
+            comboGroups.set(price, group);
+          }
+        }
       }
 
       let created = 0;
-      // bulkCreateJournalVariants prices every combo the same -- chunk by
-      // the existing (cord, pen) combo's own price so new patch variants
-      // start from the right base instead of a single flat price.
-      const comboGroups = new Map<string, { cord: string; pen: string; patch: string }[]>();
-      for (const c of combos) {
-        const price = priceByComboKey.get(`${c.cord} ${c.pen}`) ?? "0.00";
-        const group = comboGroups.get(price) ?? [];
-        group.push(c);
-        comboGroups.set(price, group);
-      }
       for (const [price, group] of comboGroups) {
         created += await bulkCreateJournalVariants(
           product.id,
@@ -1350,7 +1353,6 @@ export async function migratePatchOptionOntoExistingCovers(): Promise<PatchMigra
           coverValue,
           cordOption.id,
           penOption.id,
-          patchOption.id,
           group,
           price
         );

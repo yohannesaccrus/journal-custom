@@ -34,8 +34,9 @@ export function PenHolderStep({
   // variant that doesn't exist would throw before the user even clicks.
   const effectiveCord =
     selection.cord !== "none" ? selection.cord : buildCordEntries(product, cordSwatchByLabel)[0]?.label ?? selection.cord;
-  const entries = buildPenHolderEntries(product, effectiveCord, penHolderSwatchByLabel);
-  const edgeInStock = selection.penHolder !== "none" ? isEdgeInStock(product, effectiveCord, selection.penHolder) : true;
+  const entries = buildPenHolderEntries(product, effectiveCord, selection.patch, penHolderSwatchByLabel);
+  const edgeInStock =
+    selection.penHolder !== "none" ? isEdgeInStock(product, effectiveCord, selection.penHolder, selection.patch) : true;
 
   const priceAt = (penHolder: JournalSelection["penHolder"], edge: boolean) => {
     const cord = penHolder === "none" ? selection.cord : effectiveCord;

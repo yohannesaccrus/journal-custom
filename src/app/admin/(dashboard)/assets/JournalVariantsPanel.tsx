@@ -31,6 +31,19 @@ function optionValue(variant: Variant, name: string): string {
 }
 
 /**
+ * Patch has no option of its own on the real variant (Shopify caps products
+ * at 3 options, already used by Cover/String/Pen Holder) — it's encoded as
+ * a "<cord> + <patch>" suffix on the String value instead. Splits that back
+ * apart for display.
+ */
+function stringAndPatch(variant: Variant): { string: string; patch: string } {
+  const raw = optionValue(variant, "String");
+  const plusIndex = raw.indexOf(" + ");
+  if (plusIndex === -1) return { string: raw, patch: "None" };
+  return { string: raw.slice(0, plusIndex), patch: raw.slice(plusIndex + 3) };
+}
+
+/**
  * The per-cover accordion body — every String × Pen Holder × Patch
  * combination that actually exists on the real sellable journal product for
  * this cover (not shown anywhere else in Assets & Stock). Editable: SKU,
@@ -183,13 +196,13 @@ function JournalComboRow({ productId, variant }: { productId: string; variant: V
       </td>
       <td className="px-5 py-2 text-[#1c1c1a]">
         <span className="text-[#a89a80]">String: </span>
-        <span className="font-semibold">{optionValue(variant, "String")}</span>
+        <span className="font-semibold">{stringAndPatch(variant).string}</span>
         <span className="mx-1.5 text-[#d8d5cb]">·</span>
         <span className="text-[#a89a80]">Pen Holder: </span>
         <span className="font-semibold">{optionValue(variant, "Pen Holder")}</span>
         <span className="mx-1.5 text-[#d8d5cb]">·</span>
         <span className="text-[#a89a80]">Patch: </span>
-        <span className="font-semibold">{optionValue(variant, "Patch")}</span>
+        <span className="font-semibold">{stringAndPatch(variant).patch}</span>
       </td>
       <td className="px-5 py-2">
         <input
