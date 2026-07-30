@@ -1645,6 +1645,8 @@ export interface AdminOrder {
   displayFinancialStatus: string;
   displayFulfillmentStatus: string;
   customerName: string | null;
+  /** The buyer's order note (added at checkout), if any. */
+  note: string | null;
   /** Raw numeric total, in the store's currency — pair with `totalPriceCurrency` to format/convert. */
   totalPriceAmount: number;
   totalPriceCurrency: string;
@@ -1663,6 +1665,15 @@ export interface AdminOrder {
    * missing/malformed (e.g. very old pre-design-link orders).
    */
   specs: (JournalSelection | null)[];
+}
+
+/** True for the customer-facing `/design` preview page link, false for its sibling `/api/design-image` (front/back/side email image) attributes — see the `designLinks` comment below. */
+function isDesignPageLink(value: string): boolean {
+  try {
+    return new URL(value.trim()).pathname === "/design";
+  } catch {
+    return false;
+  }
 }
 
 /** Pulls the `d` payload out of a design link URL and decodes it; tolerant of malformed/legacy links. */
@@ -1685,6 +1696,7 @@ const ORDERS_QUERY = `
         createdAt
         displayFinancialStatus
         displayFulfillmentStatus
+        note
         totalPriceSet { shopMoney { amount currencyCode } }
         customer { displayName }
         customAttributes { key value }
@@ -1707,6 +1719,7 @@ interface RawOrder {
   createdAt: string;
   displayFinancialStatus: string;
   displayFulfillmentStatus: string;
+  note: string | null;
   totalPriceSet: { shopMoney: { amount: string; currencyCode: string } };
   customer: { displayName: string } | null;
   customAttributes: { key: string; value: string }[];
@@ -1762,17 +1775,20 @@ export async function fetchJournalOrders(cursor?: string): Promise<{
         displayFinancialStatus: o.displayFinancialStatus,
         displayFulfillmentStatus: o.displayFulfillmentStatus,
         customerName: o.customer?.displayName ?? null,
+        note: o.note,
         totalPriceAmount: Number(o.totalPriceSet.shopMoney.amount),
         totalPriceCurrency: o.totalPriceSet.shopMoney.currencyCode,
         journals,
-        // Matched by value (a URL), not by key text — the caption on this
-        // attribute (see cart.ts) is customer-facing copy that's changed
-        // more than once, so pinning to an exact/prefix key string here just
-        // breaks again on the next wording tweak.
-        designLinks: o.customAttributes.filter((a) => /^https?:\/\//.test(a.value.trim())).map((a) => a.value),
-        specs: o.customAttributes
-          .filter((a) => /^https?:\/\//.test(a.value.trim()))
-          .map((a) => decodeSpecFromLink(a.value)),
+        // Matched by the URL's own path (`/design`), not by key text — the
+        // caption on this attribute (see cart.ts) is customer-facing copy
+        // that's changed more than once, so pinning to an exact/prefix key
+        // string here just breaks again on the next wording tweak. Can't
+        // just match "any URL value" either: the Front/Back/Side email
+        // images (`/api/design-image`) are URLs too, on separate attributes
+        // for the same journal — that used to inflate one journal into 3-4
+        // "View design" buttons.
+        designLinks: o.customAttributes.filter((a) => isDesignPageLink(a.value)).map((a) => a.value),
+        specs: o.customAttributes.filter((a) => isDesignPageLink(a.value)).map((a) => decodeSpecFromLink(a.value)),
       };
     });
 

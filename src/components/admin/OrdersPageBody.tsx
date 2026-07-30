@@ -134,7 +134,13 @@ function OrderTable({
                   <td className="px-5 py-3 align-top">
                     <div className="flex flex-col gap-2">
                       {order.journals.map((j, i) => (
-                        <JournalThumbnail key={i} imageUrl={j.imageUrl} title={j.title} preview={order.previews[i] ?? null} />
+                        <JournalThumbnail
+                          key={i}
+                          imageUrl={j.imageUrl}
+                          title={j.title}
+                          preview={order.previews[i] ?? null}
+                          note={order.note}
+                        />
                       ))}
                     </div>
                   </td>

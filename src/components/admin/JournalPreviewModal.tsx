@@ -15,10 +15,12 @@ export function JournalThumbnail({
   imageUrl,
   title,
   preview,
+  note,
 }: {
   imageUrl: string | null;
   title: string;
   preview: OrderJournalPreview | null;
+  note?: string | null;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -84,7 +86,7 @@ export function JournalThumbnail({
         </span>
       </button>
 
-      {open && <JournalPreviewModal title={title} preview={preview} onClose={() => setOpen(false)} />}
+      {open && <JournalPreviewModal title={title} preview={preview} note={note} onClose={() => setOpen(false)} />}
     </>
   );
 }
@@ -92,10 +94,12 @@ export function JournalThumbnail({
 function JournalPreviewModal({
   title,
   preview,
+  note,
   onClose,
 }: {
   title: string;
   preview: OrderJournalPreview;
+  note?: string | null;
   onClose: () => void;
 }) {
   useEffect(() => {
@@ -142,6 +146,13 @@ function JournalPreviewModal({
                 </div>
               ))}
             </dl>
+
+            {note && (
+              <div className="rounded-xl bg-white/70 px-4 py-3 ring-1 ring-inset ring-white/70">
+                <h3 className="text-xs font-medium uppercase tracking-wide text-[#6b6a63]">Note from customer</h3>
+                <p className="mt-1.5 whitespace-pre-wrap text-xs text-[#4a4944]">{note}</p>
+              </div>
+            )}
 
             {preview.charms.length > 0 && (
               <div className="flex flex-col min-h-0">
