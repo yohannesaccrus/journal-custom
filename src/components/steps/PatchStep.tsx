@@ -17,9 +17,16 @@ interface PatchStepProps {
   onPatchChange: (value: JournalSelection["patch"]) => void;
 }
 
+const PATCH_SHAPES = ["star", "heart"] as const;
+
 export function PatchStep({ product, cord, penHolder, edge, cordSelected, patch, onPatchChange }: PatchStepProps) {
   const { format } = useCurrencyFormat();
-  const patchEntries = buildPatchEntries(product, cord, penHolder, edge);
+  // Before a string is picked there's no combo to price/stock-check yet
+  // (buildPatchEntries needs one) — show both shapes anyway, just disabled,
+  // so the options aren't a mystery until the previous step is done.
+  const patchEntries = cordSelected
+    ? buildPatchEntries(product, cord, penHolder, edge)
+    : PATCH_SHAPES.map((shape) => ({ shape, price: 0, inStock: true }));
 
   return (
     <div className="step-fade-in">
@@ -66,7 +73,7 @@ export function PatchStep({ product, cord, penHolder, edge, cordSelected, patch,
                 <PatchIcon shape={p.shape} className="h-6 w-6" />
               </span>
               <span className="text-xs text-[var(--ink)] capitalize">{p.shape}</span>
-              <span className="text-[10px] text-[var(--brand)] -mt-1">+{format(p.price)}</span>
+              {cordSelected && <span className="text-[10px] text-[var(--brand)] -mt-1">+{format(p.price)}</span>}
             </button>
           </DisabledHint>
         ))}
