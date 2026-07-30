@@ -8,11 +8,14 @@ export default function VariantThumbnail({
   variantId,
   imageUrl,
   onUploaded,
+  caption,
 }: {
   productId: string;
   variantId: string;
   imageUrl: string | null;
   onUploaded: () => void;
+  /** Small label under the thumbnail clarifying where this image is actually seen — e.g. "Admin only" vs "Shown to customer". Omit to show nothing. */
+  caption?: string;
 }) {
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -45,7 +48,7 @@ export default function VariantThumbnail({
   const displaySrc = preview ?? imageUrl;
 
   return (
-    <>
+    <div className="flex w-11 flex-col items-center gap-1">
       <button
         type="button"
         onClick={() => setModalOpen(true)}
@@ -91,6 +94,12 @@ export default function VariantThumbnail({
         {error && <div className="absolute inset-x-0 -bottom-px h-1 bg-[#b5342c]" title="Upload failed, try again" />}
       </button>
 
+      {caption && (
+        <span className="text-center text-[9px] leading-tight text-[#a89a80]" title={caption}>
+          {caption}
+        </span>
+      )}
+
       {modalOpen && (
         <ImageModal
           imageUrl={displaySrc}
@@ -100,7 +109,7 @@ export default function VariantThumbnail({
           onClose={() => setModalOpen(false)}
         />
       )}
-    </>
+    </div>
   );
 }
 

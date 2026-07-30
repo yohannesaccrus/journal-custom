@@ -173,6 +173,7 @@ function JournalComboRow({ productId, variant }: { productId: string; variant: V
           variantId={variant.id}
           imageUrl={variant.image?.url ?? null}
           onUploaded={() => router.refresh()}
+          caption="Shown to customer"
         />
       </td>
       <td className="px-5 py-2 font-medium text-[#1c1c1a]">{comboLabel(variant)}</td>

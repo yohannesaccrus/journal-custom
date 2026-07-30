@@ -28,6 +28,7 @@ export default function VariantRow({
   hideSwatch,
   hideStock,
   hidePrice,
+  imageCaption,
 }: {
   productId: string;
   variant: Variant;
@@ -46,6 +47,8 @@ export default function VariantRow({
   hideStock?: boolean;
   /** String/Pen Holder: real price lives per-cover, not here — see the banner in AssetCategoryCard. */
   hidePrice?: boolean;
+  /** Small label under the thumbnail — e.g. "Admin only" vs "Shown to customer". */
+  imageCaption?: string;
 }) {
   const router = useRouter();
   const { currency } = useCurrency();
@@ -122,6 +125,7 @@ export default function VariantRow({
           variantId={variant.id}
           imageUrl={variant.image?.url ?? null}
           onUploaded={() => router.refresh()}
+          caption={imageCaption}
         />
       </td>
       <td className="px-5 py-2.5">

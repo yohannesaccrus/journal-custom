@@ -86,6 +86,12 @@ export default function AssetCategoryCard({
   // `syncJournalPricing`) — the combo table itself only shows the computed
   // result, read-only.
   const hidePrice = false;
+  // Charm is the only tracker whose own variant photo is what customers
+  // actually see (buildCharmEntries reads it straight off this product) —
+  // every other tracker's image (Cover/String/Pen Holder/Patch/Notebook/Edge)
+  // is admin-only reference; the photo customers see for a cover combo comes
+  // from the real journal product's own image in the accordion below instead.
+  const imageCaption = isCharm ? "Shown to customer" : "Admin only";
   // String and Pen Holder's Swatch columns stay editable — they actually
   // drive the live customizer's color pickers (see `fetchSwatchColors`) —
   // but like Cover/Charm/Patch/Corner Edge/Notebook their titles shouldn't
@@ -574,6 +580,7 @@ export default function AssetCategoryCard({
                 hideSwatch={hideSwatch}
                 hideStock={hideStock}
                 hidePrice={hidePrice}
+                imageCaption={imageCaption}
                 expandable={isCoverTracker}
                 expanded={expandedVariantId === variant.id}
                 onToggleExpand={() => setExpandedVariantId((cur) => (cur === variant.id ? null : variant.id))}
