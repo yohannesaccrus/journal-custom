@@ -57,18 +57,24 @@ function inStock(variant: ShopifyVariant | undefined): boolean {
   return (variant?.inventoryQuantity ?? 0) > 0;
 }
 
-function baseVariant(product: ShopifyJournalProduct): ShopifyVariant {
-  const found = product.variants.find(
+function baseVariant(product: ShopifyJournalProduct): ShopifyVariant | undefined {
+  return product.variants.find(
     (v) => optionValue(v, "String") === "No Cord" && optionValue(v, "Pen Holder") === "None"
   );
-  if (!found) throw new Error(`No base (No Cord / None) variant found for ${product.handle}`);
-  return found;
 }
 
+/**
+ * A malformed "tag:journal" product (e.g. a cover creation that failed
+ * partway through — see `createJournalCoverProduct`) must never take down
+ * the whole storefront build. Skip it instead of throwing, same as any
+ * product still missing photos/stock.
+ */
 export function buildCoverEntries(products: ShopifyJournalProduct[]): CoverEntry[] {
-  const globalBase = Math.min(...products.map((p) => Number(baseVariant(p).price)));
-  return products.map((p) => {
-    const base = baseVariant(p);
+  const withBase = products
+    .map((p) => ({ p, base: baseVariant(p) }))
+    .filter((x): x is { p: ShopifyJournalProduct; base: ShopifyVariant } => !!x.base);
+  const globalBase = Math.min(...withBase.map((x) => Number(x.base.price)));
+  return withBase.map(({ p, base }) => {
     const label = optionValue(base, "Cover") ?? p.title;
     const category = coverCategory(p);
     return {

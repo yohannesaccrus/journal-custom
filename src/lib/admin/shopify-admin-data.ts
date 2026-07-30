@@ -574,6 +574,41 @@ export async function createJournalCoverProduct(
   const productId = createRes.productCreate.product?.id;
   if (!productId) throw new Error("Shopify did not return the created product");
 
+  try {
+    return await finishJournalCoverProduct(productId, handle, style, price, stringValues, penHolderValues);
+  } catch (err) {
+    // Anything short of a fully-formed base ("No Cord" / "None") variant
+    // would otherwise sit around tagged "journal" and crash the whole
+    // storefront build (catalog.ts requires every journal product to have
+    // one) — better to undo the partial product than leave debris behind.
+    await deleteProduct(productId).catch(() => {});
+    throw err;
+  }
+}
+
+async function deleteProduct(productId: string): Promise<void> {
+  const MUTATION = `
+    mutation DeleteJournalCoverProduct($input: ProductDeleteInput!) {
+      productDelete(input: $input) {
+        userErrors { field message }
+      }
+    }
+  `;
+  const data = await shopifyAdmin<{
+    productDelete: { userErrors: { field: string[]; message: string }[] };
+  }>(MUTATION, { input: { id: productId } });
+  const errs = data.productDelete.userErrors;
+  if (errs.length) throw new Error(errs.map((e) => e.message).join("; "));
+}
+
+async function finishJournalCoverProduct(
+  productId: string,
+  handle: string,
+  style: string,
+  price: string,
+  stringValues: string[],
+  penHolderValues: string[]
+): Promise<{ productId: string; handle: string; created: number }> {
   // Step 2: add String and Pen Holder as brand-new options on that product —
   // productOptionsCreate is the dedicated mutation for adding options after
   // creation (productOptionUpdate, used elsewhere in this file, only adds
