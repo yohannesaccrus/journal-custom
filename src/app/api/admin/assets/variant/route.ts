@@ -39,12 +39,19 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    await addAssetVariant(productId, optionId, optionName, value, price ?? "0.00", sku ?? "");
-
+    // For Cover, create the real sellable product FIRST — if that fails,
+    // the tracker bookkeeping row below is never added, so a failed attempt
+    // never leaves an orphaned row with nothing behind it (see the "Classic
+    // Pink" row this order used to produce).
     let journalSync: JournalSyncResult[] = [];
     if (productTags?.includes("cover")) {
       const result = await createJournalCoverProduct(value, price ?? "0.00", category!);
       journalSync = [{ coverHandle: result.handle, coverTitle: value, created: result.created, skipped: false }];
+    }
+
+    await addAssetVariant(productId, optionId, optionName, value, price ?? "0.00", sku ?? "");
+
+    if (productTags?.includes("cover")) {
       await syncJournalPricing();
     } else if (productTags) {
       journalSync = await syncJournalOptionAdd(productTags, value);

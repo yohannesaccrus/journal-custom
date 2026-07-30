@@ -131,12 +131,16 @@ export async function fetchAssetProducts(): Promise<AdminProduct[]> {
 
   return data.products.nodes.map((p) => ({
     ...p,
-    variants: p.variants.nodes.map((v) => ({
-      ...v,
-      inventoryItemId: v.inventoryItem.id,
-      inventoryQuantity: v.inventoryQuantity,
-      swatchColor: v.swatchMetafield?.value ?? null,
-    })),
+    // Shopify returns variants oldest-first; admin tables want the
+    // most-recently-added row on top.
+    variants: p.variants.nodes
+      .map((v) => ({
+        ...v,
+        inventoryItemId: v.inventoryItem.id,
+        inventoryQuantity: v.inventoryQuantity,
+        swatchColor: v.swatchMetafield?.value ?? null,
+      }))
+      .reverse(),
   }));
 }
 
@@ -154,15 +158,21 @@ export async function fetchJournalCoverProducts(): Promise<AdminProduct[]> {
     swatchKey: SWATCH_METAFIELD_KEY,
   });
 
-  return data.products.nodes.map((p) => ({
-    ...p,
-    variants: p.variants.nodes.map((v) => ({
-      ...v,
-      inventoryItemId: v.inventoryItem.id,
-      inventoryQuantity: v.inventoryQuantity,
-      swatchColor: v.swatchMetafield?.value ?? null,
-    })),
-  }));
+  return data.products.nodes
+    .map((p) => ({
+      ...p,
+      // Shopify returns variants oldest-first; the per-cover combo table
+      // wants the most-recently-added combo on top.
+      variants: p.variants.nodes
+        .map((v) => ({
+          ...v,
+          inventoryItemId: v.inventoryItem.id,
+          inventoryQuantity: v.inventoryQuantity,
+          swatchColor: v.swatchMetafield?.value ?? null,
+        }))
+        .reverse(),
+    }))
+    .reverse();
 }
 
 export async function setVariantSwatchColor(variantId: string, hex: string | null): Promise<void> {
