@@ -485,7 +485,7 @@ async function bulkCreateJournalVariants(
     };
   }>(MUTATION, { productId, variants });
   const errs = data.productVariantsBulkCreate.userErrors;
-  if (errs.length) throw new Error(errs.map((e) => e.message).join("; "));
+  if (errs.length) throw new Error(`Create combo variants: ${errs.map((e) => e.message).join("; ")}`);
 
   // So the admin can set opening stock per cover in Shopify right away,
   // instead of hitting the same "not stocked at the location" error there too.
@@ -546,27 +546,19 @@ export async function createJournalCoverProduct(
 
   const handle = `sanaya-journal-${slugify(style)}`;
 
+  // Step 1: create the product with only its Cover option — guarantees
+  // exactly one default variant, no ambiguity about auto-generated combos.
   const PRODUCT_CREATE = `
     mutation CreateJournalCover($product: ProductCreateInput!) {
       productCreate(product: $product) {
-        product {
-          id
-          handle
-          options { id name optionValues { id name } }
-          variants(first: 250) { nodes { id } }
-        }
+        product { id handle }
         userErrors { field message }
       }
     }
   `;
   const createRes = await shopifyAdmin<{
     productCreate: {
-      product: {
-        id: string;
-        handle: string;
-        options: { id: string; name: string; optionValues: { id: string; name: string }[] }[];
-        variants: { nodes: { id: string }[] };
-      } | null;
+      product: { id: string; handle: string } | null;
       userErrors: { field: string[]; message: string }[];
     };
   }>(PRODUCT_CREATE, {
@@ -574,21 +566,61 @@ export async function createJournalCoverProduct(
       title: `Sanaya Journal — ${style}`,
       handle,
       tags: ["journal", COVER_CATEGORY_TAG[category]],
-      productOptions: [
-        { name: "Cover", values: [{ name: style }] },
-        { name: "String", values: stringValues.map((name) => ({ name })) },
-        { name: "Pen Holder", values: penHolderValues.map((name) => ({ name })) },
-      ],
+      productOptions: [{ name: "Cover", values: [{ name: style }] }],
     },
   });
   const createErrs = createRes.productCreate.userErrors;
-  if (createErrs.length) throw new Error(createErrs.map((e) => e.message).join("; "));
-  const product = createRes.productCreate.product;
-  if (!product) throw new Error("Shopify did not return the created product");
+  if (createErrs.length) throw new Error(`Create product: ${createErrs.map((e) => e.message).join("; ")}`);
+  const productId = createRes.productCreate.product?.id;
+  if (!productId) throw new Error("Shopify did not return the created product");
 
-  const coverOption = product.options.find((o) => o.name === "Cover");
-  const cordOption = product.options.find((o) => o.name === "String");
-  const penOption = product.options.find((o) => o.name === "Pen Holder");
+  // Step 2: add String and Pen Holder as brand-new options on that product —
+  // productOptionsCreate is the dedicated mutation for adding options after
+  // creation (productOptionUpdate, used elsewhere in this file, only adds
+  // values to an option that already exists, and can't create a new one).
+  const OPTIONS_CREATE = `
+    mutation AddCoverOptions($productId: ID!, $options: [OptionCreateInput!]!) {
+      productOptionsCreate(productId: $productId, options: $options) {
+        userErrors { field message }
+      }
+    }
+  `;
+  const optionsRes = await shopifyAdmin<{
+    productOptionsCreate: { userErrors: { field: string[]; message: string }[] };
+  }>(OPTIONS_CREATE, {
+    productId,
+    options: [
+      { name: "String", values: stringValues.map((name) => ({ name })) },
+      { name: "Pen Holder", values: penHolderValues.map((name) => ({ name })) },
+    ],
+  });
+  const optionsErrs = optionsRes.productOptionsCreate.userErrors;
+  if (optionsErrs.length) throw new Error(`Add String/Pen Holder options: ${optionsErrs.map((e) => e.message).join("; ")}`);
+
+  // Re-fetch fresh — both steps above may have auto-generated placeholder
+  // variants for the option value combinations Shopify computed on its own,
+  // which don't necessarily match the valid combo rule this catalog uses.
+  const STATE_QUERY = `
+    query JournalCoverState($id: ID!) {
+      node(id: $id) {
+        ... on Product {
+          options { id name optionValues { id name } }
+          variants(first: 250) { nodes { id } }
+        }
+      }
+    }
+  `;
+  const state = await shopifyAdmin<{
+    node: {
+      options: { id: string; name: string; optionValues: { id: string; name: string }[] }[];
+      variants: { nodes: { id: string }[] };
+    } | null;
+  }>(STATE_QUERY, { id: productId });
+  if (!state.node) throw new Error("Shopify did not return the product after adding options");
+
+  const coverOption = state.node.options.find((o) => o.name === "Cover");
+  const cordOption = state.node.options.find((o) => o.name === "String");
+  const penOption = state.node.options.find((o) => o.name === "Pen Holder");
   if (!coverOption || !cordOption || !penOption) throw new Error("Created product is missing an expected option");
 
   // Same combo rule as syncJournalOptionAdd: a real cord pairs with every pen
@@ -602,12 +634,7 @@ export async function createJournalCoverProduct(
     }
   }
 
-  // Shopify auto-generates the full String × Pen Holder cartesian product as
-  // placeholder variants when a product is created with multiple option
-  // values at once — that includes invalid combos (e.g. "No Cord" + a real
-  // pen holder) this catalog never allows. Clear all of them out and create
-  // exactly the valid combo set fresh, rather than trying to reconcile.
-  if (product.variants.nodes.length > 0) {
+  if (state.node.variants.nodes.length > 0) {
     const DELETE_MUTATION = `
       mutation DeletePlaceholderVariants($productId: ID!, $variantsIds: [ID!]!) {
         productVariantsBulkDelete(productId: $productId, variantsIds: $variantsIds) {
@@ -615,19 +642,19 @@ export async function createJournalCoverProduct(
         }
       }
     `;
-    const ids = product.variants.nodes.map((v) => v.id);
+    const ids = state.node.variants.nodes.map((v) => v.id);
     for (let i = 0; i < ids.length; i += 100) {
       const chunk = ids.slice(i, i + 100);
       const delRes = await shopifyAdmin<{
         productVariantsBulkDelete: { userErrors: { field: string[]; message: string }[] };
-      }>(DELETE_MUTATION, { productId: product.id, variantsIds: chunk });
+      }>(DELETE_MUTATION, { productId, variantsIds: chunk });
       const delErrs = delRes.productVariantsBulkDelete.userErrors;
-      if (delErrs.length) throw new Error(delErrs.map((e) => e.message).join("; "));
+      if (delErrs.length) throw new Error(`Delete placeholder variants: ${delErrs.map((e) => e.message).join("; ")}`);
     }
   }
 
   const created = await bulkCreateJournalVariants(
-    product.id,
+    productId,
     handle,
     coverOption.id,
     style,
@@ -637,7 +664,7 @@ export async function createJournalCoverProduct(
     price
   );
 
-  return { productId: product.id, handle, created };
+  return { productId, handle, created };
 }
 
 /**
