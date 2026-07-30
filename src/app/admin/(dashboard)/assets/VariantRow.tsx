@@ -26,7 +26,6 @@ export default function VariantRow({
   expanded,
   onToggleExpand,
   hideSwatch,
-  hideStock,
   hidePrice,
   imageCaption,
 }: {
@@ -43,8 +42,6 @@ export default function VariantRow({
   onToggleExpand?: () => void;
   /** Charms are identified by their photo, not a color swatch. */
   hideSwatch?: boolean;
-  /** String/Pen Holder: real stock lives per-cover, not here — see the banner in AssetCategoryCard. */
-  hideStock?: boolean;
   /** String/Pen Holder: real price lives per-cover, not here — see the banner in AssetCategoryCard. */
   hidePrice?: boolean;
   /** Small label under the thumbnail — e.g. "Admin only" vs "Shown to customer". */
@@ -213,30 +210,28 @@ export default function VariantRow({
           </div>
         </td>
       )}
-      {!hideStock && (
-        <td className="px-5 py-2.5">
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              min={0}
-              disabled={saving || deleting}
-              value={stock}
-              onChange={(e) => setStock(Number(e.target.value))}
-              className={`admin-input w-20 ${stock !== variant.inventoryQuantity ? "dirty" : ""}`}
-            />
-            {!dirty && stock <= 0 && (
-              <span className="rounded-full bg-gradient-to-r from-[#c23f35] to-[#b5342c] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white shadow-sm">
-                Out of stock
-              </span>
-            )}
-            {!dirty && stock > 0 && stock <= 10 && (
-              <span className="rounded-full bg-gradient-to-r from-[#f6dcbb] to-[#f0ce9f] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#8a4d1f]">
-                Low
-              </span>
-            )}
-          </div>
-        </td>
-      )}
+      <td className="px-5 py-2.5">
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            min={0}
+            disabled={saving || deleting}
+            value={stock}
+            onChange={(e) => setStock(Number(e.target.value))}
+            className={`admin-input w-20 ${stock !== variant.inventoryQuantity ? "dirty" : ""}`}
+          />
+          {!dirty && stock <= 0 && (
+            <span className="rounded-full bg-gradient-to-r from-[#c23f35] to-[#b5342c] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white shadow-sm">
+              Out of stock
+            </span>
+          )}
+          {!dirty && stock > 0 && stock <= 10 && (
+            <span className="rounded-full bg-gradient-to-r from-[#f6dcbb] to-[#f0ce9f] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#8a4d1f]">
+              Low
+            </span>
+          )}
+        </div>
+      </td>
       <td className="px-5 py-2.5">
         <div className="flex items-center justify-end gap-3">
           {saved && !dirty && (

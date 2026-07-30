@@ -1106,6 +1106,187 @@ export async function syncJournalPricing(): Promise<void> {
   }
 }
 
+/** Stands in for "this combo doesn't consume this component" (e.g. "No Cord", "None", no patch) in the `Math.min` below, so a combo is never capped by a component it doesn't actually use. */
+const UNLIMITED_STOCK = 1_000_000;
+
+/**
+ * Raw-material stock for each of the five component trackers (Cover,
+ * String, Pen Holder, Corner Edge, Patch) — these are physical materials
+ * shared across every combo that uses them (e.g. one roll of Orange string
+ * is shared by all 9 covers), unlike price, which is a per-value add-on.
+ * Corner Edge has a single variant (a yes/no add-on kit), so its stock is
+ * one number rather than a per-value map.
+ */
+async function fetchStockComponents(): Promise<{
+  coverStock: Record<string, number>;
+  stringStock: Record<string, number>;
+  penHolderStock: Record<string, number>;
+  patchStock: Record<string, number>;
+  edgeStock: number | null;
+}> {
+  const data = await shopifyAdmin<{
+    products: { nodes: { tags: string[]; variants: { nodes: { title: string; inventoryQuantity: number }[] } }[] };
+  }>(
+    `query StockComponents {
+      products(first: 20, query: "tag:cover OR tag:string OR tag:pen-holder OR tag:patch OR tag:edge") {
+        nodes {
+          tags
+          variants(first: 100) { nodes { title inventoryQuantity } }
+        }
+      }
+    }`
+  );
+
+  const coverStock: Record<string, number> = {};
+  const stringStock: Record<string, number> = {};
+  const penHolderStock: Record<string, number> = {};
+  const patchStock: Record<string, number> = {};
+  let edgeStock: number | null = null;
+
+  for (const product of data.products.nodes) {
+    if (product.tags.includes("cover")) {
+      for (const v of product.variants.nodes) coverStock[v.title] = v.inventoryQuantity;
+    } else if (product.tags.includes("edge")) {
+      edgeStock = product.variants.nodes[0]?.inventoryQuantity ?? null;
+    } else if (product.tags.includes("string")) {
+      for (const v of product.variants.nodes) stringStock[v.title] = v.inventoryQuantity;
+    } else if (product.tags.includes("pen-holder")) {
+      for (const v of product.variants.nodes) penHolderStock[v.title] = v.inventoryQuantity;
+    } else if (product.tags.includes("patch")) {
+      for (const v of product.variants.nodes) patchStock[v.title] = v.inventoryQuantity;
+    }
+  }
+  return { coverStock, stringStock, penHolderStock, patchStock, edgeStock };
+}
+
+export interface JournalStockResult {
+  coverHandle: string;
+  coverTitle: string;
+  updated: number;
+  skipped: boolean;
+  error?: string;
+}
+
+/**
+ * Recomputes every real (Cover x String[+ Patch] x Pen Holder[+ Edge])
+ * journal variant's purchasable stock as `Math.min` of the raw-material
+ * stock of every component it consumes, and pushes any changed quantities
+ * to Shopify. Call this any time a Cover/String/Pen Holder/Corner Edge/Patch
+ * tracker's own stock changes — a single shared material (e.g. Orange
+ * string) running out must zero out every combo that uses it, across all 9
+ * covers, not just one row.
+ */
+export async function syncJournalStock(): Promise<JournalStockResult[]> {
+  const { coverStock, stringStock, penHolderStock, patchStock, edgeStock } = await fetchStockComponents();
+  const locationId = await getPrimaryLocationId();
+
+  const JOURNAL_QUERY = `
+    query JournalStockSync {
+      products(first: 20, query: "tag:journal") {
+        nodes {
+          id
+          handle
+          title
+          variants(first: 250) {
+            nodes {
+              inventoryQuantity
+              inventoryItem { id }
+              selectedOptions { name value }
+            }
+          }
+        }
+      }
+    }
+  `;
+  const data = await shopifyAdmin<{
+    products: {
+      nodes: {
+        id: string;
+        handle: string;
+        title: string;
+        variants: {
+          nodes: {
+            inventoryQuantity: number;
+            inventoryItem: { id: string };
+            selectedOptions: { name: string; value: string }[];
+          }[];
+        };
+      }[];
+    };
+  }>(JOURNAL_QUERY);
+
+  const results: JournalStockResult[] = [];
+
+  for (const product of data.products.nodes) {
+    const quantities: { inventoryItemId: string; locationId: string; quantity: number }[] = [];
+    let skippedAny = false;
+
+    for (const v of product.variants.nodes) {
+      const cover = v.selectedOptions.find((o) => o.name === "Cover")?.value;
+      if (!cover || !(cover in coverStock)) {
+        skippedAny = true;
+        continue;
+      }
+      const stringValue = v.selectedOptions.find((o) => o.name === "String")?.value ?? "No Cord";
+      const penHolderValue = v.selectedOptions.find((o) => o.name === "Pen Holder")?.value ?? "None";
+
+      // "<cord> + <patch>" suffix -- see `stringValueFor` in catalog.ts.
+      const plusIndex = stringValue.indexOf(" + ");
+      const baseCord = plusIndex === -1 ? stringValue : stringValue.slice(0, plusIndex);
+      const patchLabel = plusIndex === -1 ? "None" : stringValue.slice(plusIndex + 3);
+
+      const hasEdge = penHolderValue.endsWith(" + Edge");
+      const basePen = hasEdge ? penHolderValue.slice(0, -" + Edge".length) : penHolderValue;
+
+      const cordAvail = baseCord === "No Cord" ? UNLIMITED_STOCK : stringStock[baseCord] ?? 0;
+      const penAvail = basePen === "None" ? UNLIMITED_STOCK : penHolderStock[basePen] ?? 0;
+      const edgeAvail = hasEdge ? edgeStock ?? 0 : UNLIMITED_STOCK;
+      const patchAvail = patchLabel === "None" ? UNLIMITED_STOCK : patchStock[patchLabel] ?? 0;
+
+      const computed = Math.min(coverStock[cover], cordAvail, penAvail, edgeAvail, patchAvail);
+      if (computed !== v.inventoryQuantity) {
+        quantities.push({ inventoryItemId: v.inventoryItem.id, locationId, quantity: computed });
+      }
+    }
+
+    if (quantities.length === 0) {
+      results.push({ coverHandle: product.handle, coverTitle: product.title, updated: 0, skipped: skippedAny });
+      continue;
+    }
+
+    try {
+      const MUTATION = `
+        mutation SyncJournalStock($input: InventorySetQuantitiesInput!) {
+          inventorySetQuantities(input: $input) {
+            userErrors { field message }
+          }
+        }
+      `;
+      for (let i = 0; i < quantities.length; i += 100) {
+        const chunk = quantities.slice(i, i + 100);
+        const res = await shopifyAdmin<{
+          inventorySetQuantities: { userErrors: { field: string[]; message: string }[] };
+        }>(MUTATION, {
+          input: { name: "available", reason: "correction", ignoreCompareQuantity: true, quantities: chunk },
+        });
+        const errs = res.inventorySetQuantities.userErrors;
+        if (errs.length) throw new Error(errs.map((e) => e.message).join("; "));
+      }
+      results.push({ coverHandle: product.handle, coverTitle: product.title, updated: quantities.length, skipped: false });
+    } catch (err) {
+      results.push({
+        coverHandle: product.handle,
+        coverTitle: product.title,
+        updated: 0,
+        skipped: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  return results;
+}
+
 export interface JournalDeleteResult {
   coverHandle: string;
   coverTitle: string;

@@ -46,11 +46,13 @@ function stringAndPatch(variant: Variant): { string: string; patch: string } {
 /**
  * The per-cover accordion body — every String × Pen Holder × Patch
  * combination that actually exists on the real sellable journal product for
- * this cover (not shown anywhere else in Assets & Stock). Editable: SKU,
- * stock. Price is read-only here (computed by `syncJournalPricing` from the
- * Cover/String/Pen Holder/Patch tracker prices). Renaming/deleting is
- * intentionally not supported here — these variants' identity comes from
- * real option values customers pick in the customizer, not free text.
+ * this cover (not shown anywhere else in Assets & Stock). Editable: SKU
+ * only. Price and Stock are both read-only here — computed by
+ * `syncJournalPricing`/`syncJournalStock` from the Cover/String/Pen
+ * Holder/Corner Edge/Patch tracker prices and raw-material stock.
+ * Renaming/deleting is intentionally not supported here — these variants'
+ * identity comes from real option values customers pick in the customizer,
+ * not free text.
  */
 export default function JournalVariantsPanel({
   journalProduct,
@@ -97,7 +99,7 @@ export default function JournalVariantsPanel({
               <th className="px-5 py-2 font-medium">String / Pen Holder / Patch</th>
               <th className="px-5 py-2 font-medium">SKU</th>
               <th className="px-5 py-2 font-medium">Price (auto)</th>
-              <th className="px-5 py-2 font-medium">Stock</th>
+              <th className="px-5 py-2 font-medium">Stock (auto)</th>
               <th className="px-5 py-2 font-medium" />
             </tr>
           </thead>
@@ -125,17 +127,15 @@ function JournalComboRow({ productId, variant }: { productId: string; variant: V
   const currencyCfg = CURRENCIES[currency];
   const priceIDR = Number(variant.price) || 0;
   const [sku, setSku] = useState(variant.sku);
-  const [stock, setStock] = useState(variant.inventoryQuantity);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const priceDisplay = formatAmountInput(idrToInputValue(priceIDR, currency), currency);
-  const dirty = sku !== variant.sku || stock !== variant.inventoryQuantity;
+  const dirty = sku !== variant.sku;
 
   function reset() {
     setSku(variant.sku);
-    setStock(variant.inventoryQuantity);
     setError(null);
   }
 
@@ -143,35 +143,18 @@ function JournalComboRow({ productId, variant }: { productId: string; variant: V
     setSaving(true);
     setError(null);
     try {
-      const requests: Promise<Response>[] = [];
-      if (sku !== variant.sku) {
-        requests.push(
-          fetch("/api/admin/assets/variant", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              productId,
-              variantId: variant.id,
-              sku,
-            }),
-          })
-        );
-      }
-      if (stock !== variant.inventoryQuantity) {
-        requests.push(
-          fetch("/api/admin/assets/stock", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ inventoryItemId: variant.inventoryItemId, quantity: stock }),
-          })
-        );
-      }
-      const results = await Promise.all(requests);
-      for (const res of results) {
-        if (!res.ok) {
-          const json = await res.json();
-          throw new Error(json.error ?? "Failed to save");
-        }
+      const res = await fetch("/api/admin/assets/variant", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId,
+          variantId: variant.id,
+          sku,
+        }),
+      });
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.error ?? "Failed to save");
       }
       setSaved(true);
       setTimeout(() => setSaved(false), 1400);
@@ -215,17 +198,10 @@ function JournalComboRow({ productId, variant }: { productId: string; variant: V
       <td className="px-5 py-2 text-[#6b6a63]">
         {currencyCfg.symbol} {priceDisplay}
       </td>
-      <td className="px-5 py-2">
+      <td className="px-5 py-2 text-[#6b6a63]">
         <div className="flex items-center gap-1.5">
-          <input
-            type="number"
-            min={0}
-            disabled={saving}
-            value={stock}
-            onChange={(e) => setStock(Number(e.target.value))}
-            className={`admin-input w-16 ${stock !== variant.inventoryQuantity ? "dirty" : ""}`}
-          />
-          {!dirty && stock <= 0 && (
+          {variant.inventoryQuantity}
+          {variant.inventoryQuantity <= 0 && (
             <span className="rounded-full bg-gradient-to-r from-[#c23f35] to-[#b5342c] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">
               Out
             </span>

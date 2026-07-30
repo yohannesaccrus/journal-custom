@@ -2,7 +2,7 @@
 
 import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import type { AdminProduct, JournalDeleteResult, JournalSyncResult } from "@/lib/admin/shopify-admin-data";
+import type { AdminProduct, JournalDeleteResult, JournalStockResult, JournalSyncResult } from "@/lib/admin/shopify-admin-data";
 import EditableTitle from "./EditableTitle";
 import VariantRow from "./VariantRow";
 import JournalVariantsPanel from "./JournalVariantsPanel";
@@ -44,6 +44,7 @@ export default function AssetCategoryCard({
   const [submittingVariant, setSubmittingVariant] = useState(false);
   const [journalSync, setJournalSync] = useState<JournalSyncResult[] | null>(null);
   const [journalDeleteSync, setJournalDeleteSync] = useState<JournalDeleteResult[] | null>(null);
+  const [journalStockSync, setJournalStockSync] = useState<JournalStockResult[] | null>(null);
 
   // String, Pen Holder and Patch values also live as option values on every
   // sellable journal cover product — adding one here needs to propagate
@@ -70,15 +71,21 @@ export default function AssetCategoryCard({
   // Notebook designs (To-Do List, Lined, Blank, Grid) are identified by their
   // photo/pattern too, same as Charm/Patch.
   const isNotebook = product.tags.includes("notebook");
+  // Every raw-material component tracker — Cover, String, Pen Holder,
+  // Corner Edge, Patch — feeds the shared stock pool `syncJournalStock`
+  // recomputes from (see the banner below).
+  const isStockComponent = isCoverTracker || isCornerEdge || syncsToJournal;
   // Cover rows are read-only / swatch-less for the same reasons as Charm:
   // renaming would desync from the "Cover" option value the accordion below
   // matches by, and covers are identified by photo, not a color.
   const hideSwatch = isCharm || isCoverTracker || isPatch || isCornerEdge || isNotebook;
-  // String/Pen Holder/Patch Stock here would be misleading — real,
-  // customer-facing stock lives per (cover, string, pen holder, patch) combo
-  // on the journal cover products, editable only from the Cover card's
-  // per-cover accordion (see the banner rendered below instead of this column).
-  const hideStock = syncsToJournal;
+  // Stock here IS editable, on every tracker (Cover/String/Pen Holder/Corner
+  // Edge/Patch alike): it's the raw-material count for that component (e.g.
+  // one shared pool of Orange string used across all 9 covers), not a
+  // per-combo count. Saving it recomputes every real journal combo's
+  // purchasable stock as the minimum of the components it consumes (see
+  // `syncJournalStock`) — the combo table itself only shows the computed
+  // result, read-only, same treatment as Price below.
   // Price, unlike Stock, IS editable here: this is an additive pricing model
   // — Cover's price is the base price for that cover, String/Pen
   // Holder/Patch's price is a pure add-on delta on top. Saving any of the
@@ -150,6 +157,7 @@ export default function AssetCategoryCard({
     fields: { name?: string; sku?: string; price?: string; stock?: number; swatchColor?: string | null }
   ) {
     setError(null);
+    setJournalStockSync(null);
     const requests: Promise<Response>[] = [];
 
     if (fields.name !== undefined || fields.sku !== undefined || fields.price !== undefined) {
@@ -180,7 +188,11 @@ export default function AssetCategoryCard({
         fetch("/api/admin/assets/stock", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ inventoryItemId: variant.inventoryItemId, quantity: fields.stock }),
+          body: JSON.stringify({
+            inventoryItemId: variant.inventoryItemId,
+            quantity: fields.stock,
+            productTags: product.tags,
+          }),
         })
       );
     }
@@ -197,10 +209,13 @@ export default function AssetCategoryCard({
 
     const results = await Promise.all(requests);
     for (const res of results) {
+      const json = await res.json();
       if (!res.ok) {
-        const json = await res.json();
         setError(json.error ?? "Failed to save variant");
         throw new Error(json.error);
+      }
+      if (Array.isArray(json.journalStockSync) && json.journalStockSync.length > 0) {
+        setJournalStockSync(json.journalStockSync);
       }
     }
     refresh();
@@ -308,7 +323,7 @@ export default function AssetCategoryCard({
         </p>
       )}
 
-      {syncsToJournal && (
+      {isStockComponent && (
         <div className="flex flex-col gap-3 border-b border-[#f0d9a8] bg-gradient-to-r from-[#fdf3da] to-[#faecc6] px-5 py-3.5">
           <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-2.5">
@@ -324,37 +339,39 @@ export default function AssetCategoryCard({
                 />
               </svg>
               <p className="text-xs leading-relaxed text-[#6b4c14]">
-                <span className="font-semibold">Price here is an add-on, not the final price</span>
-                {" — "}saving it recomputes every affected combo automatically.
-                <br />
-                Stock isn&apos;t shown here; update it from the{" "}
-                <span className="font-semibold">Cover</span>
-                {" "}table instead.
+                {syncsToJournal && (
+                  <>
+                    <span className="font-semibold">Price here is an add-on, not the final price</span>
+                    {" — "}saving it recomputes every affected combo automatically.
+                    <br />
+                  </>
+                )}
+                <span className="font-semibold">Stock here is the raw-material count</span>
+                {" — "}e.g. how many {isCoverTracker ? "blank covers" : isCornerEdge ? "Corner Edge kits" : "rolls of this color"} are
+                on hand, shared across every combo that uses {isCoverTracker ? "this cover" : "it"}. Saving it recomputes
+                every affected combo&apos;s purchasable stock (the lowest of its Cover/String/Pen Holder/Corner
+                Edge/Patch components) and pushes it live automatically.{" "}
+                {!isCoverTracker && (
+                  <>
+                    The combo table under <span className="font-semibold">Cover</span> only shows that computed
+                    result, read-only.
+                  </>
+                )}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() =>
-                document
-                  .getElementById("asset-cover-card")
-                  ?.scrollIntoView({ behavior: "smooth", block: "start" })
-              }
-              className="shrink-0 rounded-full border border-[#e0b45c] bg-white/70 px-3.5 py-1.5 text-xs font-medium text-[#8a5f1f] shadow-sm transition-colors hover:bg-white"
-            >
-              Open Cover table
-            </button>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1.5 pl-6 text-[11px] font-medium text-[#8a5f1f]">
-            <span className="rounded-full bg-white/70 px-2.5 py-1 shadow-sm">1. Open the Cover table</span>
-            <span className="text-[#c9a869]">→</span>
-            <span className="rounded-full bg-white/70 px-2.5 py-1 shadow-sm">2. Expand the cover row</span>
-            <span className="text-[#c9a869]">→</span>
-            <span className="rounded-full bg-white/70 px-2.5 py-1 shadow-sm">3. Find the String / Pen Holder / Patch combo</span>
-            <span className="text-[#c9a869]">→</span>
-            <span className="rounded-full bg-white/70 px-2.5 py-1 shadow-sm">4. Edit its Stock field</span>
-            <span className="text-[#c9a869]">→</span>
-            <span className="rounded-full bg-white/70 px-2.5 py-1 shadow-sm">5. Save</span>
+            {!isCoverTracker && (
+              <button
+                type="button"
+                onClick={() =>
+                  document
+                    .getElementById("asset-cover-card")
+                    ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                }
+                className="shrink-0 rounded-full border border-[#e0b45c] bg-white/70 px-3.5 py-1.5 text-xs font-medium text-[#8a5f1f] shadow-sm transition-colors hover:bg-white"
+              >
+                Open Cover table
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -560,6 +577,44 @@ export default function AssetCategoryCard({
         </div>
       )}
 
+      {journalStockSync && (
+        <div className="animate-[fadeIn_0.15s_ease-out] border-b border-[#eae7de] bg-gradient-to-r from-[#f7f9f6] to-[#eef4ef] px-5 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-xs font-medium text-[#1c1c1a]">
+              Recomputed stock on {journalStockSync.filter((r) => r.updated > 0).length}/{journalStockSync.length}{" "}
+              covers ({journalStockSync.reduce((sum, r) => sum + r.updated, 0)} variants changed)
+              {journalStockSync.some((r) => r.error) && (
+                <span className="ml-1.5 text-[#b5342c]">· {journalStockSync.filter((r) => r.error).length} failed</span>
+              )}
+              {journalStockSync.some((r) => r.skipped) && (
+                <span className="ml-1.5 text-[#b1632f]">
+                  · {journalStockSync.filter((r) => r.skipped).length} had a cover not tracked yet
+                </span>
+              )}
+            </p>
+            <button
+              type="button"
+              onClick={() => setJournalStockSync(null)}
+              className="shrink-0 text-xs text-[#a89a80] hover:text-[#1c1c1a]"
+            >
+              Dismiss
+            </button>
+          </div>
+          {journalStockSync.some((r) => r.error) && (
+            <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+              {journalStockSync
+                .filter((r) => r.error)
+                .map((r) => (
+                  <li key={r.coverHandle} className="flex items-center gap-1.5 text-xs text-[#b5342c]">
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#b5342c]" />
+                    {r.coverTitle} — {r.error}
+                  </li>
+                ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-gradient-to-r from-[#f2ece1] to-[#ece4d3] text-left text-xs text-[#6b6a63] uppercase tracking-wide">
@@ -568,7 +623,7 @@ export default function AssetCategoryCard({
             <th className="px-5 py-2.5 font-medium">SKU</th>
             {!hidePrice && <th className="px-5 py-2.5 font-medium">Price ({currency})</th>}
             {!hideSwatch && <th className="px-5 py-2.5 font-medium">Swatch</th>}
-            {!hideStock && <th className="px-5 py-2.5 font-medium">Stock</th>}
+            <th className="px-5 py-2.5 font-medium">Stock</th>
             <th className="px-5 py-2.5 font-medium" />
           </tr>
         </thead>
@@ -581,7 +636,6 @@ export default function AssetCategoryCard({
                 onSave={saveVariant}
                 onDelete={removeVariant}
                 hideSwatch={hideSwatch}
-                hideStock={hideStock}
                 hidePrice={hidePrice}
                 imageCaption={imageCaption}
                 expandable={isCoverTracker}
@@ -603,7 +657,7 @@ export default function AssetCategoryCard({
           {isPaginated && visibleVariants.length === 0 && (
             <tr>
               <td
-                colSpan={7 - (hideSwatch ? 1 : 0) - (hideStock ? 1 : 0) - (hidePrice ? 1 : 0)}
+                colSpan={7 - (hideSwatch ? 1 : 0) - (hidePrice ? 1 : 0)}
                 className="px-5 py-8 text-center text-sm text-[#a89a80]"
               >
                 No variants match “{query}”.
