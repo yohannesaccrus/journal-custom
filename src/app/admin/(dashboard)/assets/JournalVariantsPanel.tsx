@@ -20,10 +20,14 @@ function fuzzyMatch(query: string, target: string): boolean {
   return qi === q.length;
 }
 
-/** Drops the redundant "Cover" option value from a variant's title, e.g. "Classic Black A / Orange / Black + Edge" -> "Orange / Black + Edge" — the cover is already the row this panel is nested under. */
+/** Drops the redundant "Cover" option value from a variant's title, e.g. "Classic Black A / Orange / Black + Edge" -> "Orange / Black + Edge" — the cover is already the row this panel is nested under. Used for search matching, where the raw text (not JSX) is needed. */
 function comboLabel(variant: Variant): string {
   const parts = variant.selectedOptions.filter((o) => o.name !== "Cover").map((o) => o.value);
   return parts.join(" / ");
+}
+
+function optionValue(variant: Variant, name: string): string {
+  return variant.selectedOptions.find((o) => o.name === name)?.value ?? "—";
 }
 
 /**
@@ -176,7 +180,13 @@ function JournalComboRow({ productId, variant }: { productId: string; variant: V
           caption="Shown to customer"
         />
       </td>
-      <td className="px-5 py-2 font-medium text-[#1c1c1a]">{comboLabel(variant)}</td>
+      <td className="px-5 py-2 text-[#1c1c1a]">
+        <span className="text-[#a89a80]">String: </span>
+        <span className="font-semibold">{optionValue(variant, "String")}</span>
+        <span className="mx-1.5 text-[#d8d5cb]">·</span>
+        <span className="text-[#a89a80]">Pen Holder: </span>
+        <span className="font-semibold">{optionValue(variant, "Pen Holder")}</span>
+      </td>
       <td className="px-5 py-2">
         <input
           value={sku}
