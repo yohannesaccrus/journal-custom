@@ -86,7 +86,10 @@ export function DesignSlider({ views, charmEntries, patch }: DesignSliderProps) 
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={v.image} alt={`${v.label} of journal`} className="h-full w-full object-contain p-4" />
                 )}
-                {i === 0 && patch !== "none" && (
+                {/* Fallback only: real combo photos already have the patch baked in —
+                    drawing this on top of one would double it up. Only draw the floating
+                    marker when the front view has no photo of its own yet. */}
+                {i === 0 && patch !== "none" && !v.image && (
                   <div
                     className="absolute -translate-x-1/2 -translate-y-1/2"
                     style={{

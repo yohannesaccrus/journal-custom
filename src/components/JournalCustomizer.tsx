@@ -611,7 +611,10 @@ function JournalCustomizerContent({
                     alt="Journal preview"
                     className="h-full w-full object-contain preview-shadow transition-opacity duration-200 pointer-events-none"
                   />
-                  {mainView === "front" && selection.patch !== "none" && (
+                  {/* Fallback only: real combo photos (see the Assets admin panel) already
+                      have the patch baked in — drawing this on top of one would double it up.
+                      Only draw the floating marker when this exact combo has no photo yet. */}
+                  {mainView === "front" && selection.patch !== "none" && !imageSrc && (
                     <div
                       className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
                       style={{
