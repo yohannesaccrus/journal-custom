@@ -49,7 +49,6 @@ function newBundleId(): string {
 export function buildCartItems(
   variant: ShopifyVariant,
   charmProduct: ShopifyJournalProduct,
-  patchProduct: ShopifyJournalProduct,
   selection: JournalSelection,
   designPageOrigin: string
 ): CartPayload {
@@ -77,23 +76,12 @@ export function buildCartItems(
   properties["✨ Design page Link"] = designUrl;
   properties["_bundle_id"] = bundleId;
 
+  // Patch is now a real 4th option baked into the journal variant itself
+  // (Cover×String×Pen Holder×Patch) — its price and stock come along with
+  // `variant` automatically, so it never needs its own cart line item here.
   const items: CartLineItem[] = [
     { id: toLegacyId(variant.id), variantId: variant.id, quantity: 1, properties },
   ];
-
-  if (selection.patch !== "none") {
-    const patchVariant = patchProduct.variants.find(
-      (v) => v.title.toLowerCase() === selection.patch
-    );
-    if (patchVariant) {
-      items.push({
-        id: toLegacyId(patchVariant.id),
-        variantId: patchVariant.id,
-        quantity: 1,
-        properties: { _for_journal: bundleId },
-      });
-    }
-  }
 
   const charmGroups = new Map<string, { variantId: string; side: string; count: number }>();
   for (const c of selection.charms) {

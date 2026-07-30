@@ -29,6 +29,8 @@ export interface ShopifyJournalProduct {
   media: ShopifyMedia[];
 }
 
+// Journal products can now carry Cover×String×Pen Holder×Patch combos (well
+// over the old 40-variant cap) — 250 is Shopify's per-page connection max.
 const PRODUCTS_QUERY = `
   query Products($query: String!) {
     products(first: 20, query: $query) {
@@ -37,7 +39,7 @@ const PRODUCTS_QUERY = `
         handle
         title
         tags
-        variants(first: 40) {
+        variants(first: 250) {
           nodes {
             id
             title
@@ -108,11 +110,6 @@ export async function fetchCharmProduct(): Promise<ShopifyJournalProduct | undef
 
 export async function fetchNotebookProduct(): Promise<ShopifyJournalProduct | undefined> {
   const products = await fetchProducts("tag:notebook");
-  return products[0];
-}
-
-export async function fetchPatchProduct(): Promise<ShopifyJournalProduct | undefined> {
-  const products = await fetchProducts("tag:patch");
   return products[0];
 }
 

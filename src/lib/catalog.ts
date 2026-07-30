@@ -52,6 +52,19 @@ function optionValue(variant: ShopifyVariant, name: string): string | undefined 
   return variant.selectedOptions.find((o) => o.name === name)?.value;
 }
 
+/**
+ * Whether this journal product has been migrated to carry a real "Patch"
+ * option on its variants yet (see `migratePatchOptionOntoExistingCovers`).
+ * Every lookup below that would otherwise require `Patch === "None"` skips
+ * that requirement entirely for a not-yet-migrated product, instead of
+ * throwing/failing to match — so the storefront (and its static build)
+ * keeps working during the rollout window between deploying this code and
+ * an admin actually running the migration.
+ */
+function hasPatchOption(product: ShopifyJournalProduct): boolean {
+  return product.variants.some((v) => v.selectedOptions.some((o) => o.name === "Patch"));
+}
+
 /** Whether a variant can actually be added to cart right now. */
 function inStock(variant: ShopifyVariant | undefined): boolean {
   return (variant?.inventoryQuantity ?? 0) > 0;
@@ -104,12 +117,16 @@ export interface CordEntry {
  * for colors that predate that metafield being set.
  */
 export function buildCordEntries(product: ShopifyJournalProduct, swatchByLabel: Record<string, string> = {}): CordEntry[] {
+  const requirePatchNone = hasPatchOption(product);
   const values = new Set(
     product.variants.map((v) => optionValue(v, "String")).filter((v): v is string => !!v && v !== "No Cord")
   );
   return Array.from(values).map((label) => {
     const variant = product.variants.find(
-      (v) => optionValue(v, "String") === label && optionValue(v, "Pen Holder") === "None"
+      (v) =>
+        optionValue(v, "String") === label &&
+        optionValue(v, "Pen Holder") === "None" &&
+        (!requirePatchNone || optionValue(v, "Patch") === "None")
     );
     return { label, swatch: swatchByLabel[label] ?? SWATCH_HEX[label] ?? "#999999", inStock: inStock(variant) };
   });
@@ -128,6 +145,7 @@ export function buildPenHolderEntries(
   swatchByLabel: Record<string, string> = {}
 ): PenHolderEntry[] {
   const cordValue = cord === "none" ? "No Cord" : cord;
+  const requirePatchNone = hasPatchOption(product);
   const values = new Set(
     product.variants
       .map((v) => optionValue(v, "Pen Holder"))
@@ -135,7 +153,10 @@ export function buildPenHolderEntries(
   );
   return Array.from(values).map((label) => {
     const variant = product.variants.find(
-      (v) => optionValue(v, "String") === cordValue && optionValue(v, "Pen Holder") === label
+      (v) =>
+        optionValue(v, "String") === cordValue &&
+        optionValue(v, "Pen Holder") === label &&
+        (!requirePatchNone || optionValue(v, "Patch") === "None")
     );
     return { label, swatch: swatchByLabel[label] ?? SWATCH_HEX[label] ?? "#999999", inStock: inStock(variant) };
   });
@@ -149,10 +170,19 @@ export function isEdgeInStock(
 ): boolean {
   const cordValue = cord === "none" ? "No Cord" : cord;
   const cap = penHolder === "black" ? "Black" : "Brown";
+  const requirePatchNone = hasPatchOption(product);
   const variant = product.variants.find(
-    (v) => optionValue(v, "String") === cordValue && optionValue(v, "Pen Holder") === `${cap} + Edge`
+    (v) =>
+      optionValue(v, "String") === cordValue &&
+      optionValue(v, "Pen Holder") === `${cap} + Edge` &&
+      (!requirePatchNone || optionValue(v, "Patch") === "None")
   );
   return inStock(variant);
+}
+
+function patchValue(patch: JournalSelection["patch"]): string {
+  if (patch === "none") return "None";
+  return patch === "star" ? "Star" : "Heart";
 }
 
 /** Resolves the exact Shopify variant matching a customizer selection. */
@@ -166,15 +196,20 @@ export function resolveVariant(
     const cap = selection.penHolder === "black" ? "Black" : "Brown";
     penValue = selection.edge ? `${cap} + Edge` : cap;
   }
+  // The patch is stitched onto the string itself, so it can never apply
+  // without one — same rule enforced client-side in PatchStep/JournalCustomizer.
+  const patch = selection.cord === "none" ? "None" : patchValue(selection.patch);
+  const requirePatch = hasPatchOption(product);
 
   const match = product.variants.find(
     (v) =>
       optionValue(v, "String") === cordValue &&
-      optionValue(v, "Pen Holder") === penValue
+      optionValue(v, "Pen Holder") === penValue &&
+      (!requirePatch || optionValue(v, "Patch") === patch)
   );
   if (!match) {
     throw new Error(
-      `No variant found for ${product.handle} with Cord=${cordValue}, Pen Holder=${penValue}`
+      `No variant found for ${product.handle} with Cord=${cordValue}, Pen Holder=${penValue}, Patch=${patch}`
     );
   }
   return match;
@@ -260,24 +295,45 @@ export function notebookCount(notebooks: Record<string, number>): number {
 }
 
 export interface PatchEntry {
-  variantId: string;
   shape: "star" | "heart";
+  /** Delta vs. the same String/Pen Holder combo with no patch — the patch's own price is baked into that exact variant on the journal product, not a separate line item. */
   price: number;
   inStock: boolean;
 }
 
-export function buildPatchEntries(patchProduct: ShopifyJournalProduct): PatchEntry[] {
-  return patchProduct.variants.map((v) => ({
-    variantId: v.id,
-    shape: (optionValue(v, "Shape") ?? v.title).toLowerCase() as "star" | "heart",
-    price: Number(v.price),
-    inStock: inStock(v),
-  }));
-}
-
-export function patchPrice(patchProduct: ShopifyJournalProduct, patch: JournalSelection["patch"]): number {
-  if (patch === "none") return 0;
-  return buildPatchEntries(patchProduct).find((p) => p.shape === patch)?.price ?? 0;
+/**
+ * The patch is stitched onto the string itself (real photography now, no
+ * graphic overlay), so it's a 4th option on the journal product's own
+ * variants — never available without a real cord (`cord === "none"`), same
+ * rule `resolveVariant`/`PatchStep` enforce. `cord`/`penHolder`/`edge` are
+ * the currently selected/effective values — price shown is the delta vs. the
+ * matching no-patch variant, and stock is per (cover, string, pen holder,
+ * patch) variant.
+ */
+export function buildPatchEntries(
+  product: ShopifyJournalProduct,
+  cord: JournalSelection["cord"],
+  penHolder: JournalSelection["penHolder"],
+  edge: boolean
+): PatchEntry[] {
+  if (cord === "none") return [];
+  const penValue = penHolder === "none" ? "None" : `${penHolder === "black" ? "Black" : "Brown"}${edge ? " + Edge" : ""}`;
+  const findVariant = (patch: string) =>
+    product.variants.find(
+      (v) =>
+        optionValue(v, "String") === cord &&
+        optionValue(v, "Pen Holder") === penValue &&
+        optionValue(v, "Patch") === patch
+    );
+  const baseline = Number(findVariant("None")?.price ?? 0);
+  return (["Star", "Heart"] as const).map((label) => {
+    const variant = findVariant(label);
+    return {
+      shape: label.toLowerCase() as "star" | "heart",
+      price: variant ? Number(variant.price) - baseline : 0,
+      inStock: inStock(variant),
+    };
+  });
 }
 
 /**

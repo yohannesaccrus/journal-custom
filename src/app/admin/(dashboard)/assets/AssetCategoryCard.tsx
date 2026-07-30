@@ -44,11 +44,16 @@ export default function AssetCategoryCard({
   const [submittingVariant, setSubmittingVariant] = useState(false);
   const [journalSync, setJournalSync] = useState<JournalSyncResult[] | null>(null);
   const [journalDeleteSync, setJournalDeleteSync] = useState<JournalDeleteResult[] | null>(null);
+  const [migrating, setMigrating] = useState(false);
+  const [migrateResult, setMigrateResult] = useState<{ coverTitle: string; created: number; skipped: boolean; error?: string }[] | null>(
+    null
+  );
 
-  // String and Pen Holder colors also live as option values on all 8 sellable
-  // journal cover products — adding one here needs to propagate there too, or
-  // customers can never actually pick the new color.
-  const syncsToJournal = product.tags.includes("string") || product.tags.includes("pen-holder");
+  // String, Pen Holder and Patch values also live as option values on every
+  // sellable journal cover product — adding one here needs to propagate
+  // there too, or customers can never actually pick the new value.
+  const syncsToJournal =
+    product.tags.includes("string") || product.tags.includes("pen-holder") || product.tags.includes("patch");
 
   // Each Cover row can expand into an accordion showing that cover's real
   // journal variants (String × Pen Holder combos) — only one open at a time.
@@ -73,18 +78,18 @@ export default function AssetCategoryCard({
   // renaming would desync from the "Cover" option value the accordion below
   // matches by, and covers are identified by photo, not a color.
   const hideSwatch = isCharm || isCoverTracker || isPatch || isCornerEdge || isNotebook;
-  // String/Pen Holder Stock here would be misleading — real, customer-facing
-  // stock lives per (cover, string, pen holder) combo on the 8 journal cover
-  // products, editable only from the Cover card's per-cover accordion (see
-  // the banner rendered below instead of this column).
+  // String/Pen Holder/Patch Stock here would be misleading — real,
+  // customer-facing stock lives per (cover, string, pen holder, patch) combo
+  // on the journal cover products, editable only from the Cover card's
+  // per-cover accordion (see the banner rendered below instead of this column).
   const hideStock = syncsToJournal;
   // Price, unlike Stock, IS editable here: this is an additive pricing model
-  // — Cover's price is the base price for that cover, String/Pen Holder's
-  // price is a pure add-on delta on top. Saving any of the three
-  // automatically recomputes and pushes the final price for every affected
-  // (cover, string, pen holder) combo on the real journal products (see
-  // `syncJournalPricing`) — the combo table itself only shows the computed
-  // result, read-only.
+  // — Cover's price is the base price for that cover, String/Pen
+  // Holder/Patch's price is a pure add-on delta on top. Saving any of the
+  // four automatically recomputes and pushes the final price for every
+  // affected (cover, string, pen holder, patch) combo on the real journal
+  // products (see `syncJournalPricing`) — the combo table itself only shows
+  // the computed result, read-only.
   const hidePrice = false;
   // Charm is the only tracker whose own variant photo is what customers
   // actually see (buildCharmEntries reads it straight off this product) —
@@ -272,6 +277,24 @@ export default function AssetCategoryCard({
     }
   }
 
+  async function runPatchMigration() {
+    setError(null);
+    setMigrateResult(null);
+    setMigrating(true);
+    try {
+      const res = await fetch("/api/admin/assets/migrate-patch", { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? "Migration failed");
+        return;
+      }
+      setMigrateResult(json.results);
+      refresh();
+    } finally {
+      setMigrating(false);
+    }
+  }
+
   return (
     <div
       id={isCoverTracker ? "asset-cover-card" : undefined}
@@ -284,25 +307,72 @@ export default function AssetCategoryCard({
             {product.handle} · {product.status} · {product.tags.join(", ")}
           </p>
         </div>
-        {primaryOption && (
-          <button
-            onClick={() => setAdding((v) => !v)}
-            disabled={submittingVariant}
-            className={`shrink-0 rounded-full border px-4 py-1.5 text-xs font-medium transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${
-              adding
-                ? "border-[#d8d5cb] text-[#6b6a63] hover:bg-[#f2ece1]"
-                : "border-transparent bg-gradient-to-r from-[#154a3f] to-[#0f3d34] text-white shadow-sm hover:from-[#0f3d34] hover:to-[#0a2b25]"
-            }`}
-          >
-            {adding ? "Cancel" : "+ Add variant"}
-          </button>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          {isPatch && (
+            <button
+              onClick={runPatchMigration}
+              disabled={migrating}
+              title="Adds the Patch option to any cover created before Patch became a real 4th variant option — safe to run more than once, already-migrated covers are skipped."
+              className="rounded-full border border-[#d8d5cb] px-3.5 py-1.5 text-xs font-medium text-[#6b6a63] transition-colors hover:bg-[#f2ece1] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {migrating ? "Migrating…" : "Migrate existing covers"}
+            </button>
+          )}
+          {primaryOption && (
+            <button
+              onClick={() => setAdding((v) => !v)}
+              disabled={submittingVariant}
+              className={`rounded-full border px-4 py-1.5 text-xs font-medium transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${
+                adding
+                  ? "border-[#d8d5cb] text-[#6b6a63] hover:bg-[#f2ece1]"
+                  : "border-transparent bg-gradient-to-r from-[#154a3f] to-[#0f3d34] text-white shadow-sm hover:from-[#0f3d34] hover:to-[#0a2b25]"
+              }`}
+            >
+              {adding ? "Cancel" : "+ Add variant"}
+            </button>
+          )}
+        </div>
       </div>
 
       {error && (
         <p className="animate-[fadeIn_0.15s_ease-out] border-b border-[#f6dcd6] bg-gradient-to-r from-[#fbe9e7] to-[#f8dcd8] px-5 py-2 text-xs text-[#b5342c]">
           {error}
         </p>
+      )}
+
+      {migrateResult && (
+        <div className="animate-[fadeIn_0.15s_ease-out] border-b border-[#eae7de] bg-gradient-to-r from-[#f7f9f6] to-[#eef4ef] px-5 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-xs font-medium text-[#1c1c1a]">
+              Migrated {migrateResult.filter((r) => r.created > 0).length}/{migrateResult.length} covers
+              {migrateResult.some((r) => r.error) && (
+                <span className="ml-1.5 text-[#b5342c]">· {migrateResult.filter((r) => r.error).length} failed</span>
+              )}
+              {migrateResult.some((r) => r.skipped) && (
+                <span className="ml-1.5 text-[#a89a80]">· {migrateResult.filter((r) => r.skipped).length} already migrated</span>
+              )}
+            </p>
+            <button
+              type="button"
+              onClick={() => setMigrateResult(null)}
+              className="shrink-0 text-xs text-[#a89a80] hover:text-[#1c1c1a]"
+            >
+              Dismiss
+            </button>
+          </div>
+          <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+            {migrateResult.map((r) => (
+              <li key={r.coverTitle} className="flex items-center gap-1.5 text-xs text-[#6b6a63]">
+                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${r.error ? "bg-[#b5342c]" : "bg-[#1f7a4d]"}`} />
+                {r.coverTitle}
+                {r.error ? ` — ${r.error}` : r.skipped ? " — already had Patch" : ` — ${r.created} variants added`}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2.5 text-[11px] text-[#a89a80]">
+            New Star/Heart combos start at 0 stock and no photo — set those per combo in the Cover table.
+          </p>
+        </div>
       )}
 
       {syncsToJournal && (
@@ -347,7 +417,7 @@ export default function AssetCategoryCard({
             <span className="text-[#c9a869]">→</span>
             <span className="rounded-full bg-white/70 px-2.5 py-1 shadow-sm">2. Expand the cover row</span>
             <span className="text-[#c9a869]">→</span>
-            <span className="rounded-full bg-white/70 px-2.5 py-1 shadow-sm">3. Find the String / Pen Holder combo</span>
+            <span className="rounded-full bg-white/70 px-2.5 py-1 shadow-sm">3. Find the String / Pen Holder / Patch combo</span>
             <span className="text-[#c9a869]">→</span>
             <span className="rounded-full bg-white/70 px-2.5 py-1 shadow-sm">4. Edit its Stock field</span>
             <span className="text-[#c9a869]">→</span>

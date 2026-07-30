@@ -1,6 +1,6 @@
 "use client";
 
-import { buildCoverEntries, charmsTotal, patchPrice, resolveVariant } from "@/lib/catalog";
+import { buildCoverEntries, charmsTotal, resolveVariant } from "@/lib/catalog";
 import type { ShopifyJournalProduct } from "@/lib/shopify-admin";
 import { useCurrencyFormat } from "@/components/CurrencyContext";
 import type { JournalSelection } from "@/lib/types";
@@ -9,19 +9,20 @@ interface PreviewStepProps {
   products: ShopifyJournalProduct[];
   product: ShopifyJournalProduct;
   charmProduct: ShopifyJournalProduct;
-  patchProduct: ShopifyJournalProduct;
   selection: JournalSelection;
   onAddToCart: () => void;
   adding?: boolean;
   error?: string | null;
 }
 
-export function PreviewStep({ products, product, charmProduct, patchProduct, selection, onAddToCart, adding, error }: PreviewStepProps) {
+export function PreviewStep({ products, product, charmProduct, selection, onAddToCart, adding, error }: PreviewStepProps) {
   const { format } = useCurrencyFormat();
   const cover = buildCoverEntries(products).find((c) => c.handle === product.handle);
   const variant = resolveVariant(product, selection);
   const charmsPrice = charmsTotal(charmProduct, selection.charms);
-  const total = Number(variant.price) + charmsPrice + patchPrice(patchProduct, selection.patch);
+  // Patch price is baked into `variant.price` now (a real 4th option on the
+  // journal product), not a separate add-on total.
+  const total = Number(variant.price) + charmsPrice;
 
   const frontCharms = selection.charms.filter((c) => c.side === "front").length;
   const backCharms = selection.charms.filter((c) => c.side === "back").length;

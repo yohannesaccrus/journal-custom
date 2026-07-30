@@ -31,12 +31,13 @@ function optionValue(variant: Variant, name: string): string {
 }
 
 /**
- * The per-cover accordion body — every String × Pen Holder combination that
- * actually exists on the real sellable journal product for this cover (not
- * shown anywhere else in Assets & Stock). Editable: price, SKU, stock.
- * Renaming/deleting is intentionally not supported here — these variants'
- * identity comes from real option values customers pick in the customizer,
- * not free text.
+ * The per-cover accordion body — every String × Pen Holder × Patch
+ * combination that actually exists on the real sellable journal product for
+ * this cover (not shown anywhere else in Assets & Stock). Editable: SKU,
+ * stock. Price is read-only here (computed by `syncJournalPricing` from the
+ * Cover/String/Pen Holder/Patch tracker prices). Renaming/deleting is
+ * intentionally not supported here — these variants' identity comes from
+ * real option values customers pick in the customizer, not free text.
  */
 export default function JournalVariantsPanel({
   journalProduct,
@@ -67,7 +68,7 @@ export default function JournalVariantsPanel({
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search String/Pen Holder combo or SKU…"
+          placeholder="Search String/Pen Holder/Patch combo or SKU…"
           className="w-full max-w-xs bg-transparent text-xs text-[#1c1c1a] placeholder:text-[#a89a80] focus:outline-none"
         />
         <span className="ml-auto shrink-0 text-[11px] text-[#a89a80]">
@@ -80,7 +81,7 @@ export default function JournalVariantsPanel({
           <thead>
             <tr className="bg-[#f2ece1] text-left text-[10px] uppercase tracking-wide text-[#6b6a63]">
               <th className="px-5 py-2 font-medium">Image</th>
-              <th className="px-5 py-2 font-medium">String / Pen Holder</th>
+              <th className="px-5 py-2 font-medium">String / Pen Holder / Patch</th>
               <th className="px-5 py-2 font-medium">SKU</th>
               <th className="px-5 py-2 font-medium">Price (auto)</th>
               <th className="px-5 py-2 font-medium">Stock</th>
@@ -186,6 +187,9 @@ function JournalComboRow({ productId, variant }: { productId: string; variant: V
         <span className="mx-1.5 text-[#d8d5cb]">·</span>
         <span className="text-[#a89a80]">Pen Holder: </span>
         <span className="font-semibold">{optionValue(variant, "Pen Holder")}</span>
+        <span className="mx-1.5 text-[#d8d5cb]">·</span>
+        <span className="text-[#a89a80]">Patch: </span>
+        <span className="font-semibold">{optionValue(variant, "Patch")}</span>
       </td>
       <td className="px-5 py-2">
         <input

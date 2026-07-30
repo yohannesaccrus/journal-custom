@@ -24,7 +24,6 @@ import {
   charmsTotal,
   NOTEBOOKS_PER_JOURNAL,
   notebookCount,
-  patchPrice,
   PATCH_POSITION,
   resolveFrontImage,
   resolveSideImage,
@@ -56,7 +55,6 @@ interface JournalCustomizerProps {
   products: ShopifyJournalProduct[];
   charmProduct: ShopifyJournalProduct;
   notebookProduct: ShopifyJournalProduct;
-  patchProduct: ShopifyJournalProduct;
   /** Admin-edited swatch colors for String/Pen Holder — see `fetchSwatchColors`. */
   swatchColors: SwatchColors;
   // Set when this render is the phone-sized <iframe> embed the "Mobile View"
@@ -80,7 +78,6 @@ function JournalCustomizerContent({
   products,
   charmProduct,
   notebookProduct,
-  patchProduct,
   swatchColors,
   hideDevControls,
   initialTheme,
@@ -226,8 +223,9 @@ function JournalCustomizerContent({
   const variant = useMemo(() => resolveVariant(product, selection), [product, selection]);
   const imageSrc = resolveFrontImage(variant);
   const charmEntries = useMemo(() => buildCharmEntries(charmProduct), [charmProduct]);
-  const total =
-    Number(variant.price) + charmsTotal(charmProduct, selection.charms) + patchPrice(patchProduct, selection.patch);
+  // Patch price is now baked straight into the resolved variant's own price
+  // (a real Cover×String×Pen Holder×Patch combo), not a separate add-on total.
+  const total = Number(variant.price) + charmsTotal(charmProduct, selection.charms);
   const frontCharms = selection.charms.filter((c) => c.side === "front");
   const backCharms = selection.charms.filter((c) => c.side === "back");
   const sideCharms = selection.charms.filter((c) => c.side === "side");
@@ -415,7 +413,7 @@ function JournalCustomizerContent({
   // the Admin API (which can include draft/unpublished variants) and send
   // the customer straight to its hosted invoice/payment page.
   async function handleAddToCart() {
-    const { items, attributes } = buildCartItems(variant, charmProduct, patchProduct, selection, window.location.origin);
+    const { items, attributes } = buildCartItems(variant, charmProduct, selection, window.location.origin);
 
     setCartError(null);
     setAddingToCart(true);
@@ -733,7 +731,10 @@ function JournalCustomizerContent({
                 </div>
                 <div className="mt-6 border-t border-[var(--border)] pt-6">
                   <PatchStep
-                    patchProduct={patchProduct}
+                    product={product}
+                    cord={selection.cord}
+                    penHolder={selection.penHolder}
+                    edge={selection.edge}
                     cordSelected={selection.cord !== "none" && !cordAutoSelected}
                     patch={selection.patch}
                     onPatchChange={(patch) => updateSelection({ patch })}
@@ -774,7 +775,6 @@ function JournalCustomizerContent({
                 products={products}
                 product={product}
                 charmProduct={charmProduct}
-                patchProduct={patchProduct}
                 selection={selection}
                 onAddToCart={handleAddToCart}
                 adding={addingToCart}

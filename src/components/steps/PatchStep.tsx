@@ -8,15 +8,18 @@ import { DisabledHint } from "@/components/DisabledHint";
 import type { JournalSelection } from "@/lib/types";
 
 interface PatchStepProps {
-  patchProduct: ShopifyJournalProduct;
+  product: ShopifyJournalProduct;
+  cord: JournalSelection["cord"];
+  penHolder: JournalSelection["penHolder"];
+  edge: boolean;
   cordSelected: boolean;
   patch: JournalSelection["patch"];
   onPatchChange: (value: JournalSelection["patch"]) => void;
 }
 
-export function PatchStep({ patchProduct, cordSelected, patch, onPatchChange }: PatchStepProps) {
+export function PatchStep({ product, cord, penHolder, edge, cordSelected, patch, onPatchChange }: PatchStepProps) {
   const { format } = useCurrencyFormat();
-  const patchEntries = buildPatchEntries(patchProduct);
+  const patchEntries = buildPatchEntries(product, cord, penHolder, edge);
 
   return (
     <div className="step-fade-in">
@@ -46,7 +49,7 @@ export function PatchStep({ patchProduct, cordSelected, patch, onPatchChange }: 
 
         {patchEntries.map((p) => (
           <DisabledHint
-            key={p.variantId}
+            key={p.shape}
             message={cordSelected && !p.inStock ? "Out of stock" : null}
           >
             <button
