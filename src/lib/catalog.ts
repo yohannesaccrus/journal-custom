@@ -12,7 +12,19 @@ export const SWATCH_HEX: Record<string, string> = {
   "Light Pink": "#f0c4d0",
 };
 
+/** Legacy fallback for the original 2 classic covers, created before category was tracked as a tag. */
 const CLASSIC_HANDLES = new Set(["sanaya-journal-classic-black", "sanaya-journal-classic-brown"]);
+
+export const COVER_CATEGORY_TAG: Record<CoverCategory, string> = {
+  classic: "category:classic",
+  pattern: "category:pattern",
+};
+
+function coverCategory(p: ShopifyJournalProduct): CoverCategory {
+  if (p.tags.includes(COVER_CATEGORY_TAG.classic)) return "classic";
+  if (p.tags.includes(COVER_CATEGORY_TAG.pattern)) return "pattern";
+  return CLASSIC_HANDLES.has(p.handle) ? "classic" : "pattern";
+}
 
 /** Flat approximation of each cover's base tone, used for the back-side canvas (no back photography exists). */
 export const COVER_BACK_COLOR: Record<string, string> = {
@@ -58,7 +70,7 @@ export function buildCoverEntries(products: ShopifyJournalProduct[]): CoverEntry
   return products.map((p) => {
     const base = baseVariant(p);
     const label = optionValue(base, "Cover") ?? p.title;
-    const category: CoverCategory = CLASSIC_HANDLES.has(p.handle) ? "classic" : "pattern";
+    const category = coverCategory(p);
     return {
       handle: p.handle,
       label,

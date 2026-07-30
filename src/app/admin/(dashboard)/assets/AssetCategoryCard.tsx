@@ -2,7 +2,7 @@
 
 import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import type { AdminProduct, JournalSyncResult } from "@/lib/admin/shopify-admin-data";
+import type { AdminProduct, JournalDeleteResult, JournalSyncResult } from "@/lib/admin/shopify-admin-data";
 import EditableTitle from "./EditableTitle";
 import VariantRow from "./VariantRow";
 import JournalVariantsPanel from "./JournalVariantsPanel";
@@ -40,8 +40,10 @@ export default function AssetCategoryCard({
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [newPriceInput, setNewPriceInput] = useState("0");
+  const [newCategory, setNewCategory] = useState<"classic" | "pattern">("pattern");
   const [submittingVariant, setSubmittingVariant] = useState(false);
   const [journalSync, setJournalSync] = useState<JournalSyncResult[] | null>(null);
+  const [journalDeleteSync, setJournalDeleteSync] = useState<JournalDeleteResult[] | null>(null);
 
   // String and Pen Holder colors also live as option values on all 8 sellable
   // journal cover products — adding one here needs to propagate there too, or
@@ -197,17 +199,26 @@ export default function AssetCategoryCard({
     refresh();
   }
 
-  async function removeVariant(variantId: string) {
+  async function removeVariant(variant: AdminProduct["variants"][number]) {
     setError(null);
+    setJournalDeleteSync(null);
     const res = await fetch("/api/admin/assets/variant", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ productId: product.id, variantId }),
+      body: JSON.stringify({
+        productId: product.id,
+        variantId: variant.id,
+        value: syncsToJournal ? variant.title : undefined,
+        productTags: syncsToJournal ? product.tags : undefined,
+      }),
     });
     const json = await res.json();
     if (!res.ok) {
       setError(json.error ?? "Failed to delete variant");
       throw new Error(json.error);
+    }
+    if (Array.isArray(json.journalDeleteSync) && json.journalDeleteSync.length > 0) {
+      setJournalDeleteSync(json.journalDeleteSync);
     }
     refresh();
   }
@@ -236,6 +247,7 @@ export default function AssetCategoryCard({
           price,
           sku,
           productTags: product.tags,
+          category: isCoverTracker ? newCategory : undefined,
         }),
       });
       const json = await res.json();
@@ -303,10 +315,12 @@ export default function AssetCategoryCard({
                 />
               </svg>
               <p className="text-xs leading-relaxed text-[#6b4c14]">
-                <span className="font-semibold">Price here is an add-on, not the final price.</span>{" "}
-                Saving it recomputes every affected combo automatically. To update stock, use the{" "}
-                <span className="font-semibold">Cover</span> table instead — this table doesn&apos;t
-                show stock.
+                <span className="font-semibold">Price here is an add-on, not the final price</span>
+                {" — "}saving it recomputes every affected combo automatically.
+                <br />
+                Stock isn&apos;t shown here; update it from the{" "}
+                <span className="font-semibold">Cover</span>
+                {" "}table instead.
               </p>
             </div>
             <button
@@ -409,6 +423,19 @@ export default function AssetCategoryCard({
             <Field label="SKU">
               <input name="sku" disabled={submittingVariant} className="admin-input w-32 disabled:opacity-50" />
             </Field>
+            {isCoverTracker && (
+              <Field label="Category">
+                <select
+                  value={newCategory}
+                  disabled={submittingVariant}
+                  onChange={(e) => setNewCategory(e.target.value as "classic" | "pattern")}
+                  className="admin-input disabled:opacity-50"
+                >
+                  <option value="classic">Classic</option>
+                  <option value="pattern">Animal Print</option>
+                </select>
+              </Field>
+            )}
             <button
               type="submit"
               disabled={submittingVariant}
@@ -420,7 +447,7 @@ export default function AssetCategoryCard({
                   <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
                 </svg>
               )}
-              {submittingVariant ? (syncsToJournal ? "Generating…" : "Adding…") : "Add"}
+              {submittingVariant ? (isCoverTracker ? "Creating…" : syncsToJournal ? "Generating…" : "Adding…") : "Add"}
             </button>
           </div>
 
@@ -434,6 +461,17 @@ export default function AssetCategoryCard({
                 : "This will also create matching variants for every color combination across all 8 cover products."}
             </p>
           )}
+
+          {isCoverTracker && (
+            <p className="mt-3 flex items-start gap-1.5 text-xs text-[#8a6a3a]">
+              <svg viewBox="0 0 20 20" fill="currentColor" className="mt-0.5 h-3.5 w-3.5 shrink-0">
+                <path d="M10 2a1 1 0 01.894.553l1.382 2.764 3.05.443a1 1 0 01.554 1.706l-2.207 2.152.521 3.038a1 1 0 01-1.451 1.054L10 12.202l-2.743 1.508a1 1 0 01-1.451-1.054l.521-3.038-2.207-2.152a1 1 0 01.554-1.706l3.05-.443L9.106 2.553A1 1 0 0110 2z" />
+              </svg>
+              {submittingVariant
+                ? "Creating a new sellable journal product with every String × Pen Holder combination — this can take a while…"
+                : "This creates a brand-new sellable journal product with every String × Pen Holder combination, priced automatically. Starts at 0 stock and no photo — set those next in its own accordion row below."}
+            </p>
+          )}
         </form>
       )}
 
@@ -441,7 +479,9 @@ export default function AssetCategoryCard({
         <div className="animate-[fadeIn_0.15s_ease-out] border-b border-[#eae7de] bg-gradient-to-r from-[#f7f9f6] to-[#eef4ef] px-5 py-4">
           <div className="flex items-center justify-between gap-4">
             <p className="text-xs font-medium text-[#1c1c1a]">
-              Synced to {journalSync.filter((r) => r.created > 0).length}/{journalSync.length} covers
+              {isCoverTracker
+                ? `Created ${journalSync[0]?.created ?? 0} variants for the new cover`
+                : `Synced to ${journalSync.filter((r) => r.created > 0).length}/${journalSync.length} covers`}
               {journalSync.some((r) => r.error) && (
                 <span className="ml-1.5 text-[#b5342c]">
                   · {journalSync.filter((r) => r.error).length} failed
@@ -477,6 +517,37 @@ export default function AssetCategoryCard({
           <p className="mt-2.5 text-[11px] text-[#a89a80]">
             New variants start at 0 stock — set opening stock for each cover directly in Shopify Admin.
           </p>
+        </div>
+      )}
+
+      {journalDeleteSync && (
+        <div className="animate-[fadeIn_0.15s_ease-out] border-b border-[#f6dcd6] bg-gradient-to-r from-[#fbe9e7] to-[#f8dcd8] px-5 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-xs font-medium text-[#1c1c1a]">
+              Removed from {journalDeleteSync.filter((r) => r.removed > 0).length}/{journalDeleteSync.length} covers
+              {journalDeleteSync.some((r) => r.error) && (
+                <span className="ml-1.5 text-[#b5342c]">
+                  · {journalDeleteSync.filter((r) => r.error).length} failed
+                </span>
+              )}
+            </p>
+            <button
+              type="button"
+              onClick={() => setJournalDeleteSync(null)}
+              className="shrink-0 text-xs text-[#a89a80] hover:text-[#1c1c1a]"
+            >
+              Dismiss
+            </button>
+          </div>
+          <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+            {journalDeleteSync.map((r) => (
+              <li key={r.coverHandle} className="flex items-center gap-1.5 text-xs text-[#6b6a63]">
+                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${r.error ? "bg-[#b5342c]" : "bg-[#1f7a4d]"}`} />
+                {r.coverTitle}
+                {r.error ? ` — ${r.error}` : ` — ${r.removed} variants removed`}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

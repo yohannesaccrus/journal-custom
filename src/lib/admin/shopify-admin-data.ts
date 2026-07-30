@@ -1,6 +1,8 @@
 import "server-only";
 import { decodeDesign } from "@/lib/design-link";
+import { COVER_CATEGORY_TAG } from "@/lib/catalog";
 import type { JournalSelection } from "@/lib/types";
+import type { CoverCategory } from "@/lib/types";
 
 const STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN;
 const ACCESS_TOKEN = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
@@ -494,6 +496,150 @@ async function bulkCreateJournalVariants(
   return combos.length;
 }
 
+function slugify(s: string): string {
+  return s
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
+/**
+ * Unlike String/Pen Holder (which are just an option value added onto 8
+ * already-existing sellable products), a new Cover has no product to attach
+ * to yet — this creates a brand-new "tag:journal" product from scratch, with
+ * every String × Pen Holder combination that already exists elsewhere in the
+ * catalog (copied from an existing journal product's option values, so a new
+ * String/Pen Holder color added earlier is automatically included). Category
+ * ("classic" vs "pattern") is persisted as a `category:*` tag — see
+ * `COVER_CATEGORY_TAG` in catalog.ts — so it can be set here without a code
+ * change. New variants start at 0 stock and get a price from
+ * `syncJournalPricing` (base = this cover's own price, same additive model as
+ * every other cover) — call that right after this returns.
+ */
+export async function createJournalCoverProduct(
+  style: string,
+  price: string,
+  category: CoverCategory
+): Promise<{ productId: string; handle: string; created: number }> {
+  const REF_QUERY = `
+    query JournalCoverReference {
+      products(first: 1, query: "tag:journal") {
+        nodes {
+          options { name optionValues { name } }
+        }
+      }
+    }
+  `;
+  const ref = await shopifyAdmin<{
+    products: { nodes: { options: { name: string; optionValues: { name: string }[] }[] }[] };
+  }>(REF_QUERY);
+  const refProduct = ref.products.nodes[0];
+  if (!refProduct) throw new Error("No existing journal product found to copy String/Pen Holder options from");
+
+  const stringValues = refProduct.options.find((o) => o.name === "String")?.optionValues.map((v) => v.name) ?? [];
+  const penHolderValues =
+    refProduct.options.find((o) => o.name === "Pen Holder")?.optionValues.map((v) => v.name) ?? [];
+  if (stringValues.length === 0 || penHolderValues.length === 0) {
+    throw new Error("Reference journal product is missing String/Pen Holder option values");
+  }
+
+  const handle = `sanaya-journal-${slugify(style)}`;
+
+  const PRODUCT_CREATE = `
+    mutation CreateJournalCover($product: ProductCreateInput!) {
+      productCreate(product: $product) {
+        product {
+          id
+          handle
+          options { id name optionValues { id name } }
+          variants(first: 250) { nodes { id } }
+        }
+        userErrors { field message }
+      }
+    }
+  `;
+  const createRes = await shopifyAdmin<{
+    productCreate: {
+      product: {
+        id: string;
+        handle: string;
+        options: { id: string; name: string; optionValues: { id: string; name: string }[] }[];
+        variants: { nodes: { id: string }[] };
+      } | null;
+      userErrors: { field: string[]; message: string }[];
+    };
+  }>(PRODUCT_CREATE, {
+    product: {
+      title: `Sanaya Journal — ${style}`,
+      handle,
+      tags: ["journal", COVER_CATEGORY_TAG[category]],
+      productOptions: [
+        { name: "Cover", values: [{ name: style }] },
+        { name: "String", values: stringValues.map((name) => ({ name })) },
+        { name: "Pen Holder", values: penHolderValues.map((name) => ({ name })) },
+      ],
+    },
+  });
+  const createErrs = createRes.productCreate.userErrors;
+  if (createErrs.length) throw new Error(createErrs.map((e) => e.message).join("; "));
+  const product = createRes.productCreate.product;
+  if (!product) throw new Error("Shopify did not return the created product");
+
+  const coverOption = product.options.find((o) => o.name === "Cover");
+  const cordOption = product.options.find((o) => o.name === "String");
+  const penOption = product.options.find((o) => o.name === "Pen Holder");
+  if (!coverOption || !cordOption || !penOption) throw new Error("Created product is missing an expected option");
+
+  // Same combo rule as syncJournalOptionAdd: a real cord pairs with every pen
+  // holder value including "None"; "No Cord" only ever pairs with "None".
+  const combos: { cord: string; pen: string }[] = [];
+  for (const cord of stringValues) {
+    if (cord === "No Cord") {
+      combos.push({ cord, pen: "None" });
+    } else {
+      for (const pen of penHolderValues) combos.push({ cord, pen });
+    }
+  }
+
+  // Shopify auto-generates the full String × Pen Holder cartesian product as
+  // placeholder variants when a product is created with multiple option
+  // values at once — that includes invalid combos (e.g. "No Cord" + a real
+  // pen holder) this catalog never allows. Clear all of them out and create
+  // exactly the valid combo set fresh, rather than trying to reconcile.
+  if (product.variants.nodes.length > 0) {
+    const DELETE_MUTATION = `
+      mutation DeletePlaceholderVariants($productId: ID!, $variantsIds: [ID!]!) {
+        productVariantsBulkDelete(productId: $productId, variantsIds: $variantsIds) {
+          userErrors { field message }
+        }
+      }
+    `;
+    const ids = product.variants.nodes.map((v) => v.id);
+    for (let i = 0; i < ids.length; i += 100) {
+      const chunk = ids.slice(i, i + 100);
+      const delRes = await shopifyAdmin<{
+        productVariantsBulkDelete: { userErrors: { field: string[]; message: string }[] };
+      }>(DELETE_MUTATION, { productId: product.id, variantsIds: chunk });
+      const delErrs = delRes.productVariantsBulkDelete.userErrors;
+      if (delErrs.length) throw new Error(delErrs.map((e) => e.message).join("; "));
+    }
+  }
+
+  const created = await bulkCreateJournalVariants(
+    product.id,
+    handle,
+    coverOption.id,
+    style,
+    cordOption.id,
+    penOption.id,
+    combos,
+    price
+  );
+
+  return { productId: product.id, handle, created };
+}
+
 /**
  * The counterpart to `syncJournalOptionRename` for brand-new Cord/Pen Holder
  * colors: the "+Add variant" button on the matching internal component
@@ -720,6 +866,120 @@ export async function syncJournalPricing(): Promise<void> {
       if (errs.length) throw new Error(errs.map((e) => e.message).join("; "));
     }
   }
+}
+
+export interface JournalDeleteResult {
+  coverHandle: string;
+  coverTitle: string;
+  removed: number;
+  skipped: boolean;
+  error?: string;
+}
+
+/**
+ * The delete counterpart to `syncJournalOptionAdd`: removing a String/Pen
+ * Holder color from its tracker product only deletes that bookkeeping row —
+ * customers could still pick the color and orders could still price it at
+ * Rp0 (see `syncJournalPricing`'s fallback) unless the option value and its
+ * combo variants are also removed from all 8 real "tag:journal" products.
+ * Deletes every variant matching this value first, then removes the option
+ * value itself. Pen Holder also removes the paired "<value> + Edge" combo.
+ */
+export async function syncJournalOptionDelete(componentTags: string[], value: string): Promise<JournalDeleteResult[]> {
+  const tag = componentTags.find((t) => t === "string" || t === "pen-holder");
+  if (!tag) return [];
+
+  const optionName = tag === "string" ? "String" : "Pen Holder";
+  const valuesToRemove = tag === "pen-holder" ? [value, `${value} + Edge`] : [value];
+
+  const JOURNAL_PRODUCTS_QUERY = `
+    query JournalProductsForDeleteSync {
+      products(first: 20, query: "tag:journal") {
+        nodes {
+          id
+          handle
+          title
+          options { id name optionValues { id name } }
+          variants(first: 100) { nodes { id selectedOptions { name value } } }
+        }
+      }
+    }
+  `;
+  const data = await shopifyAdmin<{
+    products: {
+      nodes: {
+        id: string;
+        handle: string;
+        title: string;
+        options: { id: string; name: string; optionValues: { id: string; name: string }[] }[];
+        variants: { nodes: { id: string; selectedOptions: { name: string; value: string }[] }[] };
+      }[];
+    };
+  }>(JOURNAL_PRODUCTS_QUERY);
+
+  const results: JournalDeleteResult[] = [];
+
+  for (const product of data.products.nodes) {
+    const option = product.options.find((o) => o.name === optionName);
+    const optionValueIds = option?.optionValues.filter((v) => valuesToRemove.includes(v.name)).map((v) => v.id) ?? [];
+    if (!option || optionValueIds.length === 0) {
+      results.push({ coverHandle: product.handle, coverTitle: product.title, removed: 0, skipped: true });
+      continue;
+    }
+
+    try {
+      const variantIds = product.variants.nodes
+        .filter((v) => v.selectedOptions.some((o) => o.name === optionName && valuesToRemove.includes(o.value)))
+        .map((v) => v.id);
+
+      if (variantIds.length > 0) {
+        const DELETE_VARIANTS = `
+          mutation DeleteJournalCombos($productId: ID!, $variantsIds: [ID!]!) {
+            productVariantsBulkDelete(productId: $productId, variantsIds: $variantsIds) {
+              userErrors { field message }
+            }
+          }
+        `;
+        for (let i = 0; i < variantIds.length; i += 100) {
+          const chunk = variantIds.slice(i, i + 100);
+          const delRes = await shopifyAdmin<{
+            productVariantsBulkDelete: { userErrors: { field: string[]; message: string }[] };
+          }>(DELETE_VARIANTS, { productId: product.id, variantsIds: chunk });
+          const delErrs = delRes.productVariantsBulkDelete.userErrors;
+          if (delErrs.length) throw new Error(delErrs.map((e) => e.message).join("; "));
+        }
+      }
+
+      const DELETE_OPTION_VALUES = `
+        mutation DeleteOptionValues($productId: ID!, $option: OptionUpdateInput!, $optionValuesToDelete: [ID!]) {
+          productOptionUpdate(productId: $productId, option: $option, optionValuesToDelete: $optionValuesToDelete) {
+            userErrors { field message }
+          }
+        }
+      `;
+      const optRes = await shopifyAdmin<{
+        productOptionUpdate: { userErrors: { field: string[]; message: string }[] };
+      }>(DELETE_OPTION_VALUES, {
+        productId: product.id,
+        option: { id: option.id },
+        optionValuesToDelete: optionValueIds,
+      });
+      const optErrs = optRes.productOptionUpdate.userErrors;
+      if (optErrs.length) throw new Error(optErrs.map((e) => e.message).join("; "));
+
+      results.push({ coverHandle: product.handle, coverTitle: product.title, removed: variantIds.length, skipped: false });
+    } catch (err) {
+      results.push({
+        coverHandle: product.handle,
+        coverTitle: product.title,
+        removed: 0,
+        skipped: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  return results;
 }
 
 export async function updateProductTitle(productId: string, title: string): Promise<void> {

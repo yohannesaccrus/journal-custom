@@ -35,7 +35,7 @@ export default function VariantRow({
     variant: Variant,
     fields: { name?: string; sku?: string; price?: string; stock?: number; swatchColor?: string | null }
   ) => Promise<void>;
-  onDelete: (variantId: string) => Promise<void>;
+  onDelete: (variant: Variant) => Promise<void>;
   /** Shows a chevron toggle before the variant name — used on the Cover tracker to reveal that cover's real journal String × Pen Holder variants. */
   expandable?: boolean;
   expanded?: boolean;
@@ -103,7 +103,7 @@ export default function VariantRow({
   async function confirmDelete() {
     setDeleting(true);
     try {
-      await onDelete(variant.id);
+      await onDelete(variant);
     } catch {
       setDeleting(false);
       setConfirmingDelete(false);
