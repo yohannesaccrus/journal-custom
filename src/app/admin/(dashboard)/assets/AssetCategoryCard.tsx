@@ -71,13 +71,19 @@ export default function AssetCategoryCard({
   // renaming would desync from the "Cover" option value the accordion below
   // matches by, and covers are identified by photo, not a color.
   const hideSwatch = isCharm || isCoverTracker || isPatch || isCornerEdge || isNotebook;
-  // String/Pen Holder Stock AND Price here would be misleading — the real,
-  // customer-facing stock and price live per (cover, string, pen holder)
-  // combo on the 8 journal cover products, not on this tracker. Both are
-  // only ever editable from the Cover card's per-cover accordion — see the
-  // banner rendered below instead of these two columns.
+  // String/Pen Holder Stock here would be misleading — real, customer-facing
+  // stock lives per (cover, string, pen holder) combo on the 8 journal cover
+  // products, editable only from the Cover card's per-cover accordion (see
+  // the banner rendered below instead of this column).
   const hideStock = syncsToJournal;
-  const hidePrice = syncsToJournal;
+  // Price, unlike Stock, IS editable here: this is an additive pricing model
+  // — Cover's price is the base price for that cover, String/Pen Holder's
+  // price is a pure add-on delta on top. Saving any of the three
+  // automatically recomputes and pushes the final price for every affected
+  // (cover, string, pen holder) combo on the real journal products (see
+  // `syncJournalPricing`) — the combo table itself only shows the computed
+  // result, read-only.
+  const hidePrice = false;
   // String and Pen Holder's Swatch columns stay editable — they actually
   // drive the live customizer's color pickers (see `fetchSwatchColors`) —
   // but like Cover/Charm/Patch/Corner Edge/Notebook their titles shouldn't
@@ -297,10 +303,10 @@ export default function AssetCategoryCard({
                 />
               </svg>
               <p className="text-xs leading-relaxed text-[#6b4c14]">
-                <span className="font-semibold">To update stock or price, use the Cover table.</span>{" "}
-                This table doesn&apos;t show stock or price — the stock and price customers actually
-                see come from the per-cover variants in the <span className="font-semibold">Cover</span>{" "}
-                table.
+                <span className="font-semibold">Price here is an add-on, not the final price.</span>{" "}
+                Saving it recomputes every affected combo automatically. To update stock, use the{" "}
+                <span className="font-semibold">Cover</span> table instead — this table doesn&apos;t
+                show stock.
               </p>
             </div>
             <button
@@ -323,7 +329,7 @@ export default function AssetCategoryCard({
             <span className="text-[#c9a869]">→</span>
             <span className="rounded-full bg-white/70 px-2.5 py-1 shadow-sm">3. Find the String / Pen Holder combo</span>
             <span className="text-[#c9a869]">→</span>
-            <span className="rounded-full bg-white/70 px-2.5 py-1 shadow-sm">4. Edit its Stock / Price field</span>
+            <span className="rounded-full bg-white/70 px-2.5 py-1 shadow-sm">4. Edit its Stock field</span>
             <span className="text-[#c9a869]">→</span>
             <span className="rounded-full bg-white/70 px-2.5 py-1 shadow-sm">5. Save</span>
           </div>

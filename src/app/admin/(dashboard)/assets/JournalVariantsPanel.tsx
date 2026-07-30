@@ -5,15 +5,7 @@ import { useRouter } from "next/navigation";
 import type { AdminProduct } from "@/lib/admin/shopify-admin-data";
 import VariantThumbnail from "./VariantThumbnail";
 import { useCurrency } from "../CurrencyContext";
-import {
-  CURRENCIES,
-  convertToIDR,
-  formatAmountInput,
-  idrToInputValue,
-  parseAmountInput,
-  sanitizeAmountInput,
-  toShopifyPriceString,
-} from "@/lib/currency";
+import { CURRENCIES, formatAmountInput, idrToInputValue } from "@/lib/currency";
 
 type Variant = AdminProduct["variants"][number];
 
@@ -86,7 +78,7 @@ export default function JournalVariantsPanel({
               <th className="px-5 py-2 font-medium">Image</th>
               <th className="px-5 py-2 font-medium">String / Pen Holder</th>
               <th className="px-5 py-2 font-medium">SKU</th>
-              <th className="px-5 py-2 font-medium">Price</th>
+              <th className="px-5 py-2 font-medium">Price (auto)</th>
               <th className="px-5 py-2 font-medium">Stock</th>
               <th className="px-5 py-2 font-medium" />
             </tr>
@@ -113,20 +105,18 @@ function JournalComboRow({ productId, variant }: { productId: string; variant: V
   const router = useRouter();
   const { currency } = useCurrency();
   const currencyCfg = CURRENCIES[currency];
-  const initialPriceIDR = Number(variant.price) || 0;
+  const priceIDR = Number(variant.price) || 0;
   const [sku, setSku] = useState(variant.sku);
-  const [priceIDR, setPriceIDR] = useState(initialPriceIDR);
   const [stock, setStock] = useState(variant.inventoryQuantity);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const priceDisplay = formatAmountInput(idrToInputValue(priceIDR, currency), currency);
-  const dirty = sku !== variant.sku || priceIDR !== initialPriceIDR || stock !== variant.inventoryQuantity;
+  const dirty = sku !== variant.sku || stock !== variant.inventoryQuantity;
 
   function reset() {
     setSku(variant.sku);
-    setPriceIDR(initialPriceIDR);
     setStock(variant.inventoryQuantity);
     setError(null);
   }
@@ -136,7 +126,7 @@ function JournalComboRow({ productId, variant }: { productId: string; variant: V
     setError(null);
     try {
       const requests: Promise<Response>[] = [];
-      if (sku !== variant.sku || priceIDR !== initialPriceIDR) {
+      if (sku !== variant.sku) {
         requests.push(
           fetch("/api/admin/assets/variant", {
             method: "PATCH",
@@ -144,8 +134,7 @@ function JournalComboRow({ productId, variant }: { productId: string; variant: V
             body: JSON.stringify({
               productId,
               variantId: variant.id,
-              sku: sku !== variant.sku ? sku : undefined,
-              price: priceIDR !== initialPriceIDR ? toShopifyPriceString(priceIDR) : undefined,
+              sku,
             }),
           })
         );
@@ -195,20 +184,8 @@ function JournalComboRow({ productId, variant }: { productId: string; variant: V
           className={`admin-input w-40 ${sku !== variant.sku ? "dirty" : ""}`}
         />
       </td>
-      <td className="px-5 py-2">
-        <div className={`admin-input-group w-24 ${priceIDR !== initialPriceIDR ? "dirty" : ""}`}>
-          <span className="admin-input-prefix">{currencyCfg.symbol}</span>
-          <input
-            inputMode="decimal"
-            disabled={saving}
-            value={priceDisplay}
-            onChange={(e) => {
-              const sanitized = sanitizeAmountInput(e.target.value, currency);
-              setPriceIDR(convertToIDR(parseAmountInput(sanitized, currency), currency));
-            }}
-            className="admin-input-bare"
-          />
-        </div>
+      <td className="px-5 py-2 text-[#6b6a63]">
+        {currencyCfg.symbol} {priceDisplay}
       </td>
       <td className="px-5 py-2">
         <div className="flex items-center gap-1.5">

@@ -614,6 +614,114 @@ export async function syncJournalOptionAdd(componentTags: string[], newValue: st
   return results;
 }
 
+/**
+ * Additive pricing model: Cover/String/Pen Holder tracker products each carry
+ * their own `price` per option value — Cover's is the base price for that
+ * cover (same for every String/Pen Holder combo), String/Pen Holder's are
+ * pure add-on deltas on top of it ("No Cord"/"None" always contribute 0,
+ * since they're the zero-cost default option, not a tracked variant).
+ */
+async function fetchPriceComponents(): Promise<{
+  coverPrice: Record<string, number>;
+  stringDelta: Record<string, number>;
+  penHolderDelta: Record<string, number>;
+}> {
+  const data = await shopifyAdmin<{
+    products: { nodes: { tags: string[]; variants: { nodes: { title: string; price: string }[] } }[] };
+  }>(
+    `query PriceComponents {
+      products(first: 20, query: "tag:cover OR tag:string OR tag:pen-holder") {
+        nodes {
+          tags
+          variants(first: 100) { nodes { title price } }
+        }
+      }
+    }`
+  );
+
+  const coverPrice: Record<string, number> = {};
+  const stringDelta: Record<string, number> = { "No Cord": 0 };
+  // "+ Edge" combos aren't tracked as separate pen-holder rows — they carry
+  // the same add-on price as their plain counterpart.
+  const penHolderDelta: Record<string, number> = { None: 0 };
+
+  for (const product of data.products.nodes) {
+    if (product.tags.includes("cover")) {
+      for (const v of product.variants.nodes) coverPrice[v.title] = Number(v.price);
+    } else if (product.tags.includes("string")) {
+      for (const v of product.variants.nodes) stringDelta[v.title] = Number(v.price);
+    } else if (product.tags.includes("pen-holder")) {
+      for (const v of product.variants.nodes) {
+        penHolderDelta[v.title] = Number(v.price);
+        penHolderDelta[`${v.title} + Edge`] = Number(v.price);
+      }
+    }
+  }
+  return { coverPrice, stringDelta, penHolderDelta };
+}
+
+/**
+ * Recomputes every real (Cover × String × Pen Holder) journal variant's price
+ * as `coverPrice + stringDelta + penHolderDelta` from the three tracker
+ * products' own per-option prices, and pushes any changed prices to Shopify.
+ * Call this any time a Cover/String/Pen Holder tracker price changes, or a
+ * new String/Pen Holder color is synced onto the journal products.
+ */
+export async function syncJournalPricing(): Promise<void> {
+  const { coverPrice, stringDelta, penHolderDelta } = await fetchPriceComponents();
+
+  const JOURNAL_QUERY = `
+    query JournalPricingSync {
+      products(first: 20, query: "tag:journal") {
+        nodes {
+          id
+          variants(first: 100) {
+            nodes { id price selectedOptions { name value } }
+          }
+        }
+      }
+    }
+  `;
+  const data = await shopifyAdmin<{
+    products: {
+      nodes: {
+        id: string;
+        variants: { nodes: { id: string; price: string; selectedOptions: { name: string; value: string }[] }[] };
+      }[];
+    };
+  }>(JOURNAL_QUERY);
+
+  const MUTATION = `
+    mutation SyncJournalPrices($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+      productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+        userErrors { field message }
+      }
+    }
+  `;
+
+  for (const product of data.products.nodes) {
+    const updates: { id: string; price: string }[] = [];
+    for (const v of product.variants.nodes) {
+      const cover = v.selectedOptions.find((o) => o.name === "Cover")?.value;
+      if (!cover || !(cover in coverPrice)) continue;
+      const stringValue = v.selectedOptions.find((o) => o.name === "String")?.value;
+      const penHolderValue = v.selectedOptions.find((o) => o.name === "Pen Holder")?.value;
+      const delta = (stringValue ? stringDelta[stringValue] ?? 0 : 0) + (penHolderValue ? penHolderDelta[penHolderValue] ?? 0 : 0);
+      const newPrice = (coverPrice[cover] + delta).toFixed(2);
+      if (newPrice !== Number(v.price).toFixed(2)) updates.push({ id: v.id, price: newPrice });
+    }
+    if (updates.length === 0) continue;
+    for (let i = 0; i < updates.length; i += 100) {
+      const chunk = updates.slice(i, i + 100);
+      const res = await shopifyAdmin<{
+        productVariantsBulkUpdate: { userErrors: { field: string[]; message: string }[] };
+      }>(MUTATION, { productId: product.id, variants: chunk });
+      const errs = res.productVariantsBulkUpdate.userErrors;
+      if (errs.length) throw new Error(errs.map((e) => e.message).join("; "));
+    }
+  }
+}
+
 export async function updateProductTitle(productId: string, title: string): Promise<void> {
   const MUTATION = `
     mutation UpdateProductTitle($input: ProductInput!) {
