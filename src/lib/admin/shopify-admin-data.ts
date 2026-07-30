@@ -556,6 +556,40 @@ export async function createJournalCoverProduct(
 
   const handle = `sanaya-journal-${slugify(style)}`;
 
+  // A previous attempt at this same style may have died partway through and
+  // left a broken product squatting on this handle (rollback only covers
+  // failures *after* this function creates the product — not a process that
+  // got interrupted, or ran before rollback existed). If it's genuinely
+  // broken (no "No Cord"/"None" base variant), clear it out automatically
+  // instead of making the admin hunt it down in Shopify by hand; if it's a
+  // real, complete cover, this is a genuine name clash — fail with a clear
+  // message instead.
+  const EXISTING_QUERY = `
+    query JournalCoverHandleCheck($query: String!) {
+      products(first: 1, query: $query) {
+        nodes {
+          id
+          variants(first: 250) { nodes { selectedOptions { name value } } }
+        }
+      }
+    }
+  `;
+  const existing = await shopifyAdmin<{
+    products: { nodes: { id: string; variants: { nodes: { selectedOptions: { name: string; value: string }[] }[] } }[] };
+  }>(EXISTING_QUERY, { query: `handle:${handle}` });
+  const existingProduct = existing.products.nodes[0];
+  if (existingProduct) {
+    const hasBase = existingProduct.variants.nodes.some(
+      (v) =>
+        v.selectedOptions.some((o) => o.name === "String" && o.value === "No Cord") &&
+        v.selectedOptions.some((o) => o.name === "Pen Holder" && o.value === "None")
+    );
+    if (hasBase) {
+      throw new Error(`A cover named "${style}" already exists — choose a different name.`);
+    }
+    await deleteProduct(existingProduct.id);
+  }
+
   // Step 1: create the product with only its Cover option — guarantees
   // exactly one default variant, no ambiguity about auto-generated combos.
   const PRODUCT_CREATE = `
