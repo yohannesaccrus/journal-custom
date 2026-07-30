@@ -16,7 +16,7 @@ export interface OrderJournalCharm {
   design: string;
   side: string;
   imageUrl?: string;
-  priceIDR?: number;
+  priceEUR?: number;
 }
 
 export interface OrderJournalPreview {
@@ -94,7 +94,7 @@ export function buildOrderJournalPreview(
         design: c.design,
         side: c.side,
         imageUrl: entry?.imageUrl,
-        priceIDR: entry?.price,
+        priceEUR: entry?.price,
       };
     }),
   };

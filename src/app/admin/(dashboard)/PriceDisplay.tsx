@@ -3,8 +3,8 @@
 import { formatAsCurrency } from "@/lib/currency";
 import { useCurrency } from "./CurrencyContext";
 
-/** Renders an IDR amount converted + formatted in whatever currency is currently selected. */
-export function PriceDisplay({ amountIDR, className }: { amountIDR: number; className?: string }) {
+/** Renders a EUR amount converted + formatted in whatever currency is currently selected. */
+export function PriceDisplay({ amountEUR, className }: { amountEUR: number; className?: string }) {
   const { currency } = useCurrency();
-  return <span className={className}>{formatAsCurrency(amountIDR, currency)}</span>;
+  return <span className={className}>{formatAsCurrency(amountEUR, currency)}</span>;
 }

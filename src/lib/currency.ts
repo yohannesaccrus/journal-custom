@@ -1,20 +1,21 @@
 import currency from "currency.js";
 
 /**
- * Shopify (and every price actually stored/saved) is always in IDR — this is
- * a *display* currency system for the admin: pick a currency, every price on
- * screen re-renders converted, editable fields convert back to IDR on save.
+ * Shopify (and every price actually stored/saved) is always in EUR — that's
+ * the store's real currency (see `shop.currencyCode`) — this is a *display*
+ * currency system for the admin: pick a currency, every price on screen
+ * re-renders converted, editable fields convert back to EUR on save.
  *
- * Adding a new currency later is just one more entry here — `rateFromIDR` is
- * "how many units of this currency equal 1 IDR".
+ * Adding a new currency later is just one more entry here — `rateFromEUR` is
+ * "how many units of this currency equal 1 EUR".
  */
 export interface CurrencyConfig {
   code: string;
   symbol: string;
   label: string;
   decimals: number;
-  /** How many units of this currency equal 1 IDR. */
-  rateFromIDR: number;
+  /** How many units of this currency equal 1 EUR. */
+  rateFromEUR: number;
   /** Decimal separator used when typing/displaying a fractional amount. */
   decimalSeparator: "." | ",";
   /** Thousands separator. */
@@ -24,12 +25,24 @@ export interface CurrencyConfig {
 }
 
 export const CURRENCIES: Record<string, CurrencyConfig> = {
+  EUR: {
+    code: "EUR",
+    symbol: "€",
+    label: "Euro",
+    decimals: 2,
+    rateFromEUR: 1,
+    decimalSeparator: ",",
+    groupSeparator: ".",
+    pattern: "!#",
+  },
   IDR: {
     code: "IDR",
     symbol: "Rp",
     label: "Indonesian Rupiah",
     decimals: 0,
-    rateFromIDR: 1,
+    // Approximate — update here (or wire to a live rate) as needed; every
+    // display and edit path reads from this single source of truth.
+    rateFromEUR: 17200,
     decimalSeparator: ",",
     groupSeparator: ".",
     pattern: "! #",
@@ -41,21 +54,9 @@ export const CURRENCIES: Record<string, CurrencyConfig> = {
     // Approximate — update here (or wire to a live rate) as needed; every
     // display and edit path reads from this single source of truth.
     decimals: 2,
-    rateFromIDR: 1 / 15800,
+    rateFromEUR: 17200 / 15800,
     decimalSeparator: ".",
     groupSeparator: ",",
-    pattern: "!#",
-  },
-  EUR: {
-    code: "EUR",
-    symbol: "€",
-    label: "Euro",
-    // Approximate — update here (or wire to a live rate) as needed; every
-    // display and edit path reads from this single source of truth.
-    decimals: 2,
-    rateFromIDR: 1 / 17200,
-    decimalSeparator: ",",
-    groupSeparator: ".",
     pattern: "!#",
   },
 };
@@ -72,22 +73,22 @@ function money(amount: number, cfg: CurrencyConfig) {
   });
 }
 
-/** Converts an IDR amount into the target currency's numeric value (rounded to its own precision). */
-export function convertFromIDR(amountIDR: number, currencyCode: string): number {
+/** Converts a EUR amount into the target currency's numeric value (rounded to its own precision). */
+export function convertFromEUR(amountEUR: number, currencyCode: string): number {
   const cfg = CURRENCIES[currencyCode] ?? CURRENCIES[DEFAULT_CURRENCY];
-  return money(amountIDR, CURRENCIES.IDR).multiply(cfg.rateFromIDR).value;
+  return money(amountEUR, CURRENCIES.EUR).multiply(cfg.rateFromEUR).value;
 }
 
-/** Converts an amount in the given currency back into IDR (rounded to whole Rupiah). */
-export function convertToIDR(amount: number, currencyCode: string): number {
+/** Converts an amount in the given currency back into EUR (rounded to cents). */
+export function convertToEUR(amount: number, currencyCode: string): number {
   const cfg = CURRENCIES[currencyCode] ?? CURRENCIES[DEFAULT_CURRENCY];
-  return Math.round(money(amount, cfg).divide(cfg.rateFromIDR).value);
+  return Math.round(money(amount, cfg).divide(cfg.rateFromEUR).value * 100) / 100;
 }
 
-/** Formats an IDR amount for display in the given currency, e.g. "Rp 750.000" or "$47.47". */
-export function formatAsCurrency(amountIDR: number, currencyCode: string): string {
+/** Formats a EUR amount for display in the given currency, e.g. "Rp 750.000" or "$47.47". */
+export function formatAsCurrency(amountEUR: number, currencyCode: string): string {
   const cfg = CURRENCIES[currencyCode] ?? CURRENCIES[DEFAULT_CURRENCY];
-  return money(convertFromIDR(amountIDR, currencyCode), cfg).format();
+  return money(convertFromEUR(amountEUR, currencyCode), cfg).format();
 }
 
 // ---------- Editable-input helpers (typing in whatever currency is active) ----------
@@ -119,14 +120,14 @@ export function formatAmountInput(raw: string, currencyCode: string): string {
   return `${groupedHead}${cfg.decimalSeparator}${frac}`;
 }
 
-/** The plain-number string (in `currencyCode`) to show/edit for a given IDR amount. */
-export function idrToInputValue(amountIDR: number, currencyCode: string): string {
+/** The plain-number string (in `currencyCode`) to show/edit for a given EUR amount. */
+export function eurToInputValue(amountEUR: number, currencyCode: string): string {
   const cfg = CURRENCIES[currencyCode] ?? CURRENCIES[DEFAULT_CURRENCY];
-  const converted = convertFromIDR(amountIDR, currencyCode);
+  const converted = convertFromEUR(amountEUR, currencyCode);
   return cfg.decimals === 0 ? String(Math.round(converted)) : converted.toFixed(cfg.decimals);
 }
 
-/** The decimal string Shopify's variant price field expects, e.g. "750000.00". */
-export function toShopifyPriceString(amountIDR: number): string {
-  return Math.round(amountIDR).toFixed(2);
+/** The decimal string Shopify's variant price field expects, e.g. "47.97". */
+export function toShopifyPriceString(amountEUR: number): string {
+  return amountEUR.toFixed(2);
 }

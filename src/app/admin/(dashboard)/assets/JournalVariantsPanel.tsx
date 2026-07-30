@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import type { AdminProduct } from "@/lib/admin/shopify-admin-data";
 import VariantThumbnail from "./VariantThumbnail";
 import { useCurrency } from "../CurrencyContext";
-import { CURRENCIES, formatAmountInput, idrToInputValue } from "@/lib/currency";
+import { CURRENCIES, formatAmountInput, eurToInputValue } from "@/lib/currency";
 
 type Variant = AdminProduct["variants"][number];
 
@@ -125,13 +125,13 @@ function JournalComboRow({ productId, variant }: { productId: string; variant: V
   const router = useRouter();
   const { currency } = useCurrency();
   const currencyCfg = CURRENCIES[currency];
-  const priceIDR = Number(variant.price) || 0;
+  const priceEUR = Number(variant.price) || 0;
   const [sku, setSku] = useState(variant.sku);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const priceDisplay = formatAmountInput(idrToInputValue(priceIDR, currency), currency);
+  const priceDisplay = formatAmountInput(eurToInputValue(priceEUR, currency), currency);
   const dirty = sku !== variant.sku;
 
   function reset() {

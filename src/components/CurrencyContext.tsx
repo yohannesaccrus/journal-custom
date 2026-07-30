@@ -41,9 +41,9 @@ export function useCurrency() {
   return useContext(CurrencyContext);
 }
 
-/** `format(amountIDR)` — every price in the customizer is stored/computed in
- * IDR; this just converts + formats it into whichever currency is selected. */
+/** `format(amountEUR)` — every price in the customizer is stored/computed in
+ * EUR; this just converts + formats it into whichever currency is selected. */
 export function useCurrencyFormat() {
   const { currency } = useCurrency();
-  return { currency, format: (amountIDR: number) => formatAsCurrency(amountIDR, currency) };
+  return { currency, format: (amountEUR: number) => formatAsCurrency(amountEUR, currency) };
 }

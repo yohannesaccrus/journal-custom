@@ -129,7 +129,7 @@ function OrderTable({
                     </div>
                   </td>
                   <td className="px-5 py-3 font-medium text-[#1c1c1a] whitespace-nowrap">
-                    <PriceDisplay amountIDR={order.totalPriceAmount} />
+                    <PriceDisplay amountEUR={order.totalPriceAmount} />
                   </td>
                   <td className="px-5 py-3 align-top">
                     <div className="flex flex-col gap-2">

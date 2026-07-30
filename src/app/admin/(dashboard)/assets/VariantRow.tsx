@@ -7,9 +7,9 @@ import VariantThumbnail from "./VariantThumbnail";
 import { useCurrency } from "../CurrencyContext";
 import {
   CURRENCIES,
-  convertToIDR,
+  convertToEUR,
   formatAmountInput,
-  idrToInputValue,
+  eurToInputValue,
   parseAmountInput,
   sanitizeAmountInput,
   toShopifyPriceString,
@@ -50,13 +50,13 @@ export default function VariantRow({
   const router = useRouter();
   const { currency } = useCurrency();
   const currencyCfg = CURRENCIES[currency];
-  const initialPriceIDR = Number(variant.price) || 0;
+  const initialPriceEUR = Number(variant.price) || 0;
   const [name, setName] = useState(variant.title);
   const [sku, setSku] = useState(variant.sku);
-  // Always the canonical IDR value — the input just displays/edits it
+  // Always the canonical EUR value — the input just displays/edits it
   // converted into whatever currency is currently selected, so switching
   // currency mid-session re-renders the same underlying price correctly.
-  const [priceIDR, setPriceIDR] = useState(initialPriceIDR);
+  const [priceEUR, setPriceEUR] = useState(initialPriceEUR);
   const [stock, setStock] = useState(variant.inventoryQuantity);
   const [swatchColor, setSwatchColor] = useState(variant.swatchColor);
   const [saving, setSaving] = useState(false);
@@ -64,19 +64,19 @@ export default function VariantRow({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const priceDisplay = formatAmountInput(idrToInputValue(priceIDR, currency), currency);
+  const priceDisplay = formatAmountInput(eurToInputValue(priceEUR, currency), currency);
 
   const dirty =
     name !== variant.title ||
     sku !== variant.sku ||
-    priceIDR !== initialPriceIDR ||
+    priceEUR !== initialPriceEUR ||
     stock !== variant.inventoryQuantity ||
     swatchColor !== variant.swatchColor;
 
   function reset() {
     setName(variant.title);
     setSku(variant.sku);
-    setPriceIDR(initialPriceIDR);
+    setPriceEUR(initialPriceEUR);
     setStock(variant.inventoryQuantity);
     setSwatchColor(variant.swatchColor);
   }
@@ -87,7 +87,7 @@ export default function VariantRow({
       await onSave(variant, {
         name: name !== variant.title ? name : undefined,
         sku: sku !== variant.sku ? sku : undefined,
-        price: priceIDR !== initialPriceIDR ? toShopifyPriceString(priceIDR) : undefined,
+        price: priceEUR !== initialPriceEUR ? toShopifyPriceString(priceEUR) : undefined,
         stock: stock !== variant.inventoryQuantity ? stock : undefined,
         swatchColor: swatchColor !== variant.swatchColor ? swatchColor : undefined,
       });
@@ -164,7 +164,7 @@ export default function VariantRow({
       </td>
       {!hidePrice && (
         <td className="px-5 py-2.5">
-          <div className={`admin-input-group w-28 ${priceIDR !== initialPriceIDR ? "dirty" : ""}`}>
+          <div className={`admin-input-group w-28 ${priceEUR !== initialPriceEUR ? "dirty" : ""}`}>
             <span className="admin-input-prefix">{currencyCfg.symbol}</span>
             <input
               inputMode="decimal"
@@ -172,7 +172,7 @@ export default function VariantRow({
               disabled={saving || deleting}
               onChange={(e) => {
                 const sanitized = sanitizeAmountInput(e.target.value, currency);
-                setPriceIDR(convertToIDR(parseAmountInput(sanitized, currency), currency));
+                setPriceEUR(convertToEUR(parseAmountInput(sanitized, currency), currency));
               }}
               className="admin-input-bare"
             />

@@ -161,8 +161,8 @@ function JournalPreviewModal({
                       <span className="min-w-0 flex-1 truncate">
                         {c.design} — {c.side.charAt(0).toUpperCase() + c.side.slice(1)}
                       </span>
-                      {c.priceIDR !== undefined && (
-                        <PriceDisplay amountIDR={c.priceIDR} className="shrink-0 font-medium text-[#1c1c1a]" />
+                      {c.priceEUR !== undefined && (
+                        <PriceDisplay amountEUR={c.priceEUR} className="shrink-0 font-medium text-[#1c1c1a]" />
                       )}
                     </li>
                   ))}

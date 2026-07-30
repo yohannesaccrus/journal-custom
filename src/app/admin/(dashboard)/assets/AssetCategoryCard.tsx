@@ -7,7 +7,7 @@ import EditableTitle from "./EditableTitle";
 import VariantRow from "./VariantRow";
 import JournalVariantsPanel from "./JournalVariantsPanel";
 import { useCurrency } from "../CurrencyContext";
-import { CURRENCIES, convertToIDR, formatAmountInput, parseAmountInput, sanitizeAmountInput, toShopifyPriceString } from "@/lib/currency";
+import { CURRENCIES, convertToEUR, formatAmountInput, parseAmountInput, sanitizeAmountInput, toShopifyPriceString } from "@/lib/currency";
 
 const PAGE_SIZE = 5;
 
@@ -443,7 +443,7 @@ export default function AssetCategoryCard({
               <input
                 type="hidden"
                 name="price"
-                value={toShopifyPriceString(convertToIDR(parseAmountInput(newPriceInput, currency), currency))}
+                value={toShopifyPriceString(convertToEUR(parseAmountInput(newPriceInput, currency), currency))}
               />
             </Field>
             <Field label="SKU">
