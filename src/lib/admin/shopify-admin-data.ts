@@ -684,7 +684,7 @@ async function finishJournalCoverProduct(
       node(id: $id) {
         ... on Product {
           options { id name optionValues { id name } }
-          variants(first: 250) { nodes { id } }
+          variants(first: 250) { nodes { id selectedOptions { name value } } }
         }
       }
     }
@@ -692,7 +692,7 @@ async function finishJournalCoverProduct(
   const state = await shopifyAdmin<{
     node: {
       options: { id: string; name: string; optionValues: { id: string; name: string }[] }[];
-      variants: { nodes: { id: string }[] };
+      variants: { nodes: { id: string; selectedOptions: { name: string; value: string }[] }[] };
     } | null;
   }>(STATE_QUERY, { id: productId });
   if (!state.node) throw new Error("Shopify did not return the product after adding options");
@@ -712,26 +712,57 @@ async function finishJournalCoverProduct(
       for (const pen of penHolderValues) combos.push({ cord, pen });
     }
   }
+  const comboKey = (cord: string, pen: string) => `${cord} ${pen}`;
+  const validKeys = new Set(combos.map((c) => comboKey(c.cord, c.pen)));
 
-  if (state.node.variants.nodes.length > 0) {
-    const DELETE_MUTATION = `
-      mutation DeletePlaceholderVariants($productId: ID!, $variantsIds: [ID!]!) {
-        productVariantsBulkDelete(productId: $productId, variantsIds: $variantsIds) {
+  // Shopify auto-generates the full String × Pen Holder cartesian product as
+  // placeholder variants once both options exist — that includes invalid
+  // combos (e.g. "No Cord" + a real pen holder) this catalog never allows.
+  // Only delete those; NEVER delete every variant in one call — wiping a
+  // product down to zero variants can make Shopify drop the options
+  // themselves too, which then breaks the variant-create call right after
+  // with "Option does not exist". Valid placeholders are updated in place
+  // (price + SKU) instead of being replaced.
+  const toDelete: string[] = [];
+  const existingValidKeys = new Set<string>();
+  const toUpdate: { id: string; price: string; sku: string }[] = [];
+  for (const v of state.node.variants.nodes) {
+    const cord = v.selectedOptions.find((o) => o.name === "String")?.value;
+    const pen = v.selectedOptions.find((o) => o.name === "Pen Holder")?.value;
+    const key = cord && pen ? comboKey(cord, pen) : null;
+    if (key && validKeys.has(key)) {
+      existingValidKeys.add(key);
+      toUpdate.push({ id: v.id, price, sku: journalSku(handle, cord!, pen!) });
+    } else {
+      toDelete.push(v.id);
+    }
+  }
+
+  if (toUpdate.length > 0) {
+    const UPDATE_MUTATION = `
+      mutation UpdateCoverPlaceholders($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+        productVariantsBulkUpdate(productId: $productId, variants: $variants) {
           userErrors { field message }
         }
       }
     `;
-    const ids = state.node.variants.nodes.map((v) => v.id);
-    for (let i = 0; i < ids.length; i += 100) {
-      const chunk = ids.slice(i, i + 100);
-      const delRes = await shopifyAdmin<{
-        productVariantsBulkDelete: { userErrors: { field: string[]; message: string }[] };
-      }>(DELETE_MUTATION, { productId, variantsIds: chunk });
-      const delErrs = delRes.productVariantsBulkDelete.userErrors;
-      if (delErrs.length) throw new Error(`Delete placeholder variants: ${delErrs.map((e) => e.message).join("; ")}`);
+    for (let i = 0; i < toUpdate.length; i += 100) {
+      const chunk = toUpdate.slice(i, i + 100);
+      const updRes = await shopifyAdmin<{
+        productVariantsBulkUpdate: { userErrors: { field: string[]; message: string }[] };
+      }>(UPDATE_MUTATION, {
+        productId,
+        variants: chunk.map((v) => ({ id: v.id, price: v.price, inventoryItem: { sku: v.sku } })),
+      });
+      const updErrs = updRes.productVariantsBulkUpdate.userErrors;
+      if (updErrs.length) throw new Error(`Update combo variants: ${updErrs.map((e) => e.message).join("; ")}`);
     }
   }
 
+  // Create any valid combo Shopify didn't already generate a placeholder for
+  // BEFORE deleting the invalid ones below — so the product always has at
+  // least one valid variant, and is never briefly reduced to zero.
+  const missingCombos = combos.filter((c) => !existingValidKeys.has(comboKey(c.cord, c.pen)));
   const created = await bulkCreateJournalVariants(
     productId,
     handle,
@@ -739,11 +770,29 @@ async function finishJournalCoverProduct(
     style,
     cordOption.id,
     penOption.id,
-    combos,
+    missingCombos,
     price
   );
 
-  return { productId, handle, created };
+  if (toDelete.length > 0) {
+    const DELETE_MUTATION = `
+      mutation DeleteInvalidComboVariants($productId: ID!, $variantsIds: [ID!]!) {
+        productVariantsBulkDelete(productId: $productId, variantsIds: $variantsIds) {
+          userErrors { field message }
+        }
+      }
+    `;
+    for (let i = 0; i < toDelete.length; i += 100) {
+      const chunk = toDelete.slice(i, i + 100);
+      const delRes = await shopifyAdmin<{
+        productVariantsBulkDelete: { userErrors: { field: string[]; message: string }[] };
+      }>(DELETE_MUTATION, { productId, variantsIds: chunk });
+      const delErrs = delRes.productVariantsBulkDelete.userErrors;
+      if (delErrs.length) throw new Error(`Delete invalid combo variants: ${delErrs.map((e) => e.message).join("; ")}`);
+    }
+  }
+
+  return { productId, handle, created: created + toUpdate.length };
 }
 
 /**
