@@ -69,11 +69,16 @@ export function buildCartItems(
   }
   // Charm placement is freeform, so it can't be baked into the variant photo —
   // link to a read-only page that renders exactly what the customer designed.
-  // Also set as a `properties` value below (so it still shows on the cart page
-  // before checkout), but the cart-level `attributes` copy is the one that
-  // actually survives once the order is created — see `CartPayload`.
+  // Kept as a *hidden* line property (Shopify hides "_"-prefixed keys from
+  // cart/checkout UI, per the note above) rather than customer-visible: the
+  // raw encoded URL is 200+ characters, un-clickable as plain checkout text,
+  // and was crowding out Shopify's native discount-code field in the order
+  // summary. The customer already gets a real clickable link/button for this
+  // at the pre-payment confirmation step, and again in the order-confirmation
+  // email — this copy is just for admin/fulfillment reference. The cart-level
+  // `attributes` copy below is still the one that survives Bundle explosion.
   const designUrl = buildDesignUrl(designPageOrigin, selection);
-  properties["✨ Design page Link"] = designUrl;
+  properties["_✨ Design page Link"] = designUrl;
   properties["_bundle_id"] = bundleId;
 
   // Patch is now a real 4th option baked into the journal variant itself
