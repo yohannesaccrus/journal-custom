@@ -44,10 +44,6 @@ export default function AssetCategoryCard({
   const [submittingVariant, setSubmittingVariant] = useState(false);
   const [journalSync, setJournalSync] = useState<JournalSyncResult[] | null>(null);
   const [journalDeleteSync, setJournalDeleteSync] = useState<JournalDeleteResult[] | null>(null);
-  const [migrating, setMigrating] = useState(false);
-  const [migrateResult, setMigrateResult] = useState<{ coverTitle: string; created: number; skipped: boolean; error?: string }[] | null>(
-    null
-  );
 
   // String, Pen Holder and Patch values also live as option values on every
   // sellable journal cover product — adding one here needs to propagate
@@ -277,24 +273,6 @@ export default function AssetCategoryCard({
     }
   }
 
-  async function runPatchMigration() {
-    setError(null);
-    setMigrateResult(null);
-    setMigrating(true);
-    try {
-      const res = await fetch("/api/admin/assets/migrate-patch", { method: "POST" });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error ?? "Migration failed");
-        return;
-      }
-      setMigrateResult(json.results);
-      refresh();
-    } finally {
-      setMigrating(false);
-    }
-  }
-
   return (
     <div
       id={isCoverTracker ? "asset-cover-card" : undefined}
@@ -308,16 +286,6 @@ export default function AssetCategoryCard({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {isPatch && (
-            <button
-              onClick={runPatchMigration}
-              disabled={migrating}
-              title="Adds the Patch option to any cover created before Patch became a real 4th variant option — safe to run more than once, already-migrated covers are skipped."
-              className="rounded-full border border-[#d8d5cb] px-3.5 py-1.5 text-xs font-medium text-[#6b6a63] transition-colors hover:bg-[#f2ece1] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {migrating ? "Migrating…" : "Migrate existing covers"}
-            </button>
-          )}
           {primaryOption && (
             <button
               onClick={() => setAdding((v) => !v)}
@@ -338,41 +306,6 @@ export default function AssetCategoryCard({
         <p className="animate-[fadeIn_0.15s_ease-out] border-b border-[#f6dcd6] bg-gradient-to-r from-[#fbe9e7] to-[#f8dcd8] px-5 py-2 text-xs text-[#b5342c]">
           {error}
         </p>
-      )}
-
-      {migrateResult && (
-        <div className="animate-[fadeIn_0.15s_ease-out] border-b border-[#eae7de] bg-gradient-to-r from-[#f7f9f6] to-[#eef4ef] px-5 py-4">
-          <div className="flex items-center justify-between gap-4">
-            <p className="text-xs font-medium text-[#1c1c1a]">
-              Migrated {migrateResult.filter((r) => r.created > 0).length}/{migrateResult.length} covers
-              {migrateResult.some((r) => r.error) && (
-                <span className="ml-1.5 text-[#b5342c]">· {migrateResult.filter((r) => r.error).length} failed</span>
-              )}
-              {migrateResult.some((r) => r.skipped) && (
-                <span className="ml-1.5 text-[#a89a80]">· {migrateResult.filter((r) => r.skipped).length} already migrated</span>
-              )}
-            </p>
-            <button
-              type="button"
-              onClick={() => setMigrateResult(null)}
-              className="shrink-0 text-xs text-[#a89a80] hover:text-[#1c1c1a]"
-            >
-              Dismiss
-            </button>
-          </div>
-          <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-            {migrateResult.map((r) => (
-              <li key={r.coverTitle} className="flex items-center gap-1.5 text-xs text-[#6b6a63]">
-                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${r.error ? "bg-[#b5342c]" : "bg-[#1f7a4d]"}`} />
-                {r.coverTitle}
-                {r.error ? ` — ${r.error}` : r.skipped ? " — already had Patch" : ` — ${r.created} variants added`}
-              </li>
-            ))}
-          </ul>
-          <p className="mt-2.5 text-[11px] text-[#a89a80]">
-            New Star/Heart combos start at 0 stock and no photo — set those per combo in the Cover table.
-          </p>
-        </div>
       )}
 
       {syncsToJournal && (
