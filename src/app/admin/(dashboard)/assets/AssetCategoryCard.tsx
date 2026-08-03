@@ -615,7 +615,8 @@ export default function AssetCategoryCard({
         </div>
       )}
 
-      <table className="w-full text-sm">
+      <div className="overflow-x-auto">
+      <table className="w-full min-w-[720px] text-sm">
         <thead>
           <tr className="bg-gradient-to-r from-[#f2ece1] to-[#ece4d3] text-left text-xs text-[#6b6a63] uppercase tracking-wide">
             <th className="px-5 py-2.5 font-medium">Image</th>
@@ -666,6 +667,7 @@ export default function AssetCategoryCard({
           )}
         </tbody>
       </table>
+      </div>
 
       {isPaginated && totalPages > 1 && (
         <div className="flex items-center justify-between gap-4 border-t border-[#f0ece0]/80 bg-white/30 px-5 py-3">

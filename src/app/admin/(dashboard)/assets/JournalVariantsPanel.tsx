@@ -91,8 +91,8 @@ export default function JournalVariantsPanel({
         </span>
       </div>
 
-      <div className="max-h-96 overflow-y-auto">
-        <table className="w-full text-xs">
+      <div className="max-h-96 overflow-x-auto overflow-y-auto">
+        <table className="w-full min-w-[640px] text-xs">
           <thead>
             <tr className="bg-[#f2ece1] text-left text-[10px] uppercase tracking-wide text-[#6b6a63]">
               <th className="px-5 py-2 font-medium">Image</th>

@@ -1,5 +1,6 @@
 import { fetchJournalOrders } from "@/lib/admin/shopify-admin-data";
 import { AdminNav } from "./AdminNav";
+import { AdminMobileNav } from "./AdminMobileNav";
 import { CurrencyProvider } from "./CurrencyContext";
 import { CurrencySwitcher } from "./CurrencySwitcher";
 
@@ -18,13 +19,15 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <CurrencyProvider>
       <CurrencySwitcher />
+      <AdminMobileNav orderCount={orderCount} />
       <div className="min-h-screen bg-gradient-to-br from-[#faf8f3] via-[#f7f5f0] to-[#efe9dc] text-[#1c1c1a]">
         <div className="flex min-h-screen">
           {/* `sticky` + `h-screen` keep this pinned to the viewport regardless
               of how tall the page content is — previously it stretched to
               match the main content's height, which pushed "Log out" far
-              below the fold on any scrollable page. */}
-          <aside className="sticky top-0 self-start h-screen relative w-60 shrink-0 overflow-hidden bg-gradient-to-b from-[#154a3f] via-[#0f3d34] to-[#0a2b25] text-white flex flex-col">
+              below the fold on any scrollable page. Hidden below `md:` — see
+              AdminMobileNav for the equivalent drawer on small screens. */}
+          <aside className="sticky top-0 z-40 hidden h-screen w-60 shrink-0 self-start overflow-hidden bg-gradient-to-b from-[#154a3f] via-[#0f3d34] to-[#0a2b25] text-white md:relative md:flex md:flex-col">
             {/* soft glow accents — purely decorative */}
             <div className="pointer-events-none absolute -top-16 -left-16 h-56 w-56 rounded-full bg-[#b1632f]/30 blur-[80px]" />
             <div className="pointer-events-none absolute bottom-0 -right-12 h-52 w-52 rounded-full bg-white/15 blur-[80px]" />
@@ -46,7 +49,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               </form>
             </div>
           </aside>
-          <main className="relative flex-1 min-w-0 px-8 py-8">
+          <main className="relative flex-1 min-w-0 px-4 pt-20 pb-8 sm:px-6 md:px-8 md:pt-8">
             {/* ambient blurred color behind the glass cards, fixed to the
                 viewport so it reads clearly through the blur no matter how
                 far the page scrolls */}

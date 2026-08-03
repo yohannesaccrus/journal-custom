@@ -20,8 +20,8 @@ export function NeedsAttentionTable({ rows }: { rows: NeedsAttentionRow[] }) {
 
   return (
     <div>
-      <div className="rounded-xl border border-white/70 bg-white/45 backdrop-blur-2xl ring-1 ring-inset ring-white/50 shadow-[0_8px_30px_-12px_rgba(15,61,52,0.15)] overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-xl border border-white/70 bg-white/45 backdrop-blur-2xl ring-1 ring-inset ring-white/50 shadow-[0_8px_30px_-12px_rgba(15,61,52,0.15)]">
+        <table className="w-full min-w-[520px] text-sm">
           <thead>
             <tr className="bg-gradient-to-r from-[#f2ece1] to-[#ece4d3] text-left text-xs text-[#6b6a63] uppercase tracking-wide">
               <th className="px-4 py-2.5 font-medium">Product</th>
