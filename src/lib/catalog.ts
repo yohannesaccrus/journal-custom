@@ -12,12 +12,13 @@ export const SWATCH_HEX: Record<string, string> = {
   "Light Pink": "#f0c4d0",
 };
 
-/** Legacy fallback for the original 2 classic covers, created before category was tracked as a tag. */
+/** Legacy fallback for covers created before category was tracked as a tag. */
 const CLASSIC_HANDLES = new Set(["sanaya-journal-classic-black", "sanaya-journal-classic-brown"]);
 
+/** Every "tag:journal" product actually carries a plain "classic"/"pattern" tag (not "category:*" — that prefix was never what got written to Shopify). */
 export const COVER_CATEGORY_TAG: Record<CoverCategory, string> = {
-  classic: "category:classic",
-  pattern: "category:pattern",
+  classic: "classic",
+  pattern: "pattern",
 };
 
 function coverCategory(p: ShopifyJournalProduct): CoverCategory {
