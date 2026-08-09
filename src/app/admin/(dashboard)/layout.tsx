@@ -27,7 +27,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               match the main content's height, which pushed "Log out" far
               below the fold on any scrollable page. Hidden below `md:` — see
               AdminMobileNav for the equivalent drawer on small screens. */}
-          <aside className="sticky top-0 z-40 hidden h-screen w-60 shrink-0 self-start overflow-hidden bg-gradient-to-b from-[#154a3f] via-[#0f3d34] to-[#0a2b25] text-white md:relative md:flex md:flex-col">
+          <aside className="sticky top-0 z-40 hidden h-screen w-60 shrink-0 self-start overflow-hidden bg-gradient-to-b from-[#154a3f] via-[#0f3d34] to-[#0a2b25] text-white md:sticky md:flex md:flex-col">
             {/* soft glow accents — purely decorative */}
             <div className="pointer-events-none absolute -top-16 -left-16 h-56 w-56 rounded-full bg-[#b1632f]/30 blur-[80px]" />
             <div className="pointer-events-none absolute bottom-0 -right-12 h-52 w-52 rounded-full bg-white/15 blur-[80px]" />
