@@ -2,6 +2,7 @@ import "server-only";
 import {
   buildCharmEntries,
   buildCoverEntries,
+  EDGE_LABEL,
   resolveFrontImage,
   resolveSideImage,
   resolveVariant,
@@ -65,7 +66,10 @@ export function buildOrderJournalPreview(
       label: "Pen holder",
       value: spec.penHolder === "none" ? "None" : spec.penHolder === "black" ? "Black" : "Brown",
     },
-    { label: "Corner edge", value: spec.edge && spec.penHolder !== "none" ? "Yes" : "No" },
+    {
+      label: "Corner edge",
+      value: spec.edge !== "none" && spec.penHolder !== "none" ? EDGE_LABEL[spec.edge] : "None",
+    },
     {
       label: "Notebooks",
       value:

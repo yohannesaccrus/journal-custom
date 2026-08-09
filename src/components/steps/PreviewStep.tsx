@@ -1,6 +1,6 @@
 "use client";
 
-import { buildCoverEntries, charmsTotal, resolveVariant } from "@/lib/catalog";
+import { buildCoverEntries, charmsTotal, EDGE_LABEL, resolveVariant } from "@/lib/catalog";
 import type { ShopifyJournalProduct } from "@/lib/shopify-admin";
 import { useCurrencyFormat } from "@/components/CurrencyContext";
 import type { JournalSelection } from "@/lib/types";
@@ -50,7 +50,10 @@ export function PreviewStep({ products, product, charmProduct, selection, onAddT
     { label: "String", value: selection.cord !== "none" ? selection.cord : "None" },
     { label: "Patch", value: selection.patch === "none" ? "None" : selection.patch.charAt(0).toUpperCase() + selection.patch.slice(1) },
     { label: "Pen holder", value: selection.penHolder === "none" ? "None" : selection.penHolder === "black" ? "Black" : "Brown" },
-    { label: "Corner edge", value: selection.edge && selection.penHolder !== "none" ? "Yes" : "No" },
+    {
+      label: "Corner edge",
+      value: selection.edge !== "none" && selection.penHolder !== "none" ? EDGE_LABEL[selection.edge] : "None",
+    },
     { label: "Charms", value: charmSummary },
     { label: "Notebooks", value: notebookSummary },
     { label: "SKU", value: variant.sku },

@@ -1,17 +1,22 @@
 "use client";
 
-import { buildCordEntries, buildPenHolderEntries, isEdgeInStock, resolveVariant } from "@/lib/catalog";
+import { buildCordEntries, buildPenHolderEntries, EDGE_LABEL, EDGE_VALUES, isEdgeInStock, resolveVariant } from "@/lib/catalog";
 import type { ShopifyJournalProduct } from "@/lib/shopify-admin";
 import { useCurrencyFormat } from "@/components/CurrencyContext";
 import { Swatch } from "@/components/Swatch";
 import { DisabledHint } from "@/components/DisabledHint";
 import type { JournalSelection } from "@/lib/types";
 
+const EDGE_SWATCH: Record<Exclude<JournalSelection["edge"], "none">, string> = {
+  gold: "#c9a227",
+  silver: "#c0c0c0",
+};
+
 interface PenHolderStepProps {
   product: ShopifyJournalProduct;
   selection: JournalSelection;
   onPenHolderChange: (slug: JournalSelection["penHolder"]) => void;
-  onEdgeChange: (edge: boolean) => void;
+  onEdgeChange: (edge: JournalSelection["edge"]) => void;
   cordSwatchByLabel?: Record<string, string>;
   penHolderSwatchByLabel?: Record<string, string>;
 }
@@ -35,16 +40,19 @@ export function PenHolderStep({
   const effectiveCord =
     selection.cord !== "none" ? selection.cord : buildCordEntries(product, cordSwatchByLabel)[0]?.label ?? selection.cord;
   const entries = buildPenHolderEntries(product, effectiveCord, selection.patch, penHolderSwatchByLabel);
-  const edgeInStock =
-    selection.penHolder !== "none" ? isEdgeInStock(product, effectiveCord, selection.penHolder, selection.patch) : true;
+  const edgeStockByColor = Object.fromEntries(
+    EDGE_VALUES.map((color) => [
+      color,
+      selection.penHolder !== "none" ? isEdgeInStock(product, effectiveCord, selection.penHolder, color, selection.patch) : true,
+    ])
+  ) as Record<Exclude<JournalSelection["edge"], "none">, boolean>;
 
-  const priceAt = (penHolder: JournalSelection["penHolder"], edge: boolean) => {
+  const priceAt = (penHolder: JournalSelection["penHolder"], edge: JournalSelection["edge"]) => {
     const cord = penHolder === "none" ? selection.cord : effectiveCord;
     return Number(resolveVariant(product, { ...selection, cord, penHolder, edge }).price);
   };
 
-  const basePrice = priceAt("none", false);
-  const edgeDelta = hasPenHolder ? priceAt(selection.penHolder, true) - priceAt(selection.penHolder, false) : 0;
+  const basePrice = priceAt("none", "none");
 
   return (
     <div className="step-fade-in">
@@ -60,7 +68,7 @@ export function PenHolderStep({
         />
         {entries.map((o) => {
           const slug = o.label.toLowerCase() as JournalSelection["penHolder"];
-          const delta = priceAt(slug, false) - basePrice;
+          const delta = priceAt(slug, "none") - basePrice;
           return (
             <DisabledHint key={o.label} message={!o.inStock ? "Out of stock" : null}>
               <Swatch
@@ -81,32 +89,24 @@ export function PenHolderStep({
         <p className="mt-1 text-xs text-[var(--muted)]">
           Reinforced leather corners on all four edges of the cover.
         </p>
-        <div className="mt-3 flex gap-3">
-          <button
-            type="button"
-            disabled={!hasPenHolder}
-            onClick={() => onEdgeChange(false)}
-            className={`px-4 py-1.5 rounded-[var(--radius-button)] text-xs font-medium border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-              !selection.edge ? "border-[var(--accent)] bg-[var(--accent)] text-white" : "border-[var(--border)] text-[var(--muted)]"
-            }`}
-          >
-            No edge
-          </button>
-          <DisabledHint message={hasPenHolder && !edgeInStock ? "Out of stock" : null}>
-            <button
-              type="button"
-              disabled={!hasPenHolder || !edgeInStock}
-              onClick={() => onEdgeChange(true)}
-              className={`px-4 py-1.5 rounded-[var(--radius-button)] text-xs font-medium border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                selection.edge ? "border-[var(--accent)] bg-[var(--accent)] text-white" : "border-[var(--border)] text-[var(--muted)]"
-              }`}
-            >
-              Add edge{" "}
-              <span className={selection.edge ? "text-white/70" : "text-[var(--brand)]"}>
-                +{format(edgeDelta)}
-              </span>
-            </button>
-          </DisabledHint>
+        <div className="mt-3 flex flex-wrap gap-4">
+          <Swatch label="No edge" selected={selection.edge === "none"} onClick={() => onEdgeChange("none")} color="#ffffff" />
+          {EDGE_VALUES.map((color) => {
+            const inStockColor = edgeStockByColor[color];
+            const delta = priceAt(selection.penHolder, color) - priceAt(selection.penHolder, "none");
+            return (
+              <DisabledHint key={color} message={hasPenHolder && !inStockColor ? "Out of stock" : null}>
+                <Swatch
+                  label={EDGE_LABEL[color]}
+                  selected={selection.edge === color}
+                  onClick={() => onEdgeChange(color)}
+                  color={EDGE_SWATCH[color]}
+                  priceLabel={hasPenHolder ? `+${format(delta)}` : undefined}
+                  disabled={!hasPenHolder || !inStockColor}
+                />
+              </DisabledHint>
+            );
+          })}
         </div>
         {!hasPenHolder && (
           <p className="mt-2 text-xs text-[var(--faint)]">Select a pen holder color to unlock corner edges.</p>

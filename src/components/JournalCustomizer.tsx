@@ -159,7 +159,7 @@ function JournalCustomizerContent({
     cover: buildCoverEntries(products).find((c) => c.category === "classic")?.handle ?? products[0]?.handle ?? "",
     cord: "none",
     penHolder: "none",
-    edge: false,
+    edge: "none",
     patch: "none",
     charms: [],
     notebooks: {},
@@ -374,7 +374,7 @@ function JournalCustomizerContent({
     if (cord === "none") {
       // Patch requires a cord, and a pen holder can't exist without one
       // either (no such Shopify variant) — both reset along with it.
-      updateSelection({ cord, patch: "none", penHolder: "none", edge: false });
+      updateSelection({ cord, patch: "none", penHolder: "none", edge: "none" });
     } else {
       updateSelection({ cord });
     }
@@ -382,7 +382,7 @@ function JournalCustomizerContent({
 
   function handlePenHolderChange(penHolder: JournalSelection["penHolder"]) {
     if (penHolder === "none") {
-      updateSelection({ penHolder, edge: false });
+      updateSelection({ penHolder, edge: "none" });
       return;
     }
     // Pen holder is selectable without a cord in the UI, but Shopify only

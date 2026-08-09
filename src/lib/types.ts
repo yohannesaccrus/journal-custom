@@ -20,7 +20,8 @@ export interface JournalSelection {
   /** Shopify Cord option value (e.g. "Light Blue"), or "none" */
   cord: string | "none";
   penHolder: "none" | "black" | "brown";
-  edge: boolean;
+  /** Corner-edge accent color, or "none". Encoded on the Pen Holder option as a suffix, e.g. "Black + Gold Edge" (see `stringValueFor`/`resolveVariant` in catalog.ts). */
+  edge: "none" | "gold" | "silver";
   /** Patch sitting at the cord's knot — only meaningful when a cord is chosen. Baked into the front photo itself, not a floating overlay. */
   patch: "none" | "brown-heart" | "brown-star" | "red-heart" | "red-star" | "sparkle-heart" | "sparkle-star";
   charms: PlacedCharm[];

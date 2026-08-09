@@ -59,7 +59,7 @@ export function decodeDesign(encoded: string): JournalSelection | null {
       cover: compact.c,
       cord: compact.cd,
       penHolder: compact.p,
-      edge: compact.e,
+      edge: typeof compact.e === "boolean" ? (compact.e ? "gold" : "none") : (compact.e ?? "none"),
       patch: compact.pa ?? "none",
       charms: (compact.ch as [number, string, CharmSide, number, number][]).map(([variantId, design, side, x, y]) => ({
         instanceId: `${variantId}-${side}-${x}-${y}`,

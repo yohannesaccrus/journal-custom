@@ -1,3 +1,4 @@
+import { EDGE_LABEL } from "./catalog";
 import type { ShopifyJournalProduct, ShopifyVariant } from "./shopify-admin";
 import type { JournalSelection } from "./types";
 import { buildDesignUrl, encodeDesign } from "./design-link";
@@ -61,7 +62,7 @@ export function buildCartItems(
   }
   if (selection.penHolder !== "none") {
     properties["Pen Holder"] = selection.penHolder === "black" ? "Black" : "Brown";
-    properties["Corner Edge"] = selection.edge ? "Yes" : "No";
+    properties["Corner Edge"] = selection.edge === "none" ? "No" : EDGE_LABEL[selection.edge];
   }
   const notebookEntries = Object.entries(selection.notebooks);
   if (notebookEntries.length > 0) {

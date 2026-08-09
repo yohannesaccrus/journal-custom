@@ -3,6 +3,7 @@ import { NotebookIcon } from "@/components/NotebookIcon";
 import {
   buildCharmEntries,
   buildCoverEntries,
+  EDGE_LABEL,
   NOTEBOOKS_PER_JOURNAL,
   PATCH_LABEL,
   resolveFrontImage,
@@ -68,7 +69,10 @@ export default async function DesignPage({ searchParams }: DesignPageProps) {
       label: "Pen holder",
       value: selection.penHolder === "none" ? "None" : selection.penHolder === "black" ? "Black" : "Brown",
     },
-    { label: "Corner edge", value: selection.edge && selection.penHolder !== "none" ? "Yes" : "No" },
+    {
+      label: "Corner edge",
+      value: selection.edge !== "none" && selection.penHolder !== "none" ? EDGE_LABEL[selection.edge] : "None",
+    },
     {
       label: "Notebooks",
       value:

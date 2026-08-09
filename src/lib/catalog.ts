@@ -148,6 +148,18 @@ export function buildCordEntries(product: ShopifyJournalProduct, swatchByLabel: 
   });
 }
 
+export const EDGE_VALUES = ["gold", "silver"] as const;
+export const EDGE_LABEL: Record<Exclude<JournalSelection["edge"], "none">, string> = {
+  gold: "Gold",
+  silver: "Silver",
+};
+
+/** Builds the Pen Holder option value for a given pen holder + edge color, e.g. "Black + Gold Edge". `penHolder` must not be "none". */
+function penHolderValueFor(penHolder: Exclude<JournalSelection["penHolder"], "none">, edge: JournalSelection["edge"]): string {
+  const cap = penHolder === "black" ? "Black" : "Brown";
+  return edge === "none" ? cap : `${cap} + ${EDGE_LABEL[edge]} Edge`;
+}
+
 export interface PenHolderEntry {
   label: string;
   swatch: string;
@@ -165,7 +177,7 @@ export function buildPenHolderEntries(
   const values = new Set(
     product.variants
       .map((v) => optionValue(v, "Pen Holder"))
-      .filter((v): v is string => !!v && v !== "None" && !v.includes("+ Edge"))
+      .filter((v): v is string => !!v && v !== "None" && !v.includes(" + "))
   );
   return Array.from(values).map((label) => {
     const variant = product.variants.find(
@@ -175,17 +187,17 @@ export function buildPenHolderEntries(
   });
 }
 
-/** Whether the corner-edge add-on is in stock for the current cord [+ patch] + pen holder. */
+/** Whether the given corner-edge color is in stock for the current cord [+ patch] + pen holder. */
 export function isEdgeInStock(
   product: ShopifyJournalProduct,
   cord: string,
   penHolder: Exclude<JournalSelection["penHolder"], "none">,
+  edge: Exclude<JournalSelection["edge"], "none">,
   patch: JournalSelection["patch"] = "none"
 ): boolean {
   const stringValue = stringValueFor(cord, patch);
-  const cap = penHolder === "black" ? "Black" : "Brown";
   const variant = product.variants.find(
-    (v) => optionValue(v, "String") === stringValue && optionValue(v, "Pen Holder") === `${cap} + Edge`
+    (v) => optionValue(v, "String") === stringValue && optionValue(v, "Pen Holder") === penHolderValueFor(penHolder, edge)
   );
   return inStock(variant);
 }
@@ -198,11 +210,7 @@ export function resolveVariant(
   // The patch is stitched onto the string itself, so it can never apply
   // without one -- same rule enforced client-side in PatchStep/JournalCustomizer.
   const stringValue = stringValueFor(selection.cord, selection.patch);
-  let penValue = "None";
-  if (selection.penHolder !== "none") {
-    const cap = selection.penHolder === "black" ? "Black" : "Brown";
-    penValue = selection.edge ? `${cap} + Edge` : cap;
-  }
+  const penValue = selection.penHolder === "none" ? "None" : penHolderValueFor(selection.penHolder, selection.edge);
 
   const match = product.variants.find(
     (v) => optionValue(v, "String") === stringValue && optionValue(v, "Pen Holder") === penValue
@@ -248,9 +256,11 @@ const CORD_SLUG: Record<string, string> = {
 
 /**
  * Resolves the generated back/side charm-placement view matching the current
- * cord + edge selection (pen holder is irrelevant to these views). These are
- * stand-in renders — no back/side photography exists — uploaded as extra
- * product media tagged e.g. "back-cord-red-edge" / "side-cord-none".
+ * cord [+ edge color] selection (pen holder is irrelevant to these views).
+ * Uploaded as extra product media tagged e.g. "back-cord-red-corner-gold" /
+ * "side-cord-none". Only the back view has real corner-edge photography —
+ * side never shows the corner accents (no such assets), so its alt always
+ * omits the edge color regardless of selection.
  *
  * The patch sits on the cord's front-facing knot only, so it never affects
  * back/side — those views always use the plain cord[+edge] render regardless
@@ -263,7 +273,8 @@ export function resolveSideImage(
 ): string | undefined {
   const cordSlug = selection.cord === "none" ? "none" : (CORD_SLUG[selection.cord] ?? "none");
 
-  const edgeSuffix = selection.edge && selection.cord !== "none" ? "-edge" : "";
+  const edgeSuffix =
+    view === "back" && selection.edge !== "none" && selection.cord !== "none" ? `-corner-${selection.edge}` : "";
   const alt = `${view}-cord-${cordSlug}${edgeSuffix}`;
   return product.media.find((m) => m.alt === alt)?.url;
 }
@@ -316,11 +327,11 @@ export function buildPatchEntries(
   product: ShopifyJournalProduct,
   cord: JournalSelection["cord"],
   penHolder: JournalSelection["penHolder"],
-  edge: boolean,
+  edge: JournalSelection["edge"],
   patchProduct?: ShopifyJournalProduct
 ): PatchEntry[] {
   if (cord === "none") return [];
-  const penValue = penHolder === "none" ? "None" : `${penHolder === "black" ? "Black" : "Brown"}${edge ? " + Edge" : ""}`;
+  const penValue = penHolder === "none" ? "None" : penHolderValueFor(penHolder, edge);
   const findVariant = (patch: JournalSelection["patch"]) =>
     product.variants.find(
       (v) => optionValue(v, "String") === stringValueFor(cord, patch) && optionValue(v, "Pen Holder") === penValue

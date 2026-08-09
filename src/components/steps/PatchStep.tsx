@@ -12,7 +12,7 @@ interface PatchStepProps {
   patchProduct?: ShopifyJournalProduct;
   cord: JournalSelection["cord"];
   penHolder: JournalSelection["penHolder"];
-  edge: boolean;
+  edge: JournalSelection["edge"];
   cordSelected: boolean;
   patch: JournalSelection["patch"];
   onPatchChange: (value: JournalSelection["patch"]) => void;

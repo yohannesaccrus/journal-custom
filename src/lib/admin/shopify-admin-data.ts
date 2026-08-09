@@ -414,7 +414,8 @@ export async function syncJournalOptionRename(
     for (const value of option.optionValues) {
       if (tag === "pen-holder") {
         if (value.name === oldName) updates.push({ id: value.id, name: newName });
-        else if (value.name === `${oldName} + Edge`) updates.push({ id: value.id, name: `${newName} + Edge` });
+        else if (value.name === `${oldName} + Gold Edge`) updates.push({ id: value.id, name: `${newName} + Gold Edge` });
+        else if (value.name === `${oldName} + Silver Edge`) updates.push({ id: value.id, name: `${newName} + Silver Edge` });
       } else if (tag === "cover") {
         if (value.name === oldName) updates.push({ id: value.id, name: newName });
       } else if (tag === "string") {
@@ -921,18 +922,20 @@ export async function syncJournalOptionAdd(componentTags: string[], newValue: st
         );
         results.push({ coverHandle: product.handle, coverTitle: product.title, created, skipped: false });
       } else if (tag === "pen-holder") {
-        const edgeValue = `${newValue} + Edge`;
-        if (penOption.optionValues.some((v) => v.name === newValue || v.name === edgeValue)) {
+        const goldEdgeValue = `${newValue} + Gold Edge`;
+        const silverEdgeValue = `${newValue} + Silver Edge`;
+        if (penOption.optionValues.some((v) => v.name === newValue || v.name === goldEdgeValue || v.name === silverEdgeValue)) {
           results.push({ coverHandle: product.handle, coverTitle: product.title, created: 0, skipped: true });
           continue;
         }
-        await addOptionValues(product.id, penOption.id, [newValue, edgeValue]);
+        await addOptionValues(product.id, penOption.id, [newValue, goldEdgeValue, silverEdgeValue]);
         // Every non-"No Cord" String value (base cords AND their
         // patch-suffixed forms) is a valid pairing.
         const cordValues = cordOption.optionValues.map((v) => v.name).filter((v) => v !== "No Cord");
         const combos = cordValues.flatMap((cord) => [
           { cord, pen: newValue },
-          { cord, pen: edgeValue },
+          { cord, pen: goldEdgeValue },
+          { cord, pen: silverEdgeValue },
         ]);
         const created = await bulkCreateJournalVariants(
           product.id,
@@ -1003,7 +1006,7 @@ async function fetchPriceComponents(): Promise<{
     products: { nodes: { tags: string[]; variants: { nodes: { title: string; price: string }[] } }[] };
   }>(
     `query PriceComponents {
-      products(first: 20, query: "tag:cover OR tag:string OR tag:pen-holder OR tag:patch") {
+      products(first: 20, query: "tag:cover OR tag:string OR tag:pen-holder OR tag:patch OR tag:edge") {
         nodes {
           tags
           variants(first: 100) { nodes { title price } }
@@ -1014,10 +1017,12 @@ async function fetchPriceComponents(): Promise<{
 
   const coverPrice: Record<string, number> = {};
   const stringDelta: Record<string, number> = { "No Cord": 0 };
-  // "+ Edge" combos aren't tracked as separate pen-holder rows -- they carry
-  // the same add-on price as their plain counterpart.
   const penHolderDelta: Record<string, number> = { None: 0 };
   const patchDelta: Record<string, number> = { None: 0 };
+  // "+ Gold/Silver Edge" combos aren't tracked as separate pen-holder rows --
+  // they carry the plain pen holder's own add-on price plus the matching
+  // color variant's own price from the Corner Edge tracker.
+  const edgeDelta: Record<string, number> = { Gold: 0, Silver: 0 };
 
   for (const product of data.products.nodes) {
     if (product.tags.includes("cover")) {
@@ -1025,13 +1030,17 @@ async function fetchPriceComponents(): Promise<{
     } else if (product.tags.includes("string")) {
       for (const v of product.variants.nodes) stringDelta[v.title] = Number(v.price);
     } else if (product.tags.includes("pen-holder")) {
-      for (const v of product.variants.nodes) {
-        penHolderDelta[v.title] = Number(v.price);
-        penHolderDelta[`${v.title} + Edge`] = Number(v.price);
-      }
+      for (const v of product.variants.nodes) penHolderDelta[v.title] = Number(v.price);
     } else if (product.tags.includes("patch")) {
       for (const v of product.variants.nodes) patchDelta[v.title] = Number(v.price);
+    } else if (product.tags.includes("edge")) {
+      for (const v of product.variants.nodes) edgeDelta[v.title] = Number(v.price);
     }
+  }
+  for (const base of Object.keys(penHolderDelta)) {
+    if (base === "None") continue;
+    penHolderDelta[`${base} + Gold Edge`] = penHolderDelta[base] + (edgeDelta.Gold ?? 0);
+    penHolderDelta[`${base} + Silver Edge`] = penHolderDelta[base] + (edgeDelta.Silver ?? 0);
   }
   return { coverPrice, stringDelta, penHolderDelta, patchDelta };
 }
@@ -1122,7 +1131,7 @@ async function fetchStockComponents(): Promise<{
   stringStock: Record<string, number>;
   penHolderStock: Record<string, number>;
   patchStock: Record<string, number>;
-  edgeStock: number | null;
+  edgeStock: Record<string, number>;
 }> {
   const data = await shopifyAdmin<{
     products: { nodes: { tags: string[]; variants: { nodes: { title: string; inventoryQuantity: number }[] } }[] };
@@ -1141,13 +1150,13 @@ async function fetchStockComponents(): Promise<{
   const stringStock: Record<string, number> = {};
   const penHolderStock: Record<string, number> = {};
   const patchStock: Record<string, number> = {};
-  let edgeStock: number | null = null;
+  const edgeStock: Record<string, number> = {};
 
   for (const product of data.products.nodes) {
     if (product.tags.includes("cover")) {
       for (const v of product.variants.nodes) coverStock[v.title] = v.inventoryQuantity;
     } else if (product.tags.includes("edge")) {
-      edgeStock = product.variants.nodes[0]?.inventoryQuantity ?? null;
+      for (const v of product.variants.nodes) edgeStock[v.title] = v.inventoryQuantity;
     } else if (product.tags.includes("string")) {
       for (const v of product.variants.nodes) stringStock[v.title] = v.inventoryQuantity;
     } else if (product.tags.includes("pen-holder")) {
@@ -1235,12 +1244,12 @@ export async function syncJournalStock(): Promise<JournalStockResult[]> {
       const baseCord = plusIndex === -1 ? stringValue : stringValue.slice(0, plusIndex);
       const patchLabel = plusIndex === -1 ? "None" : stringValue.slice(plusIndex + 3);
 
-      const hasEdge = penHolderValue.endsWith(" + Edge");
-      const basePen = hasEdge ? penHolderValue.slice(0, -" + Edge".length) : penHolderValue;
+      const edgeColor = penHolderValue.endsWith(" + Gold Edge") ? "Gold" : penHolderValue.endsWith(" + Silver Edge") ? "Silver" : null;
+      const basePen = edgeColor ? penHolderValue.slice(0, -` + ${edgeColor} Edge`.length) : penHolderValue;
 
       const cordAvail = baseCord === "No Cord" ? UNLIMITED_STOCK : stringStock[baseCord] ?? 0;
       const penAvail = basePen === "None" ? UNLIMITED_STOCK : penHolderStock[basePen] ?? 0;
-      const edgeAvail = hasEdge ? edgeStock ?? 0 : UNLIMITED_STOCK;
+      const edgeAvail = edgeColor ? edgeStock[edgeColor] ?? 0 : UNLIMITED_STOCK;
       const patchAvail = patchLabel === "None" ? UNLIMITED_STOCK : patchStock[patchLabel] ?? 0;
 
       const computed = Math.min(coverStock[cover], cordAvail, penAvail, edgeAvail, patchAvail);
@@ -1345,7 +1354,7 @@ export async function syncJournalOptionDelete(componentTags: string[], value: st
     const option = product.options.find((o) => o.name === optionName);
     const valuesToRemove =
       tag === "pen-holder"
-        ? [value, `${value} + Edge`]
+        ? [value, `${value} + Gold Edge`, `${value} + Silver Edge`]
         : tag === "string"
           ? (option?.optionValues.map((v) => v.name).filter((n) => n === value || n.startsWith(`${value} + `)) ?? [])
           : (option?.optionValues.map((v) => v.name).filter((n) => n.endsWith(` + ${value}`)) ?? []);
