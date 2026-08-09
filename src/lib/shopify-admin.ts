@@ -113,6 +113,12 @@ export async function fetchNotebookProduct(): Promise<ShopifyJournalProduct | un
   return products[0];
 }
 
+/** "[JC] Sanaya Patch" — a tracker product whose 6 variants (Brown/Red/Sparkle × Heart/Star) exist purely so the picker has a photo thumbnail per patch; the patch itself is baked into each journal cover's own front photo (see `stringValueFor` in catalog.ts), not drawn from this product. */
+export async function fetchPatchProduct(): Promise<ShopifyJournalProduct | undefined> {
+  const products = await fetchProducts("tag:patch");
+  return products[0];
+}
+
 // ---------- Swatch colors ----------
 // The single source of truth for String/Pen Holder swatch colors is the
 // `sanaya`/`swatch_color` metafield the admin edits on each color's variant

@@ -21,8 +21,8 @@ export interface JournalSelection {
   cord: string | "none";
   penHolder: "none" | "black" | "brown";
   edge: boolean;
-  /** Patch sitting at the cord's knot — only meaningful when a cord is chosen. */
-  patch: "none" | "star" | "heart";
+  /** Patch sitting at the cord's knot — only meaningful when a cord is chosen. Baked into the front photo itself, not a floating overlay. */
+  patch: "none" | "brown-heart" | "brown-star" | "red-heart" | "red-star" | "sparkle-heart" | "sparkle-star";
   charms: PlacedCharm[];
   /** Notebook Type (Shopify option value) -> quantity chosen. Must total exactly 3. */
   notebooks: Record<string, number>;

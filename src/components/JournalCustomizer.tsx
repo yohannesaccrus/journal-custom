@@ -55,6 +55,7 @@ interface JournalCustomizerProps {
   products: ShopifyJournalProduct[];
   charmProduct: ShopifyJournalProduct;
   notebookProduct: ShopifyJournalProduct;
+  patchProduct: ShopifyJournalProduct;
   /** Admin-edited swatch colors for String/Pen Holder — see `fetchSwatchColors`. */
   swatchColors: SwatchColors;
   // Set when this render is the phone-sized <iframe> embed the "Mobile View"
@@ -78,6 +79,7 @@ function JournalCustomizerContent({
   products,
   charmProduct,
   notebookProduct,
+  patchProduct,
   swatchColors,
   hideDevControls,
   initialTheme,
@@ -717,6 +719,7 @@ function JournalCustomizerContent({
                 <div className="mt-6 border-t border-[var(--border)] pt-6">
                   <PatchStep
                     product={product}
+                    patchProduct={patchProduct}
                     cord={selection.cord}
                     penHolder={selection.penHolder}
                     edge={selection.edge}

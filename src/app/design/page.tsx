@@ -4,6 +4,7 @@ import {
   buildCharmEntries,
   buildCoverEntries,
   NOTEBOOKS_PER_JOURNAL,
+  PATCH_LABEL,
   resolveFrontImage,
   resolveSideImage,
   resolveVariant,
@@ -62,7 +63,7 @@ export default async function DesignPage({ searchParams }: DesignPageProps) {
   const rows = [
     { label: "Cover", value: cover?.label ?? product.title },
     { label: "String", value: selection.cord !== "none" ? selection.cord : "None" },
-    { label: "Patch", value: selection.patch === "none" ? "None" : selection.patch.charAt(0).toUpperCase() + selection.patch.slice(1) },
+    { label: "Patch", value: selection.patch === "none" ? "None" : PATCH_LABEL[selection.patch] },
     {
       label: "Pen holder",
       value: selection.penHolder === "none" ? "None" : selection.penHolder === "black" ? "Black" : "Brown",

@@ -1,14 +1,15 @@
 "use client";
 
-import { buildPatchEntries } from "@/lib/catalog";
+import { buildPatchEntries, PATCH_LABEL, PATCH_VALUES } from "@/lib/catalog";
 import { useCurrencyFormat } from "@/components/CurrencyContext";
 import type { ShopifyJournalProduct } from "@/lib/shopify-admin";
-import { PatchIcon } from "@/components/PatchIcon";
+import { Swatch } from "@/components/Swatch";
 import { DisabledHint } from "@/components/DisabledHint";
 import type { JournalSelection } from "@/lib/types";
 
 interface PatchStepProps {
   product: ShopifyJournalProduct;
+  patchProduct?: ShopifyJournalProduct;
   cord: JournalSelection["cord"];
   penHolder: JournalSelection["penHolder"];
   edge: boolean;
@@ -17,16 +18,29 @@ interface PatchStepProps {
   onPatchChange: (value: JournalSelection["patch"]) => void;
 }
 
-const PATCH_SHAPES = ["star", "heart"] as const;
-
-export function PatchStep({ product, cord, penHolder, edge, cordSelected, patch, onPatchChange }: PatchStepProps) {
+export function PatchStep({
+  product,
+  patchProduct,
+  cord,
+  penHolder,
+  edge,
+  cordSelected,
+  patch,
+  onPatchChange,
+}: PatchStepProps) {
   const { format } = useCurrencyFormat();
   // Before a string is picked there's no combo to price/stock-check yet
-  // (buildPatchEntries needs one) — show both shapes anyway, just disabled,
+  // (buildPatchEntries needs one) — show every patch anyway, just disabled,
   // so the options aren't a mystery until the previous step is done.
   const patchEntries = cordSelected
-    ? buildPatchEntries(product, cord, penHolder, edge)
-    : PATCH_SHAPES.map((shape) => ({ shape, price: 0, inStock: true }));
+    ? buildPatchEntries(product, cord, penHolder, edge, patchProduct)
+    : PATCH_VALUES.map((value) => ({
+        value,
+        label: PATCH_LABEL[value],
+        thumbnail: patchProduct?.variants.find((v) => v.title === PATCH_LABEL[value])?.image?.url,
+        price: 0,
+        inStock: true,
+      }));
 
   return (
     <div className="step-fade-in">
@@ -55,26 +69,15 @@ export function PatchStep({ product, cord, penHolder, edge, cordSelected, patch,
         </button>
 
         {patchEntries.map((p) => (
-          <DisabledHint
-            key={p.shape}
-            message={cordSelected && !p.inStock ? "Out of stock" : null}
-          >
-            <button
-              type="button"
-              onClick={() => onPatchChange(p.shape)}
+          <DisabledHint key={p.value} message={cordSelected && !p.inStock ? "Out of stock" : null}>
+            <Swatch
+              label={p.label}
+              selected={patch === p.value}
+              onClick={() => onPatchChange(p.value)}
+              thumbnail={p.thumbnail}
+              priceLabel={cordSelected ? `+${format(p.price)}` : undefined}
               disabled={!cordSelected || !p.inStock}
-              className="flex flex-col items-center gap-1.5 group disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <span
-                className={`flex h-11 w-11 items-center justify-center rounded-[var(--radius-chip)] border-2 bg-[var(--surface-soft)] transition-all ${
-                  patch === p.shape ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/30" : "border-transparent group-hover:border-[var(--accent)]/30"
-                }`}
-              >
-                <PatchIcon shape={p.shape} className="h-6 w-6" />
-              </span>
-              <span className="text-xs text-[var(--ink)] capitalize">{p.shape}</span>
-              {cordSelected && <span className="text-[10px] text-[var(--brand)] -mt-1">+{format(p.price)}</span>}
-            </button>
+            />
           </DisabledHint>
         ))}
       </div>

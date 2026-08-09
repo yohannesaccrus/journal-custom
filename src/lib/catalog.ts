@@ -98,19 +98,32 @@ export interface CordEntry {
   inStock: boolean;
 }
 
+/** Every non-"none" `JournalSelection["patch"]` key, in the order shown in the picker. */
+export const PATCH_VALUES = ["brown-heart", "brown-star", "red-heart", "red-star", "sparkle-heart", "sparkle-star"] as const;
+
+/** Matches the "[JC] Sanaya Patch" tracker product's variant titles — also the exact "<cord> + <label>" String suffix used on every journal product. */
+export const PATCH_LABEL: Record<Exclude<JournalSelection["patch"], "none">, string> = {
+  "brown-heart": "Brown Heart",
+  "brown-star": "Brown Star",
+  "red-heart": "Red Heart",
+  "red-star": "Red Star",
+  "sparkle-heart": "Sparkle Heart",
+  "sparkle-star": "Sparkle Star",
+};
+
 /**
  * Shopify caps products at 3 options total (Cover, String, Pen Holder --
  * already the max), so Patch can't be its own 4th option. Instead it's
  * encoded as a suffix on the String option's own values, exactly like Pen
  * Holder already encodes the corner-edge add-on ("Black" vs "Black + Edge"):
- * a real cord's String values are "Light Pink", "Light Pink + Star",
- * "Light Pink + Heart", etc. "No Cord" never gets a patch suffix. This
+ * a real cord's String values are "Light Pink", "Light Pink + Brown Heart",
+ * "Light Pink + Sparkle Star", etc. "No Cord" never gets a patch suffix. This
  * builds the exact String value for a given (cord, patch) pair.
  */
 function stringValueFor(cordSelection: string, patch: JournalSelection["patch"]): string {
   const cordValue = cordSelection === "none" ? "No Cord" : cordSelection;
   if (cordValue === "No Cord" || patch === "none") return cordValue;
-  return `${cordValue} + ${patch === "star" ? "Star" : "Heart"}`;
+  return `${cordValue} + ${PATCH_LABEL[patch]}`;
 }
 
 /**
@@ -280,7 +293,10 @@ export function notebookCount(notebooks: Record<string, number>): number {
 }
 
 export interface PatchEntry {
-  shape: "star" | "heart";
+  value: Exclude<JournalSelection["patch"], "none">;
+  label: string;
+  /** Picker thumbnail — the "[JC] Sanaya Patch" tracker variant's own photo, not the composited cover photo. */
+  thumbnail?: string;
   /** Delta vs. the same String/Pen Holder combo with no patch — the patch's own price is baked into that exact variant on the journal product, not a separate line item. */
   price: number;
   inStock: boolean;
@@ -300,7 +316,8 @@ export function buildPatchEntries(
   product: ShopifyJournalProduct,
   cord: JournalSelection["cord"],
   penHolder: JournalSelection["penHolder"],
-  edge: boolean
+  edge: boolean,
+  patchProduct?: ShopifyJournalProduct
 ): PatchEntry[] {
   if (cord === "none") return [];
   const penValue = penHolder === "none" ? "None" : `${penHolder === "black" ? "Black" : "Brown"}${edge ? " + Edge" : ""}`;
@@ -309,26 +326,24 @@ export function buildPatchEntries(
       (v) => optionValue(v, "String") === stringValueFor(cord, patch) && optionValue(v, "Pen Holder") === penValue
     );
   const baseline = Number(findVariant("none")?.price ?? 0);
-  return (["star", "heart"] as const).map((shape) => {
-    const variant = findVariant(shape);
+  return PATCH_VALUES.map((value) => {
+    const variant = findVariant(value);
+    const label = PATCH_LABEL[value];
+    const thumbnail = patchProduct?.variants.find((v) => v.title === label)?.image?.url;
     return {
-      shape,
+      value,
+      label,
+      thumbnail,
       price: variant ? Number(variant.price) - baseline : 0,
       inStock: inStock(variant),
     };
   });
 }
 
-/**
- * Resolves the front-cover image for the current selection. The patch is no
- * longer baked into a pre-composited photo (that only ever existed without a
- * pen holder, so choosing both made the patch disappear) — it's now drawn as
- * a floating marker on top of whichever variant photo is showing (see
- * PATCH_POSITION below), so patch and pen holder can be combined freely.
- */
+/** Resolves the front-cover image for the current selection — the patch (if any) is baked directly into this variant's own photo. */
 export function resolveFrontImage(variant: ShopifyVariant): string {
   return variant.image?.url ?? "";
 }
 
-/** Where the patch marker sits on the front cover, as % of the preview box — matches the cord knot position in the original composited photos. */
+/** Where the patch marker sits on the front cover, as % of the preview box — only used as a fallback (see the "Fallback only" comments at each call site) for a specific combo that has no real photo yet. */
 export const PATCH_POSITION = { x: 50, y: 44, sizePercent: 17 };

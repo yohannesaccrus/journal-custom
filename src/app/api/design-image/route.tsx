@@ -13,6 +13,8 @@ const HEIGHT = 566; // matches the 560/660 aspect ratio used by the interactive 
 const CHARM_SIZE: Record<string, number> = { front: 40, back: 32, side: 24 };
 
 const STAR_PATH = "M12,2 L14.9,8.6 L22,9.3 L16.6,14 L18.2,21 L12,17.3 L5.8,21 L7.4,14 L2,9.3 L9.1,8.6 Z";
+/** Rough per-material fallback color — Satori can't use the gradient PatchIcon uses client-side. */
+const MATERIAL_COLOR: Record<string, string> = { brown: "#b3854a", red: "#b5342c", sparkle: "#cf9a2e" };
 const HEART_PATH =
   "M12,21 C7,16.8 2.5,12.9 2.5,8.4 C2.5,4.9 5.2,2.5 8.3,2.5 C10.2,2.5 11.6,3.5 12,5.2 C12.4,3.5 13.8,2.5 15.7,2.5 C18.8,2.5 21.5,4.9 21.5,8.4 C21.5,12.9 17,16.8 12,21 Z";
 
@@ -114,8 +116,8 @@ export async function GET(request: Request) {
           >
             <svg viewBox="0 0 24 24" width="100%" height="100%">
               <path
-                d={selection.patch === "star" ? STAR_PATH : HEART_PATH}
-                fill="#c79a5b"
+                d={selection.patch.endsWith("-star") ? STAR_PATH : HEART_PATH}
+                fill={MATERIAL_COLOR[selection.patch.split("-")[0]] ?? "#b3854a"}
                 stroke="rgba(0,0,0,0.35)"
                 strokeWidth={0.5}
               />

@@ -1,5 +1,11 @@
 import { JournalCustomizer } from "@/components/JournalCustomizer";
-import { fetchCharmProduct, fetchJournalProducts, fetchNotebookProduct, fetchSwatchColors } from "@/lib/shopify-admin";
+import {
+  fetchCharmProduct,
+  fetchJournalProducts,
+  fetchNotebookProduct,
+  fetchPatchProduct,
+  fetchSwatchColors,
+} from "@/lib/shopify-admin";
 import type { BackgroundMode } from "@/components/BackgroundSwitcher";
 import type { Theme } from "@/components/ThemeSwitcher";
 
@@ -16,10 +22,11 @@ interface MobilePreviewProps {
  * dynamically per request.
  */
 export default async function MobilePreview({ searchParams }: MobilePreviewProps) {
-  const [products, charmProduct, notebookProduct, swatchColors, params] = await Promise.all([
+  const [products, charmProduct, notebookProduct, patchProduct, swatchColors, params] = await Promise.all([
     fetchJournalProducts(),
     fetchCharmProduct(),
     fetchNotebookProduct(),
+    fetchPatchProduct(),
     fetchSwatchColors(),
     searchParams,
   ]);
@@ -29,6 +36,9 @@ export default async function MobilePreview({ searchParams }: MobilePreviewProps
   }
   if (!notebookProduct) {
     throw new Error("Notebook product not found in Shopify (expected a product tagged 'notebook')");
+  }
+  if (!patchProduct) {
+    throw new Error("Patch product not found in Shopify (expected a product tagged 'patch')");
   }
 
   const initialTheme = THEME_IDS.find((t) => t === params.theme);
@@ -49,6 +59,7 @@ export default async function MobilePreview({ searchParams }: MobilePreviewProps
         products={products}
         charmProduct={charmProduct}
         notebookProduct={notebookProduct}
+        patchProduct={patchProduct}
         swatchColors={swatchColors}
         hideDevControls
         initialTheme={initialTheme}
