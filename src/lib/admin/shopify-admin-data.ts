@@ -34,6 +34,47 @@ async function shopifyAdmin<T>(query: string, variables?: Record<string, unknown
   return json.data as T;
 }
 
+/**
+ * Fetches every remaining page of a product's variants connection past the
+ * first 250 (Shopify's per-page connection max) using the exact same variant
+ * field selection as the original query, so callers get the identically
+ * shaped nodes for pages 2+. Journal covers can now carry 300+ variants
+ * (Cover x String[+ Patch] x Pen Holder[+ Edge color]), so any "tag:journal"
+ * query with `variants(first: 250)` needs this or it silently drops variants
+ * past the cutoff -- which then fail to resolve for real customer selections.
+ */
+interface RemainingVariantsResponse<T> {
+  node: { variants: { nodes: T[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } } } | null;
+}
+
+async function fetchRemainingVariantPages<T>(
+  productId: string,
+  variantFieldsFragment: string,
+  cursor: string
+): Promise<T[]> {
+  let nodes: T[] = [];
+  let nextCursor: string | null = cursor;
+  while (nextCursor) {
+    const data: RemainingVariantsResponse<T> = await shopifyAdmin<RemainingVariantsResponse<T>>(
+      `query RemainingVariants($id: ID!, $cursor: String) {
+        node(id: $id) {
+          ... on Product {
+            variants(first: 250, after: $cursor) {
+              pageInfo { hasNextPage endCursor }
+              nodes { ${variantFieldsFragment} }
+            }
+          }
+        }
+      }`,
+      { id: productId, cursor: nextCursor }
+    );
+    if (!data.node) break;
+    nodes = nodes.concat(data.node.variants.nodes);
+    nextCursor = data.node.variants.pageInfo.hasNextPage ? data.node.variants.pageInfo.endCursor : null;
+  }
+  return nodes;
+}
+
 // ---------- Location ----------
 
 let cachedLocationId: string | null = null;
@@ -97,6 +138,7 @@ const ASSET_PRODUCTS_QUERY = `
         tags
         options { id name optionValues { id name } }
         variants(first: 250) {
+          pageInfo { hasNextPage endCursor }
           nodes {
             id
             title
@@ -114,24 +156,68 @@ const ASSET_PRODUCTS_QUERY = `
   }
 `;
 
+type RawAssetVariant = Omit<AdminVariant, "inventoryItemId" | "inventoryQuantity" | "swatchColor"> & {
+  inventoryItem: { id: string };
+  inventoryQuantity: number;
+  swatchMetafield: { value: string } | null;
+};
+
 interface RawAssetProduct extends Omit<AdminProduct, "variants"> {
-  variants: {
-    nodes: (Omit<AdminVariant, "inventoryItemId" | "inventoryQuantity" | "swatchColor"> & {
-      inventoryItem: { id: string };
-      inventoryQuantity: number;
-      swatchMetafield: { value: string } | null;
-    })[];
-  };
+  variants: { nodes: RawAssetVariant[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } };
 }
 
-export async function fetchAssetProducts(): Promise<AdminProduct[]> {
+const ASSET_VARIANT_FIELDS = `
+  id title sku price image { url } selectedOptions { name value }
+  inventoryItem { id } inventoryQuantity
+  swatchMetafield: metafield(namespace: $swatchNamespace, key: $swatchKey) { value }
+`;
+
+interface RemainingAssetVariantsResponse {
+  node: { variants: { nodes: RawAssetVariant[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } } } | null;
+}
+
+async function fetchRemainingAssetVariants(productId: string, cursor: string): Promise<RawAssetVariant[]> {
+  let nodes: RawAssetVariant[] = [];
+  let nextCursor: string | null = cursor;
+  while (nextCursor) {
+    const data: RemainingAssetVariantsResponse = await shopifyAdmin<RemainingAssetVariantsResponse>(
+      `query RemainingAssetVariants($id: ID!, $cursor: String, $swatchNamespace: String!, $swatchKey: String!) {
+        node(id: $id) {
+          ... on Product {
+            variants(first: 250, after: $cursor) {
+              pageInfo { hasNextPage endCursor }
+              nodes { ${ASSET_VARIANT_FIELDS} }
+            }
+          }
+        }
+      }`,
+      { id: productId, cursor: nextCursor, swatchNamespace: SWATCH_METAFIELD_NAMESPACE, swatchKey: SWATCH_METAFIELD_KEY }
+    );
+    if (!data.node) break;
+    nodes = nodes.concat(data.node.variants.nodes);
+    nextCursor = data.node.variants.pageInfo.hasNextPage ? data.node.variants.pageInfo.endCursor : null;
+  }
+  return nodes;
+}
+
+async function fetchAssetProductsByQuery(query: string): Promise<AdminProduct[]> {
   const data = await shopifyAdmin<{ products: { nodes: RawAssetProduct[] } }>(ASSET_PRODUCTS_QUERY, {
-    query: "tag:component OR tag:charm OR tag:patch",
+    query,
     swatchNamespace: SWATCH_METAFIELD_NAMESPACE,
     swatchKey: SWATCH_METAFIELD_KEY,
   });
 
-  return data.products.nodes.map((p) => ({
+  const products = await Promise.all(
+    data.products.nodes.map(async (p) => {
+      let variantNodes = p.variants.nodes;
+      if (p.variants.pageInfo.hasNextPage && p.variants.pageInfo.endCursor) {
+        variantNodes = variantNodes.concat(await fetchRemainingAssetVariants(p.id, p.variants.pageInfo.endCursor));
+      }
+      return { ...p, variants: { nodes: variantNodes } };
+    })
+  );
+
+  return products.map((p) => ({
     ...p,
     // Shopify returns variants oldest-first; admin tables want the
     // most-recently-added row on top.
@@ -146,6 +232,10 @@ export async function fetchAssetProducts(): Promise<AdminProduct[]> {
   }));
 }
 
+export async function fetchAssetProducts(): Promise<AdminProduct[]> {
+  return fetchAssetProductsByQuery("tag:component OR tag:charm OR tag:patch");
+}
+
 /**
  * The 8 real sellable "tag:journal" cover products — each can carry dozens of
  * String × Pen Holder variant combinations (see `syncJournalOptionAdd`), none
@@ -154,27 +244,8 @@ export async function fetchAssetProducts(): Promise<AdminProduct[]> {
  * actually edit price/SKU/stock for those combos without leaving this page.
  */
 export async function fetchJournalCoverProducts(): Promise<AdminProduct[]> {
-  const data = await shopifyAdmin<{ products: { nodes: RawAssetProduct[] } }>(ASSET_PRODUCTS_QUERY, {
-    query: "tag:journal",
-    swatchNamespace: SWATCH_METAFIELD_NAMESPACE,
-    swatchKey: SWATCH_METAFIELD_KEY,
-  });
-
-  return data.products.nodes
-    .map((p) => ({
-      ...p,
-      // Shopify returns variants oldest-first; the per-cover combo table
-      // wants the most-recently-added combo on top.
-      variants: p.variants.nodes
-        .map((v) => ({
-          ...v,
-          inventoryItemId: v.inventoryItem.id,
-          inventoryQuantity: v.inventoryQuantity,
-          swatchColor: v.swatchMetafield?.value ?? null,
-        }))
-        .reverse(),
-    }))
-    .reverse();
+  const products = await fetchAssetProductsByQuery("tag:journal");
+  return products.slice().reverse();
 }
 
 export async function setVariantSwatchColor(variantId: string, hex: string | null): Promise<void> {
@@ -713,7 +784,10 @@ async function finishJournalCoverProduct(
       node(id: $id) {
         ... on Product {
           options { id name optionValues { id name } }
-          variants(first: 250) { nodes { id selectedOptions { name value } } }
+          variants(first: 250) {
+            pageInfo { hasNextPage endCursor }
+            nodes { id selectedOptions { name value } }
+          }
         }
       }
     }
@@ -721,10 +795,22 @@ async function finishJournalCoverProduct(
   const state = await shopifyAdmin<{
     node: {
       options: { id: string; name: string; optionValues: { id: string; name: string }[] }[];
-      variants: { nodes: { id: string; selectedOptions: { name: string; value: string }[] }[] };
+      variants: {
+        nodes: { id: string; selectedOptions: { name: string; value: string }[] }[];
+        pageInfo: { hasNextPage: boolean; endCursor: string | null };
+      };
     } | null;
   }>(STATE_QUERY, { id: productId });
   if (!state.node) throw new Error("Shopify did not return the product after adding options");
+  // Auto-generated placeholder combos (String x Pen Holder, now up to 49 x 6 = 294) can exceed one page.
+  if (state.node.variants.pageInfo.hasNextPage && state.node.variants.pageInfo.endCursor) {
+    const rest = await fetchRemainingVariantPages<{ id: string; selectedOptions: { name: string; value: string }[] }>(
+      productId,
+      "id selectedOptions { name value }",
+      state.node.variants.pageInfo.endCursor
+    );
+    state.node.variants.nodes = state.node.variants.nodes.concat(rest);
+  }
 
   const coverOption = state.node.options.find((o) => o.name === "Cover");
   const cordOption = state.node.options.find((o) => o.name === "String");
@@ -1062,20 +1148,32 @@ export async function syncJournalPricing(): Promise<void> {
         nodes {
           id
           variants(first: 250) {
+            pageInfo { hasNextPage endCursor }
             nodes { id price selectedOptions { name value } }
           }
         }
       }
     }
   `;
+  type PricingVariant = { id: string; price: string; selectedOptions: { name: string; value: string }[] };
   const data = await shopifyAdmin<{
     products: {
       nodes: {
         id: string;
-        variants: { nodes: { id: string; price: string; selectedOptions: { name: string; value: string }[] }[] };
+        variants: { nodes: PricingVariant[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } };
       }[];
     };
   }>(JOURNAL_QUERY);
+  for (const product of data.products.nodes) {
+    if (product.variants.pageInfo.hasNextPage && product.variants.pageInfo.endCursor) {
+      const rest = await fetchRemainingVariantPages<PricingVariant>(
+        product.id,
+        "id price selectedOptions { name value }",
+        product.variants.pageInfo.endCursor
+      );
+      product.variants.nodes = product.variants.nodes.concat(rest);
+    }
+  }
 
   const MUTATION = `
     mutation SyncJournalPrices($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
@@ -1197,6 +1295,7 @@ export async function syncJournalStock(): Promise<JournalStockResult[]> {
           handle
           title
           variants(first: 250) {
+            pageInfo { hasNextPage endCursor }
             nodes {
               inventoryQuantity
               inventoryItem { id }
@@ -1207,22 +1306,27 @@ export async function syncJournalStock(): Promise<JournalStockResult[]> {
       }
     }
   `;
+  type StockVariant = { inventoryQuantity: number; inventoryItem: { id: string }; selectedOptions: { name: string; value: string }[] };
   const data = await shopifyAdmin<{
     products: {
       nodes: {
         id: string;
         handle: string;
         title: string;
-        variants: {
-          nodes: {
-            inventoryQuantity: number;
-            inventoryItem: { id: string };
-            selectedOptions: { name: string; value: string }[];
-          }[];
-        };
+        variants: { nodes: StockVariant[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } };
       }[];
     };
   }>(JOURNAL_QUERY);
+  for (const product of data.products.nodes) {
+    if (product.variants.pageInfo.hasNextPage && product.variants.pageInfo.endCursor) {
+      const rest = await fetchRemainingVariantPages<StockVariant>(
+        product.id,
+        "inventoryQuantity inventoryItem { id } selectedOptions { name value }",
+        product.variants.pageInfo.endCursor
+      );
+      product.variants.nodes = product.variants.nodes.concat(rest);
+    }
+  }
 
   const results: JournalStockResult[] = [];
 
@@ -1331,11 +1435,15 @@ export async function syncJournalOptionDelete(componentTags: string[], value: st
           handle
           title
           options { id name optionValues { id name } }
-          variants(first: 250) { nodes { id selectedOptions { name value } } }
+          variants(first: 250) {
+            pageInfo { hasNextPage endCursor }
+            nodes { id selectedOptions { name value } }
+          }
         }
       }
     }
   `;
+  type DeleteVariant = { id: string; selectedOptions: { name: string; value: string }[] };
   const data = await shopifyAdmin<{
     products: {
       nodes: {
@@ -1343,10 +1451,20 @@ export async function syncJournalOptionDelete(componentTags: string[], value: st
         handle: string;
         title: string;
         options: { id: string; name: string; optionValues: { id: string; name: string }[] }[];
-        variants: { nodes: { id: string; selectedOptions: { name: string; value: string }[] }[] };
+        variants: { nodes: DeleteVariant[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } };
       }[];
     };
   }>(JOURNAL_PRODUCTS_QUERY);
+  for (const product of data.products.nodes) {
+    if (product.variants.pageInfo.hasNextPage && product.variants.pageInfo.endCursor) {
+      const rest = await fetchRemainingVariantPages<DeleteVariant>(
+        product.id,
+        "id selectedOptions { name value }",
+        product.variants.pageInfo.endCursor
+      );
+      product.variants.nodes = product.variants.nodes.concat(rest);
+    }
+  }
 
   const results: JournalDeleteResult[] = [];
 

@@ -351,9 +351,16 @@ export function buildPatchEntries(
   });
 }
 
-/** Resolves the front-cover image for the current selection — the patch (if any) is baked directly into this variant's own photo. */
+/**
+ * Resolves the front-cover image for the current selection — the patch (if
+ * any) is baked directly into this variant's own photo. Corner Edge x Patch
+ * combos would need ~300 unique front photos per cover (over Shopify's
+ * 250-media-per-product cap), so those live as a `frontImageOverride`
+ * variant metafield (a Shopify File, not product media -- no cap) instead of
+ * `variant.image`; every other combo just uses `variant.image` as before.
+ */
 export function resolveFrontImage(variant: ShopifyVariant): string {
-  return variant.image?.url ?? "";
+  return variant.frontImageOverride?.value ?? variant.image?.url ?? "";
 }
 
 /** Where the patch marker sits on the front cover, as % of the preview box — only used as a fallback (see the "Fallback only" comments at each call site) for a specific combo that has no real photo yet. */

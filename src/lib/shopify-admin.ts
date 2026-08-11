@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 
 const STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN;
 const ACCESS_TOKEN = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
@@ -10,9 +11,14 @@ export interface ShopifyVariant {
   price: string;
   sku: string;
   image: { url: string } | null;
+  /** Front-photo URL override, stored as a variant metafield rather than product media -- used for combos (Corner Edge x Patch) whose real photo would push a cover past Shopify's 250-media-per-product cap. See `resolveFrontImage` in catalog.ts. */
+  frontImageOverride: { value: string } | null;
   selectedOptions: { name: string; value: string }[];
   inventoryQuantity: number;
 }
+
+const FRONT_IMAGE_METAFIELD_NAMESPACE = "custom";
+const FRONT_IMAGE_METAFIELD_KEY = "front_image_override";
 
 export interface ShopifyMedia {
   alt: string;
@@ -29,8 +35,10 @@ export interface ShopifyJournalProduct {
   media: ShopifyMedia[];
 }
 
-// Journal products can now carry Cover×String×Pen Holder×Patch combos (well
-// over the old 40-variant cap) — 250 is Shopify's per-page connection max.
+// Journal products can now carry Cover×String×Pen Holder×Patch×Edge combos
+// (well over the old 40-variant cap, and now over 250 for some covers) — 250
+// is Shopify's per-page connection max, so a product with >250 variants needs
+// a follow-up paginated fetch (see fetchRemainingVariants below).
 const PRODUCTS_QUERY = `
   query Products($query: String!) {
     products(first: 20, query: $query) {
@@ -40,12 +48,14 @@ const PRODUCTS_QUERY = `
         title
         tags
         variants(first: 250) {
+          pageInfo { hasNextPage endCursor }
           nodes {
             id
             title
             price
             sku
             image { url }
+            frontImageOverride: metafield(namespace: "${FRONT_IMAGE_METAFIELD_NAMESPACE}", key: "${FRONT_IMAGE_METAFIELD_KEY}") { value }
             selectedOptions { name value }
             inventoryQuantity
           }
@@ -61,43 +71,122 @@ const PRODUCTS_QUERY = `
   }
 `;
 
+const REMAINING_VARIANTS_QUERY = `
+  query RemainingVariants($id: ID!, $cursor: String!) {
+    node(id: $id) {
+      ... on Product {
+        variants(first: 250, after: $cursor) {
+          pageInfo { hasNextPage endCursor }
+          nodes {
+            id
+            title
+            price
+            sku
+            image { url }
+            frontImageOverride: metafield(namespace: "${FRONT_IMAGE_METAFIELD_NAMESPACE}", key: "${FRONT_IMAGE_METAFIELD_KEY}") { value }
+            selectedOptions { name value }
+            inventoryQuantity
+          }
+        }
+      }
+    }
+  }
+`;
+
 interface RawProduct extends Omit<ShopifyJournalProduct, "variants" | "media"> {
-  variants: { nodes: ShopifyVariant[] };
+  variants: { nodes: ShopifyVariant[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } };
   media: { nodes: { alt: string | null; image?: { url: string } }[] };
 }
 
-async function fetchProducts(query: string): Promise<ShopifyJournalProduct[]> {
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Fetching a full journal cover now takes several paginated requests (300+
+// variants), so a THROTTLED response from Shopify's rate limiter is routine
+// under normal traffic, not exceptional -- retry with backoff instead of
+// failing the whole page load on it.
+async function shopifyAdminRequest<T>(query: string, variables: Record<string, unknown>, retries = 8): Promise<T> {
   if (!STORE_DOMAIN || !ACCESS_TOKEN) {
     throw new Error("Missing SHOPIFY_STORE_DOMAIN or SHOPIFY_ADMIN_ACCESS_TOKEN env vars");
   }
-
-  const res = await fetch(`https://${STORE_DOMAIN}/admin/api/${API_VERSION}/graphql.json`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Shopify-Access-Token": ACCESS_TOKEN,
-    },
-    body: JSON.stringify({ query: PRODUCTS_QUERY, variables: { query } }),
-    next: { revalidate: 300 },
-  });
-
-  if (!res.ok) {
-    throw new Error(`Shopify Admin API request failed: ${res.status} ${res.statusText}`);
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const res = await fetch(`https://${STORE_DOMAIN}/admin/api/${API_VERSION}/graphql.json`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": ACCESS_TOKEN,
+      },
+      body: JSON.stringify({ query, variables }),
+      next: { revalidate: 300 },
+    });
+    if (!res.ok) {
+      throw new Error(`Shopify Admin API request failed: ${res.status} ${res.statusText}`);
+    }
+    const json = await res.json();
+    if (json.errors) {
+      if (JSON.stringify(json.errors).includes("THROTTLED") && attempt < retries) {
+        await sleep(1000 * (attempt + 1));
+        continue;
+      }
+      throw new Error(`Shopify Admin API error: ${JSON.stringify(json.errors)}`);
+    }
+    return json.data;
   }
-
-  const json = await res.json();
-  if (json.errors) {
-    throw new Error(`Shopify Admin API error: ${JSON.stringify(json.errors)}`);
-  }
-
-  return json.data.products.nodes.map((p: RawProduct) => ({
-    ...p,
-    variants: p.variants.nodes,
-    media: p.media.nodes
-      .filter((m) => m.alt && m.image?.url)
-      .map((m) => ({ alt: m.alt as string, url: m.image!.url })),
-  }));
+  throw new Error("Shopify Admin API: exhausted retries");
 }
+
+interface RemainingVariantsResponse {
+  node: { variants: { nodes: ShopifyVariant[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } } };
+}
+
+async function fetchRemainingVariants(productId: string, cursor: string): Promise<ShopifyVariant[]> {
+  let variants: ShopifyVariant[] = [];
+  let nextCursor: string | null = cursor;
+  while (nextCursor) {
+    const data: RemainingVariantsResponse = await shopifyAdminRequest<RemainingVariantsResponse>(REMAINING_VARIANTS_QUERY, {
+      id: productId,
+      cursor: nextCursor,
+    });
+    variants = variants.concat(data.node.variants.nodes);
+    nextCursor = data.node.variants.pageInfo.hasNextPage ? data.node.variants.pageInfo.endCursor : null;
+  }
+  return variants;
+}
+
+// Journal covers are now expensive to fetch (paginated, ~150-450 Shopify API
+// cost points per cover) and every one of the 5+ route/component call sites
+// asks for the same "tag:journal" set -- React's per-request cache dedupes
+// those into a single Shopify round trip instead of firing the fetch again
+// for every caller in the same render.
+const fetchProducts = cache(async (query: string): Promise<ShopifyJournalProduct[]> => {
+  const data = await shopifyAdminRequest<{ products: { nodes: RawProduct[] } }>(PRODUCTS_QUERY, { query });
+
+  // Sequential, not Promise.all — up to 13 journal covers each needing a
+  // follow-up paginated fetch would otherwise fire that many requests at
+  // once, which reliably trips Shopify's rate limiter as a burst even though
+  // each individual request would fit comfortably within it.
+  const products: ShopifyJournalProduct[] = [];
+  for (const p of data.products.nodes) {
+    let variants = p.variants.nodes;
+    if (p.variants.pageInfo.hasNextPage && p.variants.pageInfo.endCursor) {
+      // Small gap between covers' follow-up fetches -- firing all ~13 back
+      // to back with zero spacing reliably bursts past Shopify's rate
+      // limiter even though each individual request is well within budget.
+      if (products.length > 0) await sleep(150);
+      variants = variants.concat(await fetchRemainingVariants(p.id, p.variants.pageInfo.endCursor));
+    }
+    products.push({
+      ...p,
+      variants,
+      media: p.media.nodes
+        .filter((m) => m.alt && m.image?.url)
+        .map((m) => ({ alt: m.alt as string, url: m.image!.url })),
+    });
+  }
+
+  return products;
+});
 
 export async function fetchJournalProducts(): Promise<ShopifyJournalProduct[]> {
   return fetchProducts("tag:journal");
