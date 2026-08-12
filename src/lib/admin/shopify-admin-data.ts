@@ -101,6 +101,8 @@ export interface AdminVariant {
   sku: string;
   price: string;
   image: { url: string } | null;
+  /** Front-photo URL override, stored as a variant metafield rather than product media -- used for combos (Corner Edge x Patch) whose real photo would push a cover past Shopify's 250-media-per-product cap. See `resolveFrontImage` in catalog.ts. */
+  frontImageOverride: { value: string } | null;
   selectedOptions: { name: string; value: string }[];
   inventoryItemId: string;
   inventoryQuantity: number;
@@ -125,6 +127,11 @@ export interface AdminProduct {
 export const SWATCH_METAFIELD_NAMESPACE = "sanaya";
 export const SWATCH_METAFIELD_KEY = "swatch_color";
 
+// Same metafield the customer-facing `resolveFrontImage` (catalog.ts) and
+// `ShopifyVariant.frontImageOverride` (shopify-admin.ts) read.
+const FRONT_IMAGE_METAFIELD_NAMESPACE = "custom";
+const FRONT_IMAGE_METAFIELD_KEY = "front_image_override";
+
 // Journal products can now carry Cover×String×Pen Holder×Patch combos (well
 // past the old 100-variant cap) — 250 is Shopify's per-page connection max.
 const ASSET_PRODUCTS_QUERY = `
@@ -145,6 +152,7 @@ const ASSET_PRODUCTS_QUERY = `
             sku
             price
             image { url }
+            frontImageOverride: metafield(namespace: "${FRONT_IMAGE_METAFIELD_NAMESPACE}", key: "${FRONT_IMAGE_METAFIELD_KEY}") { value }
             selectedOptions { name value }
             inventoryItem { id }
             inventoryQuantity
@@ -167,7 +175,9 @@ interface RawAssetProduct extends Omit<AdminProduct, "variants"> {
 }
 
 const ASSET_VARIANT_FIELDS = `
-  id title sku price image { url } selectedOptions { name value }
+  id title sku price image { url }
+  frontImageOverride: metafield(namespace: "${FRONT_IMAGE_METAFIELD_NAMESPACE}", key: "${FRONT_IMAGE_METAFIELD_KEY}") { value }
+  selectedOptions { name value }
   inventoryItem { id } inventoryQuantity
   swatchMetafield: metafield(namespace: $swatchNamespace, key: $swatchKey) { value }
 `;
@@ -233,7 +243,7 @@ async function fetchAssetProductsByQuery(query: string): Promise<AdminProduct[]>
 }
 
 export async function fetchAssetProducts(): Promise<AdminProduct[]> {
-  return fetchAssetProductsByQuery("tag:component OR tag:charm OR tag:patch");
+  return fetchAssetProductsByQuery("tag:component OR tag:charm OR tag:patch OR tag:pouch");
 }
 
 /**
@@ -1756,6 +1766,155 @@ export async function uploadVariantImage(
   }
 
   return attachImageUrlToVariant(productId, variantId, target.resourceUrl);
+}
+
+// ---------- Front-image override (Corner Edge x Patch, no 250-media cap) ----------
+
+/** Sets/clears a variant's `frontImageOverride` metafield to a public File URL -- see `resolveFrontImage` in catalog.ts. */
+export async function setVariantFrontImageOverride(variantId: string, url: string | null): Promise<void> {
+  if (url === null) {
+    const DELETE_MUTATION = `
+      mutation DeleteFrontImageOverride($ownerId: ID!, $namespace: String!, $key: String!) {
+        metafieldsDelete(metafields: [{ ownerId: $ownerId, namespace: $namespace, key: $key }]) {
+          userErrors { field message }
+        }
+      }
+    `;
+    const data = await shopifyAdmin<{
+      metafieldsDelete: { userErrors: { field: string[]; message: string }[] };
+    }>(DELETE_MUTATION, {
+      ownerId: variantId,
+      namespace: FRONT_IMAGE_METAFIELD_NAMESPACE,
+      key: FRONT_IMAGE_METAFIELD_KEY,
+    });
+    const errs = data.metafieldsDelete.userErrors;
+    if (errs.length) throw new Error(errs.map((e) => e.message).join("; "));
+    return;
+  }
+
+  const MUTATION = `
+    mutation SetFrontImageOverride($metafields: [MetafieldsSetInput!]!) {
+      metafieldsSet(metafields: $metafields) {
+        userErrors { field message }
+      }
+    }
+  `;
+  const data = await shopifyAdmin<{
+    metafieldsSet: { userErrors: { field: string[]; message: string }[] };
+  }>(MUTATION, {
+    metafields: [
+      {
+        ownerId: variantId,
+        namespace: FRONT_IMAGE_METAFIELD_NAMESPACE,
+        key: FRONT_IMAGE_METAFIELD_KEY,
+        type: "single_line_text_field",
+        value: url,
+      },
+    ],
+  });
+  const errs = data.metafieldsSet.userErrors;
+  if (errs.length) throw new Error(errs.map((e) => e.message).join("; "));
+}
+
+/**
+ * Uploads an image as a plain Shopify File (via `fileCreate`, not product
+ * media) and points the variant's `frontImageOverride` metafield at it --
+ * unlike `uploadVariantImage`, this never touches the product's media list,
+ * so it doesn't count against the 250-media-per-product cap that this
+ * override mechanism exists to work around.
+ */
+export async function uploadFrontImageOverride(
+  variantId: string,
+  file: { filename: string; mimeType: string; size: number; data: Buffer }
+): Promise<string> {
+  const STAGED_UPLOADS_CREATE = `
+    mutation StagedUploadsCreate($input: [StagedUploadInput!]!) {
+      stagedUploadsCreate(input: $input) {
+        stagedTargets { url resourceUrl parameters { name value } }
+        userErrors { field message }
+      }
+    }
+  `;
+  const stagedRes = await shopifyAdmin<{
+    stagedUploadsCreate: {
+      stagedTargets: { url: string; resourceUrl: string; parameters: { name: string; value: string }[] }[];
+      userErrors: { field: string[]; message: string }[];
+    };
+  }>(STAGED_UPLOADS_CREATE, {
+    input: [
+      {
+        resource: "FILE",
+        filename: file.filename,
+        mimeType: file.mimeType,
+        httpMethod: "POST",
+        fileSize: String(file.size),
+      },
+    ],
+  });
+  if (stagedRes.stagedUploadsCreate.userErrors.length) {
+    throw new Error(stagedRes.stagedUploadsCreate.userErrors.map((e) => e.message).join("; "));
+  }
+  const target = stagedRes.stagedUploadsCreate.stagedTargets[0];
+  if (!target) throw new Error("Shopify did not return a staged upload target");
+
+  const form = new FormData();
+  for (const param of target.parameters) form.append(param.name, param.value);
+  form.append("file", new Blob([new Uint8Array(file.data)], { type: file.mimeType }), file.filename);
+
+  const uploadRes = await fetch(target.url, { method: "POST", body: form });
+  if (!uploadRes.ok) {
+    throw new Error(`Staged upload failed: ${uploadRes.status} ${uploadRes.statusText}`);
+  }
+
+  const FILE_CREATE = `
+    mutation FrontImageFileCreate($files: [FileCreateInput!]!) {
+      fileCreate(files: $files) {
+        files { id fileStatus ... on MediaImage { image { url } } }
+        userErrors { field message }
+      }
+    }
+  `;
+  const fileRes = await shopifyAdmin<{
+    fileCreate: {
+      files: { id: string; fileStatus: string; image?: { url: string } }[];
+      userErrors: { field: string[]; message: string }[];
+    };
+  }>(FILE_CREATE, {
+    files: [{ originalSource: target.resourceUrl, contentType: "IMAGE", alt: `front-image-override-${variantId.split("/").pop()}` }],
+  });
+  if (fileRes.fileCreate.userErrors.length) {
+    throw new Error(fileRes.fileCreate.userErrors.map((e) => e.message).join("; "));
+  }
+  const created = fileRes.fileCreate.files[0];
+  if (!created) throw new Error("Shopify did not return the created file");
+
+  // Files process asynchronously; poll for a resolved URL before saving it.
+  const FILE_QUERY = `
+    query FrontImageFileStatus($id: ID!) {
+      node(id: $id) {
+        ... on MediaImage { fileStatus image { url } }
+      }
+    }
+  `;
+  let resolvedUrl = created.image?.url ?? "";
+  let ready = created.fileStatus === "READY" && !!resolvedUrl;
+  for (let attempt = 0; !ready && attempt < 10; attempt++) {
+    await new Promise((r) => setTimeout(r, 700));
+    const fileData = await shopifyAdmin<{ node: { fileStatus?: string; image?: { url: string } } | null }>(
+      FILE_QUERY,
+      { id: created.id }
+    );
+    if (fileData.node?.fileStatus === "READY") {
+      ready = true;
+      resolvedUrl = fileData.node.image?.url ?? "";
+    } else if (fileData.node?.fileStatus === "FAILED") {
+      throw new Error("Shopify failed to process the uploaded file");
+    }
+  }
+  if (!ready || !resolvedUrl) throw new Error("File is still processing on Shopify's side — try refreshing shortly");
+
+  await setVariantFrontImageOverride(variantId, resolvedUrl);
+  return resolvedUrl;
 }
 
 // ---------- Orders ----------

@@ -1,7 +1,7 @@
 "use client";
 
 import { buildCordEntries, buildPenHolderEntries, EDGE_LABEL, EDGE_VALUES, isEdgeInStock, resolveVariant } from "@/lib/catalog";
-import type { ShopifyJournalProduct } from "@/lib/shopify-admin";
+import type { ShopifyJournalProduct, ShopifyVariant } from "@/lib/shopify-admin";
 import { useCurrencyFormat } from "@/components/CurrencyContext";
 import { Swatch } from "@/components/Swatch";
 import { DisabledHint } from "@/components/DisabledHint";
@@ -19,6 +19,8 @@ interface PenHolderStepProps {
   onEdgeChange: (edge: JournalSelection["edge"]) => void;
   cordSwatchByLabel?: Record<string, string>;
   penHolderSwatchByLabel?: Record<string, string>;
+  pouchVariant?: ShopifyVariant;
+  onPouchChange: (pouch: boolean) => void;
 }
 
 export function PenHolderStep({
@@ -28,6 +30,8 @@ export function PenHolderStep({
   onEdgeChange,
   cordSwatchByLabel,
   penHolderSwatchByLabel,
+  pouchVariant,
+  onPouchChange,
 }: PenHolderStepProps) {
   const { format } = useCurrencyFormat();
   const hasPenHolder = selection.penHolder !== "none";
@@ -112,6 +116,26 @@ export function PenHolderStep({
           <p className="mt-2 text-xs text-[var(--faint)]">Select a pen holder color to unlock corner edges.</p>
         )}
       </div>
+
+      {pouchVariant && (
+        <div className="mt-5 border-t border-[var(--border)] pt-5">
+          <h3 className="text-base font-heading text-[var(--ink)]">Protective pouch</h3>
+          <p className="mt-1 text-xs text-[var(--muted)]">A clear plastic sleeve to keep your journal safe in transit.</p>
+          <div className="mt-3 flex flex-wrap gap-4">
+            <Swatch label="No pouch" selected={!selection.pouch} onClick={() => onPouchChange(false)} color="#ffffff" />
+            <DisabledHint message={pouchVariant.inventoryQuantity <= 0 ? "Out of stock" : null}>
+              <Swatch
+                label="Plastic Pouch"
+                selected={selection.pouch}
+                onClick={() => onPouchChange(true)}
+                thumbnail={pouchVariant.image?.url}
+                priceLabel={Number(pouchVariant.price) > 0 ? `+${format(Number(pouchVariant.price))}` : "Free"}
+                disabled={pouchVariant.inventoryQuantity <= 0}
+              />
+            </DisabledHint>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

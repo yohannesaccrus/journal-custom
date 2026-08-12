@@ -1,7 +1,7 @@
 "use client";
 
 import { buildCoverEntries, charmsTotal, EDGE_LABEL, resolveVariant } from "@/lib/catalog";
-import type { ShopifyJournalProduct } from "@/lib/shopify-admin";
+import type { ShopifyJournalProduct, ShopifyVariant } from "@/lib/shopify-admin";
 import { useCurrencyFormat } from "@/components/CurrencyContext";
 import type { JournalSelection } from "@/lib/types";
 
@@ -9,20 +9,23 @@ interface PreviewStepProps {
   products: ShopifyJournalProduct[];
   product: ShopifyJournalProduct;
   charmProduct: ShopifyJournalProduct;
+  pouchVariant?: ShopifyVariant;
   selection: JournalSelection;
   onAddToCart: () => void;
   adding?: boolean;
   error?: string | null;
 }
 
-export function PreviewStep({ products, product, charmProduct, selection, onAddToCart, adding, error }: PreviewStepProps) {
+export function PreviewStep({ products, product, charmProduct, pouchVariant, selection, onAddToCart, adding, error }: PreviewStepProps) {
   const { format } = useCurrencyFormat();
   const cover = buildCoverEntries(products).find((c) => c.handle === product.handle);
   const variant = resolveVariant(product, selection);
   const charmsPrice = charmsTotal(charmProduct, selection.charms);
+  const pouchPrice = selection.pouch ? Number(pouchVariant?.price ?? 0) : 0;
   // Patch price is baked into `variant.price` now (a real 4th option on the
   // journal product), not a separate add-on total.
-  const total = Number(variant.price) + charmsPrice;
+  const total = Number(variant.price) + charmsPrice + pouchPrice;
+  const extraNotebookNote = (selection.notebooks["Extra Notebook"] ?? 0) > 0 ? selection.notebooksNote.trim() : "";
 
   const frontCharms = selection.charms.filter((c) => c.side === "front").length;
   const backCharms = selection.charms.filter((c) => c.side === "back").length;
@@ -56,6 +59,7 @@ export function PreviewStep({ products, product, charmProduct, selection, onAddT
     },
     { label: "Charms", value: charmSummary },
     { label: "Notebooks", value: notebookSummary },
+    { label: "Pouch", value: selection.pouch ? "Plastic Pouch" : "None" },
     { label: "SKU", value: variant.sku },
   ];
 
@@ -71,6 +75,12 @@ export function PreviewStep({ products, product, charmProduct, selection, onAddT
             <dd className="text-sm font-medium text-[var(--ink)]">{r.value}</dd>
           </div>
         ))}
+        {extraNotebookNote && (
+          <div className="py-4">
+            <dt className="text-sm text-[var(--muted)]">Extra notebook details</dt>
+            <dd className="mt-1.5 text-sm font-medium text-[var(--ink)]">{extraNotebookNote}</dd>
+          </div>
+        )}
         <div className="flex items-center justify-between py-4">
           <dt className="text-sm text-[var(--muted)]">Price</dt>
           <dd className="text-base font-semibold text-[var(--ink)]">{format(total)}</dd>

@@ -27,4 +27,8 @@ export interface JournalSelection {
   charms: PlacedCharm[];
   /** Notebook Type (Shopify option value) -> quantity chosen. Must total exactly 3. */
   notebooks: Record<string, number>;
+  /** Free-text description of what the customer wants inside their "Extra Notebook" — that design's content isn't fixed like the others. */
+  notebooksNote: string;
+  /** Whether the customer added the plastic pouch add-on. Its own standalone Shopify product/variant (like charms) — doesn't affect the cover photo, so it's not baked into the journal variant matrix. */
+  pouch: boolean;
 }

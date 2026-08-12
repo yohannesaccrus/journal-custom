@@ -1,9 +1,9 @@
 "use client";
 
 const SIZES = {
-  md: { box: "h-14 w-11", pad: "p-2", gap: "gap-1.5", lines: 4, todoRows: 3, gridCols: 4, gridRows: 5 },
-  sm: { box: "h-[34px] w-[27px]", pad: "p-1", gap: "gap-0.5", lines: 4, todoRows: 3, gridCols: 4, gridRows: 5 },
-  lg: { box: "h-full w-full", pad: "p-4", gap: "gap-2.5", lines: 9, todoRows: 6, gridCols: 6, gridRows: 9 },
+  md: { box: "h-14 w-11", pad: "p-2", gap: "gap-1.5", lines: 4, todoRows: 3 },
+  sm: { box: "h-[34px] w-[27px]", pad: "p-1", gap: "gap-0.5", lines: 4, todoRows: 3 },
+  lg: { box: "h-full w-full", pad: "p-4", gap: "gap-2.5", lines: 9, todoRows: 6 },
 } as const;
 
 interface NotebookIconProps {
@@ -28,19 +28,12 @@ export function NotebookIcon({ design, size = "md" }: NotebookIconProps) {
       </div>
     );
   }
-  if (design === "Grid Notebook") {
+  if (design === "Extra Notebook") {
     return (
-      <div
-        className={`grid ${s.box} bg-white ${s.pad} ${cardStyle}`}
-        style={{
-          gridTemplateColumns: `repeat(${s.gridCols}, minmax(0, 1fr))`,
-          gridTemplateRows: `repeat(${s.gridRows}, minmax(0, 1fr))`,
-          gap: size === "lg" ? "6px" : "2px",
-        }}
-      >
-        {Array.from({ length: s.gridCols * s.gridRows }).map((_, i) => (
-          <span key={i} className="rounded-[1px] bg-[#e3b9a8]" />
-        ))}
+      <div className={`flex ${s.box} items-center justify-center bg-white ${s.pad} ${cardStyle}`}>
+        <span className="font-heading italic text-[#c8beac]" style={{ fontSize: size === "lg" ? 22 : 10 }}>
+          extra.
+        </span>
       </div>
     );
   }

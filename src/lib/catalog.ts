@@ -1,5 +1,5 @@
 import type { ShopifyJournalProduct, ShopifyVariant } from "./shopify-admin";
-import type { CoverCategory, JournalSelection } from "./types";
+import type { CharmSide, CoverCategory, JournalSelection, PlacedCharm } from "./types";
 
 /** Presentational-only swatch colors — Shopify has no concept of a color swatch. */
 export const SWATCH_HEX: Record<string, string> = {
@@ -244,6 +244,32 @@ export function charmsTotal(charmProduct: ShopifyJournalProduct, charms: { varia
   return charms.reduce((sum, c) => sum + (priceByVariant.get(c.variantId) ?? 0), 0);
 }
 
+/** Client spec: 11 charms max per journal — 5 on the front, 6 on the side.
+ * Back has no per-view cap of its own (the client only named front/side, and
+ * 5 + 6 already accounts for the full 11), so it's bounded by the shared
+ * total only. */
+export const MAX_CHARMS_TOTAL = 11;
+export const MAX_CHARMS_FRONT = 5;
+export const MAX_CHARMS_SIDE = 6;
+
+export function charmSideLimit(side: CharmSide): number | null {
+  if (side === "front") return MAX_CHARMS_FRONT;
+  if (side === "side") return MAX_CHARMS_SIDE;
+  return null;
+}
+
+export function canPlaceCharm(charms: PlacedCharm[], side: CharmSide): boolean {
+  if (charms.length >= MAX_CHARMS_TOTAL) return false;
+  const sideLimit = charmSideLimit(side);
+  if (sideLimit === null) return true;
+  return charms.filter((c) => c.side === side).length < sideLimit;
+}
+
+/** "[JC] Sanaya Pouch" is a single-variant product — this is just that one variant. */
+export function resolvePouchVariant(pouchProduct: ShopifyJournalProduct): ShopifyVariant | undefined {
+  return pouchProduct.variants[0];
+}
+
 const CORD_SLUG: Record<string, string> = {
   Black: "black",
   Brown: "brown",
@@ -283,12 +309,13 @@ export const NOTEBOOKS_PER_JOURNAL = 3;
 
 /** Shown to the customer under the notebook picker — matches the physical spec of every notebook. */
 export const NOTEBOOK_SPEC_NOTE =
-  "All notebooks: black Sanaya-branded cover, 80gsm, 50 sheets / 100 pages. To-Do List has ivory pages, the others have white pages.";
+  "All notebooks: black Sanaya-branded cover, 80gsm, 50 sheets / 100 pages. To-Do List has ivory pages, the others have white pages. Extra Notebook content is fully customizable — tell us what you'd like inside.";
 
 export interface NotebookEntry {
   variantId: string;
   design: string;
   inStock: boolean;
+  imageUrl: string | null;
 }
 
 export function buildNotebookEntries(notebookProduct: ShopifyJournalProduct): NotebookEntry[] {
@@ -296,6 +323,7 @@ export function buildNotebookEntries(notebookProduct: ShopifyJournalProduct): No
     variantId: v.id,
     design: optionValue(v, "Type") ?? v.title,
     inStock: inStock(v),
+    imageUrl: v.image?.url ?? null,
   }));
 }
 

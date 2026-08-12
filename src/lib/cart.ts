@@ -1,4 +1,4 @@
-import { EDGE_LABEL } from "./catalog";
+import { EDGE_LABEL, resolvePouchVariant } from "./catalog";
 import type { ShopifyJournalProduct, ShopifyVariant } from "./shopify-admin";
 import type { JournalSelection } from "./types";
 import { buildDesignUrl, encodeDesign } from "./design-link";
@@ -43,13 +43,17 @@ function newBundleId(): string {
  * the journal variant itself (with cord/pen holder/edge/notebooks recorded as
  * customer-visible properties), plus one line per distinct charm+placement
  * combo (charms are separately priced, published products with their own
- * variant ids). All lines share a hidden `_bundle_id` property (Shopify hides
- * property keys starting with "_" from cart/checkout UI) so fulfillment can
- * tell which charms belong to which journal within a multi-journal order.
+ * variant ids), plus one line for the plastic pouch add-on if chosen (same
+ * standalone-product pattern as charms — it doesn't affect the cover photo,
+ * so it isn't baked into the journal variant matrix). All lines share a
+ * hidden `_bundle_id` property (Shopify hides property keys starting with
+ * "_" from cart/checkout UI) so fulfillment can tell which charms/pouch
+ * belong to which journal within a multi-journal order.
  */
 export function buildCartItems(
   variant: ShopifyVariant,
   charmProduct: ShopifyJournalProduct,
+  pouchProduct: ShopifyJournalProduct,
   selection: JournalSelection,
   designPageOrigin: string
 ): CartPayload {
@@ -68,6 +72,9 @@ export function buildCartItems(
   if (notebookEntries.length > 0) {
     properties["Notebooks"] = notebookEntries.map(([design, count]) => `${count}× ${design}`).join(", ");
   }
+  const extraNotebookNote = (selection.notebooks["Extra Notebook"] ?? 0) > 0 ? selection.notebooksNote.trim() : "";
+  if (extraNotebookNote) properties["Extra Notebook Details"] = extraNotebookNote;
+  if (selection.pouch) properties["Pouch"] = "Yes";
   // Charm placement is freeform, so it can't be baked into the variant photo —
   // link to a read-only page that renders exactly what the customer designed.
   // Customer-visible on the cart and checkout pages (client requirement) —
@@ -104,6 +111,18 @@ export function buildCartItems(
     });
   }
 
+  if (selection.pouch) {
+    const pouchVariant = resolvePouchVariant(pouchProduct);
+    if (pouchVariant) {
+      items.push({
+        id: toLegacyId(pouchVariant.id),
+        variantId: pouchVariant.id,
+        quantity: 1,
+        properties: { _for_journal: bundleId },
+      });
+    }
+  }
+
   // Static per-view thumbnails for the order-confirmation email — it can't run
   // the interactive slider's absolutely-positioned charm/patch overlays, so
   // these point at a route that composites the same thing server-side into a
@@ -118,6 +137,12 @@ export function buildCartItems(
     [`✨ Design Back — ${bundleId}`]: `${imageBase}&view=back`,
     [`✨ Design Side — ${bundleId}`]: `${imageBase}&view=side`,
   };
+  // Cart-level, not just the line-item `properties` above — the journal line
+  // item's properties are dropped if it explodes into Bundle components at
+  // order-creation time (see the `CartPayload.attributes` doc comment above),
+  // so this is what actually guarantees the note survives to checkout/the
+  // finished order, the same reason the design links live here too.
+  if (extraNotebookNote) attributes[`📝 Extra Notebook Note — ${bundleId}`] = extraNotebookNote;
 
   return { items, attributes };
 }

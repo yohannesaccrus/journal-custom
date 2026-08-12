@@ -9,6 +9,10 @@ export default function VariantThumbnail({
   imageUrl,
   onUploaded,
   caption,
+  uploadUrl = "/api/admin/assets/image",
+  extraFormFields,
+  clearable = false,
+  onCleared,
 }: {
   productId: string;
   variantId: string;
@@ -16,11 +20,19 @@ export default function VariantThumbnail({
   onUploaded: () => void;
   /** Small label under the thumbnail clarifying where this image is actually seen — e.g. "Admin only" vs "Shown to customer". Omit to show nothing. */
   caption?: string;
+  /** POST endpoint for uploads. Defaults to the standard variant-image endpoint. */
+  uploadUrl?: string;
+  /** Extra fields to append to the upload form body beyond productId/variantId/file (e.g. for endpoints that don't need productId). */
+  extraFormFields?: Record<string, string>;
+  /** Show a "Clear" action in the modal, calling `onCleared` (e.g. to delete a metafield override instead of just replacing it). */
+  clearable?: boolean;
+  onCleared?: () => Promise<void>;
 }) {
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   async function upload(file: File) {
     if (!file.type.startsWith("image/")) return;
@@ -31,10 +43,13 @@ export default function VariantThumbnail({
     const form = new FormData();
     form.append("productId", productId);
     form.append("variantId", variantId);
+    if (extraFormFields) {
+      for (const [key, value] of Object.entries(extraFormFields)) form.append(key, value);
+    }
     form.append("file", file);
 
     try {
-      const res = await fetch("/api/admin/assets/image", { method: "POST", body: form });
+      const res = await fetch(uploadUrl, { method: "POST", body: form });
       if (!res.ok) throw new Error();
       onUploaded();
     } catch {
@@ -42,6 +57,21 @@ export default function VariantThumbnail({
       setPreview(null);
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function clear() {
+    if (!onCleared) return;
+    setClearing(true);
+    try {
+      await onCleared();
+      setPreview(null);
+      onUploaded();
+      setModalOpen(false);
+    } catch {
+      setError(true);
+    } finally {
+      setClearing(false);
     }
   }
 
@@ -107,6 +137,9 @@ export default function VariantThumbnail({
           error={error}
           onUpload={upload}
           onClose={() => setModalOpen(false)}
+          clearable={clearable && !!imageUrl}
+          clearing={clearing}
+          onClear={onCleared ? clear : undefined}
         />
       )}
     </div>
@@ -119,12 +152,18 @@ function ImageModal({
   error,
   onUpload,
   onClose,
+  clearable = false,
+  clearing = false,
+  onClear,
 }: {
   imageUrl: string | null;
   uploading: boolean;
   error: boolean;
   onUpload: (file: File) => void;
   onClose: () => void;
+  clearable?: boolean;
+  clearing?: boolean;
+  onClear?: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -209,6 +248,17 @@ function ImageModal({
             </svg>
             {imageUrl ? "Replace image" : "Upload image"}
           </button>
+
+          {clearable && onClear && (
+            <button
+              type="button"
+              disabled={uploading || clearing}
+              onClick={onClear}
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-full border border-[#e8e3d8] px-4 py-2 text-xs font-medium text-[#b5342c] transition-colors hover:bg-[#fdf2f0] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {clearing ? "Clearing…" : "Clear override"}
+            </button>
+          )}
         </div>
       </div>
 

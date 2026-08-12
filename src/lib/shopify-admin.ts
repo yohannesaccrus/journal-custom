@@ -1,5 +1,4 @@
 import "server-only";
-import { cache } from "react";
 
 const STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN;
 const ACCESS_TOKEN = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
@@ -118,7 +117,15 @@ async function shopifyAdminRequest<T>(query: string, variables: Record<string, u
         "X-Shopify-Access-Token": ACCESS_TOKEN,
       },
       body: JSON.stringify({ query, variables }),
-      next: { revalidate: 300 },
+      // Journal covers routinely return several MB of variant data (300+
+      // variants x image/frontImageOverride/selectedOptions), well past
+      // Next's ~2MB per-item fetch-cache ceiling -- `next.revalidate` here
+      // silently fails to cache every single response (see the "Failed to
+      // set fetch cache ... items over 2MB" warning), which means it was
+      // never actually caching and every page load re-fetched from scratch.
+      // `fetchProducts` below does the real caching instead; opt this fetch
+      // out entirely so it stops trying (and failing) to cache it too.
+      cache: "no-store",
     });
     if (!res.ok) {
       throw new Error(`Shopify Admin API request failed: ${res.status} ${res.statusText}`);
@@ -154,12 +161,7 @@ async function fetchRemainingVariants(productId: string, cursor: string): Promis
   return variants;
 }
 
-// Journal covers are now expensive to fetch (paginated, ~150-450 Shopify API
-// cost points per cover) and every one of the 5+ route/component call sites
-// asks for the same "tag:journal" set -- React's per-request cache dedupes
-// those into a single Shopify round trip instead of firing the fetch again
-// for every caller in the same render.
-const fetchProducts = cache(async (query: string): Promise<ShopifyJournalProduct[]> => {
+async function fetchProductsUncached(query: string): Promise<ShopifyJournalProduct[]> {
   const data = await shopifyAdminRequest<{ products: { nodes: RawProduct[] } }>(PRODUCTS_QUERY, { query });
 
   // Sequential, not Promise.all — up to 13 journal covers each needing a
@@ -186,7 +188,37 @@ const fetchProducts = cache(async (query: string): Promise<ShopifyJournalProduct
   }
 
   return products;
-});
+}
+
+const PRODUCTS_CACHE_TTL_MS = 5 * 60 * 1000;
+// Keyed by the "tag:..." query string. Holds either a resolved value (with
+// the time it was fetched) or an in-flight promise, so concurrent callers
+// for the same query share one Shopify round trip instead of each starting
+// their own -- same intent as the old React `cache()` wrapper, but this one
+// survives across requests/reloads instead of resetting every render.
+const productsCache = new Map<string, { promise: Promise<ShopifyJournalProduct[]>; fetchedAt: number }>();
+
+// Journal covers are now expensive to fetch (paginated, ~150-450 Shopify API
+// cost points per cover, several MB of response -- too large for Next's
+// fetch cache, see the `cache: "no-store"` note in `shopifyAdminRequest`)
+// and every one of the 5+ route/component call sites asks for the same
+// "tag:journal" set. Without a real cross-request cache, every single page
+// load re-fetches all 13 covers from scratch, which is what was keeping
+// Shopify's rate limiter permanently tripped.
+function fetchProducts(query: string): Promise<ShopifyJournalProduct[]> {
+  const cached = productsCache.get(query);
+  if (cached && Date.now() - cached.fetchedAt < PRODUCTS_CACHE_TTL_MS) {
+    return cached.promise;
+  }
+  const promise = fetchProductsUncached(query).catch((err) => {
+    // Don't leave a rejected promise cached -- the next call should retry
+    // against Shopify instead of replaying the same failure for the TTL.
+    productsCache.delete(query);
+    throw err;
+  });
+  productsCache.set(query, { promise, fetchedAt: Date.now() });
+  return promise;
+}
 
 export async function fetchJournalProducts(): Promise<ShopifyJournalProduct[]> {
   return fetchProducts("tag:journal");
@@ -205,6 +237,12 @@ export async function fetchNotebookProduct(): Promise<ShopifyJournalProduct | un
 /** "[JC] Sanaya Patch" — a tracker product whose 6 variants (Brown/Red/Sparkle × Heart/Star) exist purely so the picker has a photo thumbnail per patch; the patch itself is baked into each journal cover's own front photo (see `stringValueFor` in catalog.ts), not drawn from this product. */
 export async function fetchPatchProduct(): Promise<ShopifyJournalProduct | undefined> {
   const products = await fetchProducts("tag:patch");
+  return products[0];
+}
+
+/** "[JC] Sanaya Pouch" — a single-variant add-on product (like Charms), added as its own cart line item when the customer opts in on the Accessories step. Doesn't affect the cover photo, so it isn't baked into the journal variant matrix like Pen Holder/Corner Edge. */
+export async function fetchPouchProduct(): Promise<ShopifyJournalProduct | undefined> {
+  const products = await fetchProducts("tag:pouch");
   return products[0];
 }
 

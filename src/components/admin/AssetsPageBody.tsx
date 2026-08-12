@@ -7,9 +7,9 @@ import AssetCategoryCard from "@/app/admin/(dashboard)/assets/AssetCategoryCard"
 
 // Fixed display order for the asset category cards, matching the order the
 // customizer's own steps present these to the customer (Cover -> String ->
-// Patch -> Charm -> Pen Holder -> Corner Edge -> Notebook) rather than
-// whatever order Shopify's API happens to return.
-const CATEGORY_ORDER = ["cover", "string", "patch", "charm", "pen-holder", "edge", "notebook"];
+// Patch -> Charm -> Pen Holder -> Corner Edge -> Pouch -> Notebook) rather
+// than whatever order Shopify's API happens to return.
+const CATEGORY_ORDER = ["cover", "string", "patch", "charm", "pen-holder", "edge", "pouch", "notebook"];
 
 function categoryRank(product: AdminProduct): number {
   const index = CATEGORY_ORDER.findIndex((tag) => product.tags.includes(tag));

@@ -4,15 +4,17 @@ import {
   fetchJournalProducts,
   fetchNotebookProduct,
   fetchPatchProduct,
+  fetchPouchProduct,
   fetchSwatchColors,
 } from "@/lib/shopify-admin";
 
 export default async function Home() {
-  const [products, charmProduct, notebookProduct, patchProduct, swatchColors] = await Promise.all([
+  const [products, charmProduct, notebookProduct, patchProduct, pouchProduct, swatchColors] = await Promise.all([
     fetchJournalProducts(),
     fetchCharmProduct(),
     fetchNotebookProduct(),
     fetchPatchProduct(),
+    fetchPouchProduct(),
     fetchSwatchColors(),
   ]);
 
@@ -25,6 +27,9 @@ export default async function Home() {
   if (!patchProduct) {
     throw new Error("Patch product not found in Shopify (expected a product tagged 'patch')");
   }
+  if (!pouchProduct) {
+    throw new Error("Pouch product not found in Shopify (expected a product tagged 'pouch')");
+  }
 
   return (
     <JournalCustomizer
@@ -32,6 +37,7 @@ export default async function Home() {
       charmProduct={charmProduct}
       notebookProduct={notebookProduct}
       patchProduct={patchProduct}
+      pouchProduct={pouchProduct}
       swatchColors={swatchColors}
     />
   );

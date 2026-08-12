@@ -1,7 +1,17 @@
 "use client";
 
 import { useRef } from "react";
-import { buildCharmEntries, PATCH_POSITION, resolveSideImage, type CharmEntry } from "@/lib/catalog";
+import {
+  buildCharmEntries,
+  canPlaceCharm,
+  charmSideLimit,
+  MAX_CHARMS_FRONT,
+  MAX_CHARMS_SIDE,
+  MAX_CHARMS_TOTAL,
+  PATCH_POSITION,
+  resolveSideImage,
+  type CharmEntry,
+} from "@/lib/catalog";
 import { useCurrencyFormat } from "@/components/CurrencyContext";
 import { PatchIcon } from "@/components/PatchIcon";
 import type { ShopifyJournalProduct } from "@/lib/shopify-admin";
@@ -20,8 +30,8 @@ interface CharmsStepProps {
 
 const VIEWS: { key: CharmSide; label: string; wide: boolean }[] = [
   { key: "front", label: "Front", wide: true },
-  { key: "back", label: "Back", wide: true },
   { key: "side", label: "Side", wide: false },
+  { key: "back", label: "Back", wide: true },
 ];
 
 function clamp(n: number, min: number, max: number) {
@@ -48,6 +58,8 @@ interface CharmCanvasProps {
   imageUrl: string | undefined;
   patch?: JournalSelection["patch"];
   charms: PlacedCharm[];
+  limit: number | null;
+  atLimit: boolean;
   entries: CharmEntry[];
   active: boolean;
   onSelect: () => void;
@@ -56,7 +68,21 @@ interface CharmCanvasProps {
   onRemove: (instanceId: string) => void;
 }
 
-function CharmCanvas({ label, wide, imageUrl, patch, charms, entries, active, onSelect, onDropCharm, onMove, onRemove }: CharmCanvasProps) {
+function CharmCanvas({
+  label,
+  wide,
+  imageUrl,
+  patch,
+  charms,
+  limit,
+  atLimit,
+  entries,
+  active,
+  onSelect,
+  onDropCharm,
+  onMove,
+  onRemove,
+}: CharmCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragId = useRef<string | null>(null);
 
@@ -74,6 +100,7 @@ function CharmCanvas({ label, wide, imageUrl, patch, charms, entries, active, on
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
+    if (atLimit) return;
     const raw = e.dataTransfer.getData(DRAG_MIME);
     if (!raw) return;
     const { variantId, design } = JSON.parse(raw);
@@ -102,14 +129,27 @@ function CharmCanvas({ label, wide, imageUrl, patch, charms, entries, active, on
 
   return (
     <div className="flex flex-col items-center gap-2">
-      <button
-        type="button"
-        onClick={onSelect}
-        className={`text-xs font-medium uppercase tracking-wide transition-colors ${
-          active ? "text-[var(--accent)]" : "text-[var(--faint)] hover:text-[var(--muted)]"
-        }`}
-      >
-        {label}
+      <button type="button" onClick={onSelect} className="flex items-center gap-1.5">
+        <span
+          className={`text-xs font-medium uppercase tracking-wide transition-colors ${
+            active ? "text-[var(--accent)]" : "text-[var(--faint)] hover:text-[var(--muted)]"
+          }`}
+        >
+          {label}
+        </span>
+        {limit !== null && (
+          <span
+            className={`rounded-full px-2 py-0.5 text-[11px] font-semibold leading-none tabular-nums shadow-sm transition-colors ${
+              atLimit
+                ? "bg-[var(--brand)] text-white"
+                : charms.length > 0
+                  ? "bg-[var(--accent)] text-white"
+                  : "border border-[var(--border)] bg-white text-[var(--muted)]"
+            }`}
+          >
+            {charms.length}/{limit}
+          </span>
+        )}
       </button>
       <div
         ref={canvasRef}
@@ -118,6 +158,7 @@ function CharmCanvas({ label, wide, imageUrl, patch, charms, entries, active, on
         onDrop={handleDrop}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        title={atLimit ? "This view is full" : undefined}
         className={`relative rounded-[var(--radius-panel)] overflow-hidden border-2 select-none bg-[var(--surface-soft)] transition-colors cursor-pointer ${
           active ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/20" : "border-[var(--border)] hover:border-[var(--accent)]/30"
         } ${wide ? "w-[170px] aspect-[560/660]" : "w-[92px] aspect-[200/660]"}`}
@@ -186,6 +227,7 @@ export function CharmsStep({
   const entries = buildCharmEntries(charmProduct);
 
   function addCharm(side: CharmSide, variantId: string, design: string, x: number, y: number) {
+    if (!canPlaceCharm(charms, side)) return;
     onChange([...charms, newPlacement(variantId, design, side, x, y)]);
   }
 
@@ -201,75 +243,88 @@ export function CharmsStep({
     viewKey === "front" ? journalImageUrl : resolveSideImage(product, viewKey, selection);
 
   const totalCharms = charms.length;
+  const activeSideAtLimit = !canPlaceCharm(charms, activeSide);
+  const totalAtLimit = totalCharms >= MAX_CHARMS_TOTAL;
 
   return (
     <div className="step-fade-in">
       <h2 className="text-xl font-heading text-[var(--ink)]">Add charms</h2>
       <p className="mt-1 text-sm text-[var(--muted)]">
-        Drag a charm onto the front, back, or side cover — place as many as you like.
+        Drag a charm onto the front, back, or side cover — up to {MAX_CHARMS_TOTAL} per journal.
       </p>
 
       <div className="mt-4 flex flex-wrap gap-4">
-        {entries.map((c) => (
-          <DisabledHint key={c.variantId} message={!c.inStock ? "Out of stock" : null}>
-            <div
-              draggable={c.inStock}
-              onDragStart={(e) => {
-                if (!c.inStock) return;
-                e.dataTransfer.setData(DRAG_MIME, JSON.stringify({ variantId: c.variantId, design: c.design }));
-                e.dataTransfer.effectAllowed = "copy";
-              }}
-              onClick={() => c.inStock && addCharm(activeSide, c.variantId, c.design, 50, 45)}
-              className={`flex flex-col items-center gap-1.5 group ${
-                c.inStock ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed opacity-40"
-              }`}
+        {entries.map((c) => {
+          const disabled = !c.inStock || activeSideAtLimit;
+          return (
+            <DisabledHint
+              key={c.variantId}
+              message={!c.inStock ? "Out of stock" : totalAtLimit ? `${MAX_CHARMS_TOTAL} charm limit reached` : activeSideAtLimit ? `${activeSide} is full` : null}
             >
-              <span className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-chip)] border-2 border-transparent bg-[var(--surface-soft)] group-hover:border-[var(--accent)]/30 transition-colors">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={c.imageUrl} alt="" className="h-7 w-7 object-contain pointer-events-none" />
-              </span>
-              <span className="text-xs text-[var(--ink)]">{c.design}</span>
-              <span className="text-[10px] text-[var(--brand)] -mt-1">{format(c.price)}</span>
-            </div>
-          </DisabledHint>
-        ))}
+              <div
+                draggable={!disabled}
+                onDragStart={(e) => {
+                  if (disabled) return;
+                  e.dataTransfer.setData(DRAG_MIME, JSON.stringify({ variantId: c.variantId, design: c.design }));
+                  e.dataTransfer.effectAllowed = "copy";
+                }}
+                onClick={() => !disabled && addCharm(activeSide, c.variantId, c.design, 50, 45)}
+                className={`flex flex-col items-center gap-1.5 group ${
+                  disabled ? "cursor-not-allowed opacity-40" : "cursor-grab active:cursor-grabbing"
+                }`}
+              >
+                <span className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-chip)] border-2 border-transparent bg-[var(--surface-soft)] group-hover:border-[var(--accent)]/30 transition-colors">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={c.imageUrl} alt="" className="h-7 w-7 object-contain pointer-events-none" />
+                </span>
+                <span className="text-xs text-[var(--ink)]">{c.design}</span>
+                <span className="text-[10px] text-[var(--brand)] -mt-1">{format(c.price)}</span>
+              </div>
+            </DisabledHint>
+          );
+        })}
       </div>
 
       <div className="mt-3 flex items-start gap-2 rounded-lg bg-[var(--surface-soft)] px-3 py-2 text-xs text-[var(--muted)]">
         <span aria-hidden>💡</span>
         <span>
           Drag a charm from above and drop it onto any view below to place it there. Once placed, drag a
-          charm to fine-tune its spot, or click the × that appears on hover to remove it. You can mix
-          charms across front, back, and side.
+          charm to fine-tune its spot, or click the × that appears on hover to remove it. Mix charms across
+          front, side, and back — up to {MAX_CHARMS_FRONT} on the front, {MAX_CHARMS_SIDE} on the side,{" "}
+          {MAX_CHARMS_TOTAL} in total.
         </span>
       </div>
 
       <div className="mt-4 flex flex-wrap items-start gap-6">
-        {VIEWS.map((v) => (
-          <CharmCanvas
-            key={v.key}
-            label={v.label}
-            wide={v.wide}
-            imageUrl={imageFor(v.key)}
-            patch={v.key === "front" ? selection.patch : undefined}
-            charms={charms.filter((c) => c.side === v.key)}
-            entries={entries}
-            active={activeSide === v.key}
-            onSelect={() => onSelectSide(v.key)}
-            onDropCharm={(variantId, design, x, y) => {
-              onSelectSide(v.key);
-              addCharm(v.key, variantId, design, x, y);
-            }}
-            onMove={updatePosition}
-            onRemove={removeCharm}
-          />
-        ))}
+        {VIEWS.map((v) => {
+          const sideCharms = charms.filter((c) => c.side === v.key);
+          const limit = charmSideLimit(v.key);
+          return (
+            <CharmCanvas
+              key={v.key}
+              label={v.label}
+              wide={v.wide}
+              imageUrl={imageFor(v.key)}
+              patch={v.key === "front" ? selection.patch : undefined}
+              charms={sideCharms}
+              limit={limit}
+              atLimit={totalAtLimit || (limit !== null && sideCharms.length >= limit)}
+              entries={entries}
+              active={activeSide === v.key}
+              onSelect={() => onSelectSide(v.key)}
+              onDropCharm={(variantId, design, x, y) => {
+                onSelectSide(v.key);
+                addCharm(v.key, variantId, design, x, y);
+              }}
+              onMove={updatePosition}
+              onRemove={removeCharm}
+            />
+          );
+        })}
       </div>
 
       <p className="mt-4 text-sm text-[var(--muted)]">
-        {totalCharms === 0
-          ? "No charms added yet."
-          : `${totalCharms} charm${totalCharms > 1 ? "s" : ""} placed.`}
+        {totalCharms === 0 ? "No charms added yet." : `${totalCharms} of ${MAX_CHARMS_TOTAL} charms placed.`}
       </p>
     </div>
   );

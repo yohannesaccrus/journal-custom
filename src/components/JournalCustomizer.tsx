@@ -21,11 +21,13 @@ import {
   buildCharmEntries,
   buildCordEntries,
   buildCoverEntries,
+  canPlaceCharm,
   charmsTotal,
   NOTEBOOKS_PER_JOURNAL,
   notebookCount,
   PATCH_POSITION,
   resolveFrontImage,
+  resolvePouchVariant,
   resolveSideImage,
   resolveVariant,
 } from "@/lib/catalog";
@@ -56,6 +58,7 @@ interface JournalCustomizerProps {
   charmProduct: ShopifyJournalProduct;
   notebookProduct: ShopifyJournalProduct;
   patchProduct: ShopifyJournalProduct;
+  pouchProduct: ShopifyJournalProduct;
   /** Admin-edited swatch colors for String/Pen Holder — see `fetchSwatchColors`. */
   swatchColors: SwatchColors;
   // Set when this render is the phone-sized <iframe> embed the "Mobile View"
@@ -80,6 +83,7 @@ function JournalCustomizerContent({
   charmProduct,
   notebookProduct,
   patchProduct,
+  pouchProduct,
   swatchColors,
   hideDevControls,
   initialTheme,
@@ -163,6 +167,8 @@ function JournalCustomizerContent({
     patch: "none",
     charms: [],
     notebooks: {},
+    notebooksNote: "",
+    pouch: false,
   });
   const [orderConfirm, setOrderConfirm] = useState<{ designUrl: string } | null>(null);
   const [confirmingCheckout, setConfirmingCheckout] = useState(false);
@@ -224,9 +230,11 @@ function JournalCustomizerContent({
   const variant = useMemo(() => resolveVariant(product, selection), [product, selection]);
   const imageSrc = resolveFrontImage(variant);
   const charmEntries = useMemo(() => buildCharmEntries(charmProduct), [charmProduct]);
+  const pouchVariant = useMemo(() => resolvePouchVariant(pouchProduct), [pouchProduct]);
   // Patch price is now baked straight into the resolved variant's own price
   // (a real Cover×String×Pen Holder×Patch combo), not a separate add-on total.
-  const total = Number(variant.price) + charmsTotal(charmProduct, selection.charms);
+  const total =
+    Number(variant.price) + charmsTotal(charmProduct, selection.charms) + (selection.pouch ? Number(pouchVariant?.price ?? 0) : 0);
   const frontCharms = selection.charms.filter((c) => c.side === "front");
   const backCharms = selection.charms.filter((c) => c.side === "back");
   const sideCharms = selection.charms.filter((c) => c.side === "side");
@@ -290,6 +298,7 @@ function JournalCustomizerContent({
 
   function handleMainDrop(e: React.DragEvent) {
     e.preventDefault();
+    if (!canPlaceCharm(selection.charms, mainView)) return;
     const raw = e.dataTransfer.getData(DRAG_MIME);
     if (!raw) return;
     const { variantId, design } = JSON.parse(raw);
@@ -420,7 +429,7 @@ function JournalCustomizerContent({
 
   function handleConfirmCheckout() {
     if (!orderConfirm) return;
-    const { items, attributes } = buildCartItems(variant, charmProduct, selection, window.location.origin);
+    const { items, attributes } = buildCartItems(variant, charmProduct, pouchProduct, selection, window.location.origin);
     setConfirmingCheckout(true);
     // The iframe is cross-origin from the shop, so it can't call
     // /cart/add.js itself — it messages the parent page instead. The parent
@@ -456,6 +465,10 @@ function JournalCustomizerContent({
         : null;
   const showBackSide = step === PREVIEW_STEP;
   const showNotebookPreview = step === NOTEBOOKS_STEP || step === PREVIEW_STEP;
+  // Only once the customer's actually reached (or passed) the step where
+  // Pouch is chosen — otherwise it'd float over the cover before it means
+  // anything, on the Cover/Charms steps.
+  const showPouchPreview = selection.pouch && step >= ACCESSORIES_STEP;
 
   if (isDev && mobilePreview) {
     const embedSrc = `/mobile-preview?theme=${theme}&background=${background}`;
@@ -612,6 +625,23 @@ function JournalCustomizerContent({
                     </div>
                   )}
                   {mainCharms.map(renderMainCharmMarker)}
+
+                  {/* Plastic pouch add-on — floats over the cover's bottom-right
+                      corner as a small "included" badge, echoing how it'll sit
+                      draped over the finished journal, rather than a plain list row. */}
+                  {showPouchPreview && (
+                    <div className="step-fade-in pointer-events-none absolute -bottom-3 -right-3 translate-x-1/4 flex w-[34%] max-w-[110px] flex-col items-center gap-1">
+                      <div className="aspect-square w-full overflow-hidden rounded-[var(--radius-chip)] border-2 border-white bg-white shadow-[0_8px_20px_-6px_rgba(28,28,26,0.35)]">
+                        {pouchVariant?.image?.url && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={pouchVariant.image.url} alt="Plastic pouch" className="h-full w-full object-cover" />
+                        )}
+                      </div>
+                      <span className="rounded-full bg-white/95 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide text-[var(--muted)] shadow-sm">
+                        Pouch included
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -749,13 +779,17 @@ function JournalCustomizerContent({
                 onEdgeChange={(edge) => updateSelection({ edge })}
                 cordSwatchByLabel={swatchColors.string}
                 penHolderSwatchByLabel={swatchColors.penHolder}
+                pouchVariant={pouchVariant}
+                onPouchChange={(pouch) => updateSelection({ pouch })}
               />
             )}
             {step === NOTEBOOKS_STEP && (
               <NotebooksStep
                 notebookProduct={notebookProduct}
                 notebooks={selection.notebooks}
+                notebooksNote={selection.notebooksNote}
                 onChange={(notebooks) => updateSelection({ notebooks })}
+                onNoteChange={(notebooksNote) => updateSelection({ notebooksNote })}
               />
             )}
             {step === PREVIEW_STEP && (
@@ -763,6 +797,7 @@ function JournalCustomizerContent({
                 products={products}
                 product={product}
                 charmProduct={charmProduct}
+                pouchVariant={pouchVariant}
                 selection={selection}
                 onAddToCart={handleAddToCart}
               />

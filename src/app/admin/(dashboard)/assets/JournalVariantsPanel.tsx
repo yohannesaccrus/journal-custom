@@ -96,6 +96,7 @@ export default function JournalVariantsPanel({
           <thead>
             <tr className="bg-[#f2ece1] text-left text-[10px] uppercase tracking-wide text-[#6b6a63]">
               <th className="px-5 py-2 font-medium">Image</th>
+              <th className="px-5 py-2 font-medium">Front override</th>
               <th className="px-5 py-2 font-medium">String / Pen Holder / Patch</th>
               <th className="px-5 py-2 font-medium">SKU</th>
               <th className="px-5 py-2 font-medium">Price (auto)</th>
@@ -109,7 +110,7 @@ export default function JournalVariantsPanel({
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-5 py-6 text-center text-[#a89a80]">
+                <td colSpan={7} className="px-5 py-6 text-center text-[#a89a80]">
                   No variants match &ldquo;{query}&rdquo;.
                 </td>
               </tr>
@@ -175,6 +176,25 @@ function JournalComboRow({ productId, variant }: { productId: string; variant: V
           imageUrl={variant.image?.url ?? null}
           onUploaded={() => router.refresh()}
           caption="Shown to customer"
+        />
+      </td>
+      <td className="px-5 py-2">
+        <VariantThumbnail
+          productId={productId}
+          variantId={variant.id}
+          imageUrl={variant.frontImageOverride?.value ?? null}
+          onUploaded={() => router.refresh()}
+          caption="Front photo override"
+          uploadUrl="/api/admin/assets/front-image-override"
+          clearable
+          onCleared={async () => {
+            const res = await fetch("/api/admin/assets/front-image-override", {
+              method: "DELETE",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ variantId: variant.id }),
+            });
+            if (!res.ok) throw new Error("Failed to clear override");
+          }}
         />
       </td>
       <td className="px-5 py-2 text-[#1c1c1a]">

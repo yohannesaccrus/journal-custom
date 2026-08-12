@@ -4,6 +4,7 @@ import {
   fetchJournalProducts,
   fetchNotebookProduct,
   fetchPatchProduct,
+  fetchPouchProduct,
   fetchSwatchColors,
 } from "@/lib/shopify-admin";
 import type { BackgroundMode } from "@/components/BackgroundSwitcher";
@@ -22,11 +23,12 @@ interface MobilePreviewProps {
  * dynamically per request.
  */
 export default async function MobilePreview({ searchParams }: MobilePreviewProps) {
-  const [products, charmProduct, notebookProduct, patchProduct, swatchColors, params] = await Promise.all([
+  const [products, charmProduct, notebookProduct, patchProduct, pouchProduct, swatchColors, params] = await Promise.all([
     fetchJournalProducts(),
     fetchCharmProduct(),
     fetchNotebookProduct(),
     fetchPatchProduct(),
+    fetchPouchProduct(),
     fetchSwatchColors(),
     searchParams,
   ]);
@@ -39,6 +41,9 @@ export default async function MobilePreview({ searchParams }: MobilePreviewProps
   }
   if (!patchProduct) {
     throw new Error("Patch product not found in Shopify (expected a product tagged 'patch')");
+  }
+  if (!pouchProduct) {
+    throw new Error("Pouch product not found in Shopify (expected a product tagged 'pouch')");
   }
 
   const initialTheme = THEME_IDS.find((t) => t === params.theme);
@@ -60,6 +65,7 @@ export default async function MobilePreview({ searchParams }: MobilePreviewProps
         charmProduct={charmProduct}
         notebookProduct={notebookProduct}
         patchProduct={patchProduct}
+        pouchProduct={pouchProduct}
         swatchColors={swatchColors}
         hideDevControls
         initialTheme={initialTheme}

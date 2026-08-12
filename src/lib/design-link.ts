@@ -48,6 +48,8 @@ export function encodeDesign(selection: JournalSelection): string {
       Math.round(c.y),
     ]),
     nb: selection.notebooks,
+    nn: selection.notebooksNote || undefined,
+    po: selection.pouch || undefined,
   };
   return toBase64Url(JSON.stringify(compact));
 }
@@ -70,6 +72,8 @@ export function decodeDesign(encoded: string): JournalSelection | null {
         y,
       })),
       notebooks: compact.nb ?? {},
+      notebooksNote: compact.nn ?? "",
+      pouch: compact.po ?? false,
     };
   } catch {
     return null;

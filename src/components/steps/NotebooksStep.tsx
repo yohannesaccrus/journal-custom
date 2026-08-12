@@ -8,17 +8,19 @@ import type { ShopifyJournalProduct } from "@/lib/shopify-admin";
 interface NotebooksStepProps {
   notebookProduct: ShopifyJournalProduct;
   notebooks: Record<string, number>;
+  notebooksNote: string;
   onChange: (notebooks: Record<string, number>) => void;
+  onNoteChange: (note: string) => void;
 }
 
 const DESCRIPTIONS: Record<string, string> = {
   "To-Do List": "Checklists & daily tasks",
   "Lined Notebook": "Writing & journaling",
   "Blank Notebook": "Sketching & freeform",
-  "Grid Notebook": "Bullet journaling",
+  "Extra Notebook": "Tell us what you'd like inside",
 };
 
-export function NotebooksStep({ notebookProduct, notebooks, onChange }: NotebooksStepProps) {
+export function NotebooksStep({ notebookProduct, notebooks, notebooksNote, onChange, onNoteChange }: NotebooksStepProps) {
   const entries = buildNotebookEntries(notebookProduct);
   const total = notebookCount(notebooks);
   const remaining = NOTEBOOKS_PER_JOURNAL - total;
@@ -61,7 +63,12 @@ export function NotebooksStep({ notebookProduct, notebooks, onChange }: Notebook
                 count > 0 ? "border-[var(--accent)] bg-[var(--accent)]/[0.03]" : "border-[var(--border)]"
               } ${atLimit || !n.inStock ? "opacity-40" : ""}`}
             >
-              <NotebookIcon design={n.design} />
+              {n.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- small fixed-size thumbnail, not worth next/image's overhead here
+                <img src={n.imageUrl} alt="" className="h-14 w-11 shrink-0 rounded-sm object-cover shadow-sm" />
+              ) : (
+                <NotebookIcon design={n.design} />
+              )}
               <div className="min-w-0 flex-1">
                 <div className="font-medium text-[var(--ink)]">{n.design}</div>
                 <div className="text-xs text-[var(--faint)]">
@@ -93,6 +100,22 @@ export function NotebooksStep({ notebookProduct, notebooks, onChange }: Notebook
           );
         })}
       </div>
+
+      {(notebooks["Extra Notebook"] ?? 0) > 0 && (
+        <div className="mt-4 step-fade-in">
+          <label htmlFor="extra-notebook-note" className="text-sm font-medium text-[var(--ink)]">
+            What would you like in your Extra Notebook{(notebooks["Extra Notebook"] ?? 0) > 1 ? "s" : ""}?
+          </label>
+          <textarea
+            id="extra-notebook-note"
+            value={notebooksNote}
+            onChange={(e) => onNoteChange(e.target.value)}
+            placeholder="e.g. recipe cards, a travel itinerary template, a habit tracker…"
+            rows={3}
+            className="mt-1.5 w-full resize-none rounded-[var(--radius-panel)] border-2 border-[var(--border)] bg-white p-3 text-sm text-[var(--ink)] placeholder:text-[var(--faint)] focus:border-[var(--accent)] focus:outline-none"
+          />
+        </div>
+      )}
 
       <p className="mt-5 text-xs text-[var(--faint)]">{NOTEBOOK_SPEC_NOTE}</p>
 

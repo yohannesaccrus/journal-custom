@@ -68,9 +68,13 @@ export default function AssetCategoryCard({
   const isPatch = product.tags.includes("patch");
   // A single non-color add-on kit — no swatch makes sense here either.
   const isCornerEdge = product.tags.includes("edge");
-  // Notebook designs (To-Do List, Lined, Blank, Grid) are identified by their
+  // Notebook designs (To-Do List, Lined, Blank, Extra) are identified by their
   // photo/pattern too, same as Charm/Patch.
   const isNotebook = product.tags.includes("notebook");
+  // Single-variant add-on, same treatment as Charm: identified by its photo
+  // (not a color), and that photo is what the customer actually sees on the
+  // Accessories step's Pouch toggle.
+  const isPouch = product.tags.includes("pouch");
   // Every raw-material component tracker — Cover, String, Pen Holder,
   // Corner Edge, Patch — feeds the shared stock pool `syncJournalStock`
   // recomputes from (see the banner below).
@@ -78,7 +82,7 @@ export default function AssetCategoryCard({
   // Cover rows are read-only / swatch-less for the same reasons as Charm:
   // renaming would desync from the "Cover" option value the accordion below
   // matches by, and covers are identified by photo, not a color.
-  const hideSwatch = isCharm || isCoverTracker || isPatch || isCornerEdge || isNotebook;
+  const hideSwatch = isCharm || isCoverTracker || isPatch || isCornerEdge || isNotebook || isPouch;
   // Stock here IS editable, on every tracker (Cover/String/Pen Holder/Corner
   // Edge/Patch alike): it's the raw-material count for that component (e.g.
   // one shared pool of Orange string used across all 9 covers), not a
@@ -94,12 +98,13 @@ export default function AssetCategoryCard({
   // products (see `syncJournalPricing`) — the combo table itself only shows
   // the computed result, read-only.
   const hidePrice = false;
-  // Charm is the only tracker whose own variant photo is what customers
-  // actually see (buildCharmEntries reads it straight off this product) —
-  // every other tracker's image (Cover/String/Pen Holder/Patch/Notebook/Edge)
-  // is admin-only reference; the photo customers see for a cover combo comes
-  // from the real journal product's own image in the accordion below instead.
-  const imageCaption = isCharm ? "Shown to customer" : "Admin only";
+  // Charm and Pouch are the only trackers whose own variant photo is what
+  // customers actually see (buildCharmEntries/the Pouch toggle read it
+  // straight off this product) — every other tracker's image (Cover/String/
+  // Pen Holder/Patch/Notebook/Edge) is admin-only reference; the photo
+  // customers see for a cover combo comes from the real journal product's
+  // own image in the accordion below instead.
+  const imageCaption = isCharm || isPouch ? "Shown to customer" : "Admin only";
   // String and Pen Holder's Swatch columns stay editable — they actually
   // drive the live customizer's color pickers (see `fetchSwatchColors`) —
   // but like Cover/Charm/Patch/Corner Edge/Notebook their titles shouldn't
