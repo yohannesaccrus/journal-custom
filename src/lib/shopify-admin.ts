@@ -59,7 +59,8 @@ const PRODUCTS_QUERY = `
             inventoryQuantity
           }
         }
-        media(first: 150) {
+        media(first: 250) {
+          pageInfo { hasNextPage endCursor }
           nodes {
             alt
             ... on MediaImage { image { url } }
@@ -92,9 +93,32 @@ const REMAINING_VARIANTS_QUERY = `
   }
 `;
 
+// Journal covers with 300+ variants (Corner Edge x Patch combos, see
+// resolveFrontImage) also carry more than 250 media items once the front,
+// back, and side view images pile up -- `media(first: 250)` alone silently
+// drops anything past the first page, which is exactly how newly-added
+// back/side images (added last, so sorted last) went missing from
+// resolveSideImage even though they existed on Shopify. Needs the same
+// follow-up pagination as variants.
+const REMAINING_MEDIA_QUERY = `
+  query RemainingMedia($id: ID!, $cursor: String!) {
+    node(id: $id) {
+      ... on Product {
+        media(first: 250, after: $cursor) {
+          pageInfo { hasNextPage endCursor }
+          nodes {
+            alt
+            ... on MediaImage { image { url } }
+          }
+        }
+      }
+    }
+  }
+`;
+
 interface RawProduct extends Omit<ShopifyJournalProduct, "variants" | "media"> {
   variants: { nodes: ShopifyVariant[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } };
-  media: { nodes: { alt: string | null; image?: { url: string } }[] };
+  media: { nodes: { alt: string | null; image?: { url: string } }[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } };
 }
 
 function sleep(ms: number): Promise<void> {
@@ -161,6 +185,24 @@ async function fetchRemainingVariants(productId: string, cursor: string): Promis
   return variants;
 }
 
+interface RemainingMediaResponse {
+  node: { media: { nodes: { alt: string | null; image?: { url: string } }[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } } };
+}
+
+async function fetchRemainingMedia(productId: string, cursor: string): Promise<{ alt: string | null; image?: { url: string } }[]> {
+  let media: { alt: string | null; image?: { url: string } }[] = [];
+  let nextCursor: string | null = cursor;
+  while (nextCursor) {
+    const data: RemainingMediaResponse = await shopifyAdminRequest<RemainingMediaResponse>(REMAINING_MEDIA_QUERY, {
+      id: productId,
+      cursor: nextCursor,
+    });
+    media = media.concat(data.node.media.nodes);
+    nextCursor = data.node.media.pageInfo.hasNextPage ? data.node.media.pageInfo.endCursor : null;
+  }
+  return media;
+}
+
 async function fetchProductsUncached(query: string): Promise<ShopifyJournalProduct[]> {
   const data = await shopifyAdminRequest<{ products: { nodes: RawProduct[] } }>(PRODUCTS_QUERY, { query });
 
@@ -178,12 +220,15 @@ async function fetchProductsUncached(query: string): Promise<ShopifyJournalProdu
       if (products.length > 0) await sleep(150);
       variants = variants.concat(await fetchRemainingVariants(p.id, p.variants.pageInfo.endCursor));
     }
+    let mediaNodes = p.media.nodes;
+    if (p.media.pageInfo.hasNextPage && p.media.pageInfo.endCursor) {
+      await sleep(150);
+      mediaNodes = mediaNodes.concat(await fetchRemainingMedia(p.id, p.media.pageInfo.endCursor));
+    }
     products.push({
       ...p,
       variants,
-      media: p.media.nodes
-        .filter((m) => m.alt && m.image?.url)
-        .map((m) => ({ alt: m.alt as string, url: m.image!.url })),
+      media: mediaNodes.filter((m) => m.alt && m.image?.url).map((m) => ({ alt: m.alt as string, url: m.image!.url })),
     });
   }
 

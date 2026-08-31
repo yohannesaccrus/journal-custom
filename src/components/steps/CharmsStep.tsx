@@ -168,7 +168,11 @@ function CharmCanvas({
           <img src={imageUrl} alt="" className="absolute inset-0 h-full w-full object-contain pointer-events-none" />
         )}
 
-        {patch && patch !== "none" && (
+        {/* Fallback only: a real combo photo (see the Assets admin panel) already has
+            the patch baked in — drawing this on top of one would double it up, which
+            is exactly the bug this guard prevents. Only draw the floating marker when
+            this exact combo has no photo yet, same rule as the main preview. */}
+        {patch && patch !== "none" && !imageUrl && (
           <div
             className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
             style={{

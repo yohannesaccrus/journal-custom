@@ -8,6 +8,18 @@ export const runtime = "nodejs";
 const WIDTH = 480;
 const HEIGHT = 566; // matches the 560/660 aspect ratio used by the interactive design slider
 
+// The side (spine) photo is much narrower than front/back (200:660 vs
+// 560:660) -- `objectFit: "contain"` on a fixed 480x566 canvas therefore
+// letterboxes it into a centered strip rather than filling the frame. Charm
+// x/y are recorded as a percentage of that narrow strip itself (see
+// `previewSideRef` in JournalCustomizer.tsx and the side `CharmCanvas` in
+// CharmsStep.tsx, both of which size the strip directly with no letterbox),
+// so charm markers here need the same strip-relative -> canvas-relative
+// remap or they land wherever that percentage falls on the full-width
+// canvas instead -- visibly off to the side of the actual spine artwork.
+const SIDE_STRIP_WIDTH = HEIGHT * (200 / 660);
+const SIDE_STRIP_LEFT = (WIDTH - SIDE_STRIP_WIDTH) / 2;
+
 // Fixed marker sizes (px) per view — same values the interactive slider uses, since
 // charm/patch position is stored as a percentage of the canvas, not relative to it.
 const CHARM_SIZE: Record<string, number> = { front: 40, back: 32, side: 24 };
@@ -82,6 +94,12 @@ export async function GET(request: Request) {
   const charms = selection.charms.filter((c) => c.side === view);
   const charmSize = CHARM_SIZE[view];
 
+  // See SIDE_STRIP_WIDTH/LEFT above -- front/back fill the canvas exactly
+  // (same aspect ratio), so their x/y map 1:1; side needs remapping into
+  // the narrower letterboxed strip objectFit:contain actually draws it in.
+  const charmLeftPercent = (x: number) =>
+    view === "side" ? ((SIDE_STRIP_LEFT + (x / 100) * SIDE_STRIP_WIDTH) / WIDTH) * 100 : x;
+
   return new ImageResponse(
     (
       <div
@@ -102,7 +120,11 @@ export async function GET(request: Request) {
           style={{ position: "absolute", top: 0, left: 0, width: WIDTH, height: HEIGHT, objectFit: "contain" }}
         />
 
-        {view === "front" && selection.patch !== "none" && (
+        {/* Fallback only: a real combo photo already has the patch baked in --
+            drawing this on top of one would double it up. Only draw the
+            floating marker when this exact combo has no photo yet, same rule
+            as the interactive preview and CharmsStep. */}
+        {view === "front" && selection.patch !== "none" && !baseImage && (
           <div
             style={{
               display: "flex",
@@ -138,7 +160,7 @@ export async function GET(request: Request) {
               height={charmSize}
               style={{
                 position: "absolute",
-                left: `${c.x}%`,
+                left: `${charmLeftPercent(c.x)}%`,
                 top: `${c.y}%`,
                 width: charmSize,
                 height: charmSize,
