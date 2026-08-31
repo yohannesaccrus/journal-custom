@@ -334,10 +334,18 @@ function JournalCustomizerContent({
               }
             : undefined
         }
-        className={`group absolute h-8 w-8 -translate-x-1/2 -translate-y-1/2 touch-none ${
+        className={`group absolute -translate-x-1/2 -translate-y-1/2 touch-none ${
           isCharmsStep ? "cursor-grab active:cursor-grabbing" : "pointer-events-none"
         }`}
-        style={{ left: `${c.x}%`, top: `${c.y}%` }}
+        style={{
+          left: `${c.x}%`,
+          top: `${c.y}%`,
+          // The side (spine) strip is much narrower than the front/back canvas, so a
+          // charm sized as a fixed % of it stays legible instead of shrinking to a
+          // speck -- same ratio CharmsStep's own side/front-back canvases use.
+          width: mainView === "side" ? "28%" : "10%",
+          aspectRatio: "1",
+        }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img

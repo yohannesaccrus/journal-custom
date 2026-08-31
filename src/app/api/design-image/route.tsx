@@ -111,13 +111,22 @@ export async function GET(request: Request) {
           background: "#f7f4ee",
         }}
       >
+        {/* Satori's `objectFit: "contain"` doesn't reliably reproduce a browser's
+            letterboxing math (verified empirically -- it under-sized the side
+            strip well below the theoretical fit-by-height width), so the side
+            view is sized/positioned explicitly instead of relying on it. Charm
+            positions above are transformed to match this same explicit box. */}
         {/* eslint-disable-next-line @next/next/no-img-element -- Satori (next/og) only understands plain <img>, not next/image */}
         <img
           src={baseImage}
           alt=""
-          width={WIDTH}
+          width={view === "side" ? SIDE_STRIP_WIDTH : WIDTH}
           height={HEIGHT}
-          style={{ position: "absolute", top: 0, left: 0, width: WIDTH, height: HEIGHT, objectFit: "contain" }}
+          style={
+            view === "side"
+              ? { position: "absolute", top: 0, left: SIDE_STRIP_LEFT, width: SIDE_STRIP_WIDTH, height: HEIGHT }
+              : { position: "absolute", top: 0, left: 0, width: WIDTH, height: HEIGHT, objectFit: "contain" }
+          }
         />
 
         {/* Fallback only: a real combo photo already has the patch baked in --
