@@ -60,7 +60,6 @@ export function PreviewStep({ products, product, charmProduct, pouchVariant, sel
     { label: "Charms", value: charmSummary },
     { label: "Notebooks", value: notebookSummary },
     { label: "Pouch", value: selection.pouch ? "Plastic Pouch" : "None" },
-    { label: "SKU", value: variant.sku },
   ];
 
   return (
@@ -81,6 +80,10 @@ export function PreviewStep({ products, product, charmProduct, pouchVariant, sel
             <dd className="mt-1.5 text-sm font-medium text-[var(--ink)]">{extraNotebookNote}</dd>
           </div>
         )}
+        <div className="py-4">
+          <dt className="text-sm text-[var(--muted)]">SKU</dt>
+          <dd className="mt-1.5 break-all font-mono text-xs text-[var(--muted)]">{variant.sku}</dd>
+        </div>
         <div className="flex items-center justify-between py-4">
           <dt className="text-sm text-[var(--muted)]">Price</dt>
           <dd className="text-base font-semibold text-[var(--ink)]">{format(total)}</dd>

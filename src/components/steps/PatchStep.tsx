@@ -44,7 +44,7 @@ export function PatchStep({
 
   return (
     <div className="step-fade-in">
-      <h2 className="text-xl font-heading text-[var(--ink)]">String patch</h2>
+      <h2 className="text-xl font-heading text-[var(--ink)]">Patch</h2>
       <p className="mt-1 text-sm text-[var(--muted)]">
         {cordSelected
           ? "A stitched leather patch sitting right where the string ties."
