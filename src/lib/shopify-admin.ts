@@ -368,6 +368,49 @@ export async function fetchMarketPrice(countryCode: string): Promise<MarketPrice
   };
 }
 
+// A per-family multiplier (above) is still an approximation: Shopify Markets
+// commonly rounds each variant's contextual price to a "nice" number (e.g.
+// a flat $79.00) rather than a pure FX conversion, so applying one family's
+// ratio to a *different* variant in that family can land a cent or more off
+// what checkout actually charges. For the handful of variants that are
+// actually in the customer's cart (the exact journal/charm/pouch variants
+// chosen), fetch their own contextual price directly instead, so the
+// customizer's total matches checkout exactly.
+const VARIANT_PRICES_QUERY = `
+  query VariantPrices($ids: [ID!]!, $country: CountryCode!) {
+    nodes(ids: $ids) {
+      ... on ProductVariant {
+        id
+        contextualPricing(context: { country: $country }) {
+          price { amount currencyCode }
+        }
+      }
+    }
+  }
+`;
+
+/** Exact contextual price (in the market's currency) for each of the given variant ids, keyed by id -- variants that fail to resolve are simply omitted so callers can fall back to the multiplier estimate. */
+export async function fetchVariantContextualPrices(
+  variantIds: string[],
+  countryCode: string
+): Promise<Record<string, number>> {
+  if (variantIds.length === 0) return {};
+  try {
+    const data = await shopifyAdminRequest<{
+      nodes: ({ id: string; contextualPricing: { price: { amount: string; currencyCode: string } } } | null)[];
+    }>(VARIANT_PRICES_QUERY, { ids: variantIds, country: countryCode });
+
+    const result: Record<string, number> = {};
+    for (const node of data.nodes) {
+      const amount = node?.contextualPricing?.price?.amount;
+      if (node && amount) result[node.id] = Number(amount);
+    }
+    return result;
+  } catch {
+    return {};
+  }
+}
+
 // ---------- Swatch colors ----------
 // The single source of truth for String/Pen Holder swatch colors is the
 // `sanaya`/`swatch_color` metafield the admin edits on each color's variant

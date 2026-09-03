@@ -1,6 +1,6 @@
 "use client";
 
-import { buildCoverEntries, charmsTotal, EDGE_LABEL, resolveVariant } from "@/lib/catalog";
+import { buildCoverEntries, EDGE_LABEL, resolveVariant } from "@/lib/catalog";
 import type { ShopifyJournalProduct, ShopifyVariant } from "@/lib/shopify-admin";
 import { useCurrencyFormat } from "@/components/CurrencyContext";
 import type { JournalSelection } from "@/lib/types";
@@ -17,15 +17,20 @@ interface PreviewStepProps {
 }
 
 export function PreviewStep({ products, product, charmProduct, pouchVariant, selection, onAddToCart, adding, error }: PreviewStepProps) {
-  const { formatConverted, multipliers } = useCurrencyFormat();
+  const { formatConverted, priceFor } = useCurrencyFormat();
   const cover = buildCoverEntries(products).find((c) => c.handle === product.handle);
   const variant = resolveVariant(product, selection);
-  const charmsPrice = charmsTotal(charmProduct, selection.charms);
-  const pouchPrice = selection.pouch ? Number(pouchVariant?.price ?? 0) : 0;
+  const charmPriceByVariant = new Map(charmProduct.variants.map((v) => [v.id, Number(v.price)]));
   // Patch price is baked into `variant.price` now (a real 4th option on the
-  // journal product), not a separate add-on total. Each family is converted
-  // with its own market multiplier before summing -- see CurrencyContext.
-  const total = Number(variant.price) * multipliers.journal + charmsPrice * multipliers.charm + pouchPrice * multipliers.pouch;
+  // journal product), not a separate add-on total. `priceFor` reports these
+  // exact variant ids to CurrencyContext and returns their real contextual
+  // price when available (falling back to the multiplier estimate) -- see
+  // useReportPricedVariants in JournalCustomizer, which already reports the
+  // same ids this step is displaying.
+  const total =
+    priceFor(variant.id, Number(variant.price), "journal") +
+    selection.charms.reduce((sum, c) => sum + priceFor(c.variantId, charmPriceByVariant.get(c.variantId) ?? 0, "charm"), 0) +
+    (selection.pouch && pouchVariant ? priceFor(pouchVariant.id, Number(pouchVariant.price), "pouch") : 0);
   const extraNotebookNote = (selection.notebooks["Extra Notebook"] ?? 0) > 0 ? selection.notebooksNote.trim() : "";
 
   const frontCharms = selection.charms.filter((c) => c.side === "front").length;

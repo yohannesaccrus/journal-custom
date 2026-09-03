@@ -15,13 +15,12 @@ import { ThemeSwitcher, THEMES, type Theme } from "@/components/ThemeSwitcher";
 import { BackgroundSwitcher, type BackgroundMode } from "@/components/BackgroundSwitcher";
 import { MobileViewSwitcher } from "@/components/MobileViewSwitcher";
 import { DisabledHint } from "@/components/DisabledHint";
-import { CurrencyProvider, useCurrencyFormat } from "@/components/CurrencyContext";
+import { CurrencyProvider, useCurrencyFormat, useReportPricedVariants } from "@/components/CurrencyContext";
 import {
   buildCharmEntries,
   buildCordEntries,
   buildCoverEntries,
   canPlaceCharm,
-  charmsTotal,
   NOTEBOOKS_PER_JOURNAL,
   notebookCount,
   PATCH_POSITION,
@@ -156,7 +155,7 @@ function JournalCustomizerContent({
   // viewport, instead of trying to fake it by just shrinking a div.
   const [mobilePreview, setMobilePreview] = useState(false);
 
-  const { format, formatConverted, multipliers, currency } = useCurrencyFormat();
+  const { formatConverted, priceFor, currency } = useCurrencyFormat();
 
   const [step, setStep] = useState(0);
   const [category, setCategory] = useState<CoverCategory>("classic");
@@ -232,15 +231,24 @@ function JournalCustomizerContent({
   const imageSrc = resolveFrontImage(variant);
   const charmEntries = useMemo(() => buildCharmEntries(charmProduct), [charmProduct]);
   const pouchVariant = useMemo(() => resolvePouchVariant(pouchProduct), [pouchProduct]);
+  const charmPriceByVariant = useMemo(() => new Map(charmProduct.variants.map((v) => [v.id, Number(v.price)])), [charmProduct]);
+  // Report the exact variant ids in the cart so CurrencyContext fetches
+  // their real contextual price (see useReportPricedVariants doc comment) --
+  // a per-family multiplier alone can be a cent or more off once Shopify
+  // Markets rounds a specific variant's price to a "nice" number.
+  const pricedVariantIds = useMemo(() => {
+    const ids = new Set<string>([variant.id]);
+    for (const c of selection.charms) ids.add(c.variantId);
+    if (selection.pouch && pouchVariant) ids.add(pouchVariant.id);
+    return Array.from(ids);
+  }, [variant.id, selection.charms, selection.pouch, pouchVariant]);
+  useReportPricedVariants(pricedVariantIds);
   // Patch price is now baked straight into the resolved variant's own price
   // (a real Cover×String×Pen Holder×Patch combo), not a separate add-on total.
-  // Each family is converted to the visitor's market currency with its own
-  // multiplier before summing -- journal/charm/pouch can each have a
-  // different market price override in Shopify Markets (see CurrencyContext).
   const total =
-    Number(variant.price) * multipliers.journal +
-    charmsTotal(charmProduct, selection.charms) * multipliers.charm +
-    (selection.pouch ? Number(pouchVariant?.price ?? 0) * multipliers.pouch : 0);
+    priceFor(variant.id, Number(variant.price), "journal") +
+    selection.charms.reduce((sum, c) => sum + priceFor(c.variantId, charmPriceByVariant.get(c.variantId) ?? 0, "charm"), 0) +
+    (selection.pouch && pouchVariant ? priceFor(pouchVariant.id, Number(pouchVariant.price), "pouch") : 0);
   const frontCharms = selection.charms.filter((c) => c.side === "front");
   const backCharms = selection.charms.filter((c) => c.side === "back");
   const sideCharms = selection.charms.filter((c) => c.side === "side");

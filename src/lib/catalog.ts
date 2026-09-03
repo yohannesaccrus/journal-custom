@@ -239,11 +239,6 @@ export function buildCharmEntries(charmProduct: ShopifyJournalProduct): CharmEnt
   }));
 }
 
-export function charmsTotal(charmProduct: ShopifyJournalProduct, charms: { variantId: string }[]): number {
-  const priceByVariant = new Map(charmProduct.variants.map((v) => [v.id, Number(v.price)]));
-  return charms.reduce((sum, c) => sum + (priceByVariant.get(c.variantId) ?? 0), 0);
-}
-
 /** Client spec: 11 charms max per journal — 5 on the front, 6 on the side.
  * Back has no per-view cap of its own (the client only named front/side, and
  * 5 + 6 already accounts for the full 11), so it's bounded by the shared
