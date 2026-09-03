@@ -156,7 +156,7 @@ function JournalCustomizerContent({
   // viewport, instead of trying to fake it by just shrinking a div.
   const [mobilePreview, setMobilePreview] = useState(false);
 
-  const { format, currency } = useCurrencyFormat();
+  const { format, formatConverted, multipliers, currency } = useCurrencyFormat();
 
   const [step, setStep] = useState(0);
   const [category, setCategory] = useState<CoverCategory>("classic");
@@ -234,8 +234,13 @@ function JournalCustomizerContent({
   const pouchVariant = useMemo(() => resolvePouchVariant(pouchProduct), [pouchProduct]);
   // Patch price is now baked straight into the resolved variant's own price
   // (a real Cover×String×Pen Holder×Patch combo), not a separate add-on total.
+  // Each family is converted to the visitor's market currency with its own
+  // multiplier before summing -- journal/charm/pouch can each have a
+  // different market price override in Shopify Markets (see CurrencyContext).
   const total =
-    Number(variant.price) + charmsTotal(charmProduct, selection.charms) + (selection.pouch ? Number(pouchVariant?.price ?? 0) : 0);
+    Number(variant.price) * multipliers.journal +
+    charmsTotal(charmProduct, selection.charms) * multipliers.charm +
+    (selection.pouch ? Number(pouchVariant?.price ?? 0) * multipliers.pouch : 0);
   const frontCharms = selection.charms.filter((c) => c.side === "front");
   const backCharms = selection.charms.filter((c) => c.side === "back");
   const sideCharms = selection.charms.filter((c) => c.side === "side");
@@ -544,7 +549,7 @@ function JournalCustomizerContent({
           <div className="flex min-w-0 flex-1 justify-end text-right">
             <div>
               <div className="text-xs text-[var(--faint)]">Total</div>
-              <div className="text-lg font-semibold text-[var(--ink)] font-heading">{format(total)}</div>
+              <div className="text-lg font-semibold text-[var(--ink)] font-heading">{formatConverted(total)}</div>
             </div>
           </div>
         </header>
@@ -881,7 +886,7 @@ function JournalCustomizerContent({
           <span className="text-xs font-medium text-[var(--faint)]">{currency}</span>
           <div className="text-right">
             <div className="text-xs text-[var(--faint)]">Total</div>
-            <div className="text-base font-semibold text-[var(--ink)] font-heading">{format(total)}</div>
+            <div className="text-base font-semibold text-[var(--ink)] font-heading">{formatConverted(total)}</div>
           </div>
         </div>
       </div>
@@ -928,7 +933,7 @@ function JournalCustomizerContent({
           frontCharms={frontCharms}
           charmEntries={charmEntries}
           rows={orderConfirmRows}
-          formattedTotal={format(total)}
+          formattedTotal={formatConverted(total)}
           designUrl={orderConfirm.designUrl}
           copied={designLinkCopied}
           onCopyLink={handleCopyDesignLink}

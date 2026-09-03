@@ -17,14 +17,15 @@ interface PreviewStepProps {
 }
 
 export function PreviewStep({ products, product, charmProduct, pouchVariant, selection, onAddToCart, adding, error }: PreviewStepProps) {
-  const { format } = useCurrencyFormat();
+  const { formatConverted, multipliers } = useCurrencyFormat();
   const cover = buildCoverEntries(products).find((c) => c.handle === product.handle);
   const variant = resolveVariant(product, selection);
   const charmsPrice = charmsTotal(charmProduct, selection.charms);
   const pouchPrice = selection.pouch ? Number(pouchVariant?.price ?? 0) : 0;
   // Patch price is baked into `variant.price` now (a real 4th option on the
-  // journal product), not a separate add-on total.
-  const total = Number(variant.price) + charmsPrice + pouchPrice;
+  // journal product), not a separate add-on total. Each family is converted
+  // with its own market multiplier before summing -- see CurrencyContext.
+  const total = Number(variant.price) * multipliers.journal + charmsPrice * multipliers.charm + pouchPrice * multipliers.pouch;
   const extraNotebookNote = (selection.notebooks["Extra Notebook"] ?? 0) > 0 ? selection.notebooksNote.trim() : "";
 
   const frontCharms = selection.charms.filter((c) => c.side === "front").length;
@@ -86,7 +87,7 @@ export function PreviewStep({ products, product, charmProduct, pouchVariant, sel
         </div>
         <div className="flex items-center justify-between py-4">
           <dt className="text-sm text-[var(--muted)]">Price</dt>
-          <dd className="text-base font-semibold text-[var(--ink)]">{format(total)}</dd>
+          <dd className="text-base font-semibold text-[var(--ink)]">{formatConverted(total)}</dd>
         </div>
       </dl>
 
@@ -96,7 +97,7 @@ export function PreviewStep({ products, product, charmProduct, pouchVariant, sel
         disabled={adding}
         className="btn-continue mt-8 w-full sm:w-auto rounded-[var(--radius-button)] bg-[var(--accent)] px-8 py-3.5 text-white font-medium hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
       >
-        {adding ? "Adding to cart…" : `Add to cart — ${format(total)}`}
+        {adding ? "Adding to cart…" : `Add to cart — ${formatConverted(total)}`}
       </button>
 
       {error && (

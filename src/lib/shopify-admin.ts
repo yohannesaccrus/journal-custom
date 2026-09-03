@@ -294,12 +294,12 @@ export async function fetchPouchProduct(): Promise<ShopifyJournalProduct | undef
 // ---------- Market-aware pricing ----------
 // Shopify Markets applies a per-market price adjustment (dynamic FX + a
 // flat +/-% set by the merchant, e.g. Australia is +25%, EU is +20%) that's
-// otherwise invisible to this app -- see `contextualPricing`. It's a uniform
-// multiplier across every product in a market, so instead of querying every
-// variant's contextual price individually, one reference variant's
-// contextual price (vs. its known EUR price) gives the multiplier for
-// converting ANY EUR amount (including price *deltas* the customizer already
-// computes, like "+€5 for animal print") into that market's real currency.
+// otherwise invisible to this app -- see `contextualPricing`. That adjustment
+// can differ *per product* (a merchant can override pricing for the charm or
+// pouch product differently than for journal covers), so a single reference
+// variant's multiplier isn't safe to reuse across every product family --
+// each family (journal / charm / pouch) gets its own reference variant's
+// contextual price (vs. its known EUR price) to derive its own multiplier.
 const REFERENCE_PRICE_QUERY = `
   query ReferencePrice($id: ID!, $country: CountryCode!) {
     node(id: $id) {
@@ -315,20 +315,18 @@ const REFERENCE_PRICE_QUERY = `
 
 export interface MarketPrice {
   currencyCode: string;
-  /** Multiply any EUR amount by this to get that amount in `currencyCode` for this market. */
-  multiplier: number;
+  /** Multiply an EUR amount for a given product family by the matching multiplier to get that amount in `currencyCode` for this market. */
+  multipliers: { journal: number; charm: number; pouch: number };
 }
 
-/** null if the country isn't recognized by Shopify, or on any lookup failure -- callers should fall back to plain EUR. */
-export async function fetchMarketPrice(countryCode: string): Promise<MarketPrice | null> {
+async function fetchVariantMultiplier(
+  variantId: string,
+  countryCode: string
+): Promise<{ currencyCode: string; multiplier: number } | null> {
   try {
-    const products = await fetchJournalProducts();
-    const referenceVariant = products[0]?.variants[0];
-    if (!referenceVariant) return null;
-
     const data = await shopifyAdminRequest<{
       node: { price: string; contextualPricing: { price: { amount: string; currencyCode: string } } } | null;
-    }>(REFERENCE_PRICE_QUERY, { id: referenceVariant.id, country: countryCode });
+    }>(REFERENCE_PRICE_QUERY, { id: variantId, country: countryCode });
 
     const node = data.node;
     if (!node) return null;
@@ -340,6 +338,34 @@ export async function fetchMarketPrice(countryCode: string): Promise<MarketPrice
   } catch {
     return null;
   }
+}
+
+/** null if the country isn't recognized by Shopify, or on any lookup failure -- callers should fall back to plain EUR. */
+export async function fetchMarketPrice(countryCode: string): Promise<MarketPrice | null> {
+  const [journalProducts, charmProduct, pouchProduct] = await Promise.all([
+    fetchJournalProducts(),
+    fetchCharmProduct(),
+    fetchPouchProduct(),
+  ]);
+  const journalVariant = journalProducts[0]?.variants[0];
+  if (!journalVariant) return null;
+
+  const [journalResult, charmResult, pouchResult] = await Promise.all([
+    fetchVariantMultiplier(journalVariant.id, countryCode),
+    charmProduct?.variants[0] ? fetchVariantMultiplier(charmProduct.variants[0].id, countryCode) : Promise.resolve(null),
+    pouchProduct?.variants[0] ? fetchVariantMultiplier(pouchProduct.variants[0].id, countryCode) : Promise.resolve(null),
+  ]);
+
+  if (!journalResult) return null;
+
+  return {
+    currencyCode: journalResult.currencyCode,
+    multipliers: {
+      journal: journalResult.multiplier,
+      charm: charmResult?.multiplier ?? journalResult.multiplier,
+      pouch: pouchResult?.multiplier ?? journalResult.multiplier,
+    },
+  };
 }
 
 // ---------- Swatch colors ----------

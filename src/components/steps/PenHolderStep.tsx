@@ -129,7 +129,7 @@ export function PenHolderStep({
                 selected={selection.pouch}
                 onClick={() => onPouchChange(true)}
                 thumbnail={pouchVariant.image?.url}
-                priceLabel={Number(pouchVariant.price) > 0 ? `+${format(Number(pouchVariant.price))}` : "Free"}
+                priceLabel={Number(pouchVariant.price) > 0 ? `+${format(Number(pouchVariant.price), "pouch")}` : "Free"}
                 disabled={pouchVariant.inventoryQuantity <= 0}
               />
             </DisabledHint>

@@ -64,7 +64,8 @@ export function OrderConfirmModal({
           <div className="relative mx-auto aspect-square w-full max-w-[260px] overflow-hidden rounded-[var(--radius-panel)] bg-[var(--surface-soft)]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={imageSrc} alt="Your custom journal" className="h-full w-full object-cover" />
-            {patch !== "none" && (
+            {/* real combo photos already have the patch baked in -- drawing this on top of one would double it up. */}
+            {patch !== "none" && !imageSrc && (
               <div
                 className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
                 style={{

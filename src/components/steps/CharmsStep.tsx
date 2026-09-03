@@ -229,6 +229,12 @@ export function CharmsStep({
   const { format } = useCurrencyFormat();
   const charms = selection.charms;
   const entries = buildCharmEntries(charmProduct);
+  // A native HTML5 drag doesn't reliably suppress the "click" the browser
+  // fires on the same chip afterward (varies by browser/input device) --
+  // without this, a drag-and-drop onto the canvas plus the trailing click
+  // both call addCharm, placing the same charm twice, stacked on top of
+  // itself.
+  const wasDraggedRef = useRef(false);
 
   function addCharm(side: CharmSide, variantId: string, design: string, x: number, y: number) {
     if (!canPlaceCharm(charms, side)) return;
@@ -269,10 +275,20 @@ export function CharmsStep({
                 draggable={!disabled}
                 onDragStart={(e) => {
                   if (disabled) return;
+                  wasDraggedRef.current = true;
                   e.dataTransfer.setData(DRAG_MIME, JSON.stringify({ variantId: c.variantId, design: c.design }));
                   e.dataTransfer.effectAllowed = "copy";
                 }}
-                onClick={() => !disabled && addCharm(activeSide, c.variantId, c.design, 50, 45)}
+                onDragEnd={() => {
+                  // Cleared on the next tick, after the browser's trailing "click" (if any) has already fired.
+                  setTimeout(() => {
+                    wasDraggedRef.current = false;
+                  }, 0);
+                }}
+                onClick={() => {
+                  if (disabled || wasDraggedRef.current) return;
+                  addCharm(activeSide, c.variantId, c.design, 50, 45);
+                }}
                 className={`flex flex-col items-center gap-1.5 group ${
                   disabled ? "cursor-not-allowed opacity-40" : "cursor-grab active:cursor-grabbing"
                 }`}
@@ -282,7 +298,7 @@ export function CharmsStep({
                   <img src={c.imageUrl} alt="" className="h-7 w-7 object-contain pointer-events-none" />
                 </span>
                 <span className="text-xs text-[var(--ink)]">{c.design}</span>
-                <span className="text-[10px] text-[var(--brand)] -mt-1">{format(c.price)}</span>
+                <span className="text-[10px] text-[var(--brand)] -mt-1">{format(c.price, "charm")}</span>
               </div>
             </DisabledHint>
           );
