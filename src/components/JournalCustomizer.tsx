@@ -16,7 +16,6 @@ import { BackgroundSwitcher, type BackgroundMode } from "@/components/Background
 import { MobileViewSwitcher } from "@/components/MobileViewSwitcher";
 import { DisabledHint } from "@/components/DisabledHint";
 import { CurrencyProvider, useCurrencyFormat } from "@/components/CurrencyContext";
-import { CurrencySwitcher } from "@/components/CurrencySwitcher";
 import {
   buildCharmEntries,
   buildCordEntries,
@@ -68,11 +67,13 @@ interface JournalCustomizerProps {
   hideDevControls?: boolean;
   initialTheme?: Theme;
   initialBackground?: BackgroundMode;
+  /** Visitor's Shopify market country (e.g. "AU"), passed down from the theme embed via `?country=` — see CurrencyContext.tsx. */
+  country?: string;
 }
 
 export function JournalCustomizer(props: JournalCustomizerProps) {
   return (
-    <CurrencyProvider>
+    <CurrencyProvider country={props.country}>
       <JournalCustomizerContent {...props} />
     </CurrencyProvider>
   );
@@ -155,7 +156,7 @@ function JournalCustomizerContent({
   // viewport, instead of trying to fake it by just shrinking a div.
   const [mobilePreview, setMobilePreview] = useState(false);
 
-  const { format } = useCurrencyFormat();
+  const { format, currency } = useCurrencyFormat();
 
   const [step, setStep] = useState(0);
   const [category, setCategory] = useState<CoverCategory>("classic");
@@ -821,7 +822,7 @@ function JournalCustomizerContent({
             total bar below, so this whole footer is desktop-only. */}
         <footer className="hidden md:flex items-center justify-between gap-4 border-t border-[var(--border)] px-6 sm:px-10 py-5">
           <div className="flex items-center gap-4">
-            <CurrencySwitcher />
+            <span className="text-xs font-medium text-[var(--faint)]">{currency}</span>
             <button
               type="button"
               onClick={goBack}
@@ -877,7 +878,7 @@ function JournalCustomizerContent({
           )}
         </div>
         <div className="flex items-center justify-between">
-          <CurrencySwitcher />
+          <span className="text-xs font-medium text-[var(--faint)]">{currency}</span>
           <div className="text-right">
             <div className="text-xs text-[var(--faint)]">Total</div>
             <div className="text-base font-semibold text-[var(--ink)] font-heading">{format(total)}</div>

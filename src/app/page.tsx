@@ -8,7 +8,12 @@ import {
   fetchSwatchColors,
 } from "@/lib/shopify-admin";
 
-export default async function Home() {
+interface HomeProps {
+  searchParams: Promise<{ country?: string }>;
+}
+
+export default async function Home({ searchParams }: HomeProps) {
+  const { country } = await searchParams;
   const [products, charmProduct, notebookProduct, patchProduct, pouchProduct, swatchColors] = await Promise.all([
     fetchJournalProducts(),
     fetchCharmProduct(),
@@ -39,6 +44,7 @@ export default async function Home() {
       patchProduct={patchProduct}
       pouchProduct={pouchProduct}
       swatchColors={swatchColors}
+      country={country}
     />
   );
 }

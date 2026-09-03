@@ -291,6 +291,57 @@ export async function fetchPouchProduct(): Promise<ShopifyJournalProduct | undef
   return products[0];
 }
 
+// ---------- Market-aware pricing ----------
+// Shopify Markets applies a per-market price adjustment (dynamic FX + a
+// flat +/-% set by the merchant, e.g. Australia is +25%, EU is +20%) that's
+// otherwise invisible to this app -- see `contextualPricing`. It's a uniform
+// multiplier across every product in a market, so instead of querying every
+// variant's contextual price individually, one reference variant's
+// contextual price (vs. its known EUR price) gives the multiplier for
+// converting ANY EUR amount (including price *deltas* the customizer already
+// computes, like "+€5 for animal print") into that market's real currency.
+const REFERENCE_PRICE_QUERY = `
+  query ReferencePrice($id: ID!, $country: CountryCode!) {
+    node(id: $id) {
+      ... on ProductVariant {
+        price
+        contextualPricing(context: { country: $country }) {
+          price { amount currencyCode }
+        }
+      }
+    }
+  }
+`;
+
+export interface MarketPrice {
+  currencyCode: string;
+  /** Multiply any EUR amount by this to get that amount in `currencyCode` for this market. */
+  multiplier: number;
+}
+
+/** null if the country isn't recognized by Shopify, or on any lookup failure -- callers should fall back to plain EUR. */
+export async function fetchMarketPrice(countryCode: string): Promise<MarketPrice | null> {
+  try {
+    const products = await fetchJournalProducts();
+    const referenceVariant = products[0]?.variants[0];
+    if (!referenceVariant) return null;
+
+    const data = await shopifyAdminRequest<{
+      node: { price: string; contextualPricing: { price: { amount: string; currencyCode: string } } } | null;
+    }>(REFERENCE_PRICE_QUERY, { id: referenceVariant.id, country: countryCode });
+
+    const node = data.node;
+    if (!node) return null;
+    const basePrice = Number(node.price);
+    const contextualAmount = Number(node.contextualPricing.price.amount);
+    if (!basePrice || !contextualAmount) return null;
+
+    return { currencyCode: node.contextualPricing.price.currencyCode, multiplier: contextualAmount / basePrice };
+  } catch {
+    return null;
+  }
+}
+
 // ---------- Swatch colors ----------
 // The single source of truth for String/Pen Holder swatch colors is the
 // `sanaya`/`swatch_color` metafield the admin edits on each color's variant
