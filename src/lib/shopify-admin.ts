@@ -235,13 +235,22 @@ async function fetchProductsUncached(query: string): Promise<ShopifyJournalProdu
   return products;
 }
 
-const PRODUCTS_CACHE_TTL_MS = 5 * 60 * 1000;
-// Keyed by the "tag:..." query string. Holds either a resolved value (with
-// the time it was fetched) or an in-flight promise, so concurrent callers
-// for the same query share one Shopify round trip instead of each starting
-// their own -- same intent as the old React `cache()` wrapper, but this one
+// The covers barely change minute to minute, so a cache-miss doesn't need
+// to be nearly as rare as 5 minutes made it -- 45 minutes cuts how often
+// any visitor eats the full ~150ms-per-cover paginated re-fetch by ~9x,
+// at the cost of edits made in Shopify Admin taking up to that long to
+// show up here (an acceptable trade for a picker list that rarely changes
+// shape hour to hour).
+const PRODUCTS_CACHE_TTL_MS = 45 * 60 * 1000;
+// Keyed by the "tag:..." query string. Holds a resolved-or-in-flight
+// promise plus when that fetch was *started*, so concurrent callers for the
+// same query share one Shopify round trip instead of each starting their
+// own -- same intent as the old React `cache()` wrapper, but this one
 // survives across requests/reloads instead of resetting every render.
-const productsCache = new Map<string, { promise: Promise<ShopifyJournalProduct[]>; fetchedAt: number }>();
+// `revalidating` guards the stale-while-revalidate refresh below so a burst
+// of requests that all land just past the TTL only triggers one background
+// re-fetch, not one each.
+const productsCache = new Map<string, { promise: Promise<ShopifyJournalProduct[]>; fetchedAt: number; revalidating: boolean }>();
 
 // Journal covers are now expensive to fetch (paginated, ~150-450 Shopify API
 // cost points per cover, several MB of response -- too large for Next's
@@ -250,18 +259,40 @@ const productsCache = new Map<string, { promise: Promise<ShopifyJournalProduct[]
 // "tag:journal" set. Without a real cross-request cache, every single page
 // load re-fetches all 13 covers from scratch, which is what was keeping
 // Shopify's rate limiter permanently tripped.
+//
+// Stale-while-revalidate: once the TTL passes, callers still get the
+// existing (stale) data back immediately -- instead of one unlucky visitor
+// blocking on the full ~5-15s paginated re-fetch, that re-fetch happens in
+// the background and simply replaces the cache entry for whoever asks next.
 function fetchProducts(query: string): Promise<ShopifyJournalProduct[]> {
   const cached = productsCache.get(query);
-  if (cached && Date.now() - cached.fetchedAt < PRODUCTS_CACHE_TTL_MS) {
-    return cached.promise;
+  if (!cached) return fetchProductsAndCache(query);
+
+  const isFresh = Date.now() - cached.fetchedAt < PRODUCTS_CACHE_TTL_MS;
+  if (isFresh) return cached.promise;
+
+  if (!cached.revalidating) {
+    cached.revalidating = true;
+    fetchProductsUncached(query)
+      .then((fresh) => {
+        productsCache.set(query, { promise: Promise.resolve(fresh), fetchedAt: Date.now(), revalidating: false });
+      })
+      .catch(() => {
+        // Keep serving the stale entry; a later call can retry the revalidation.
+        cached.revalidating = false;
+      });
   }
+  return cached.promise;
+}
+
+function fetchProductsAndCache(query: string): Promise<ShopifyJournalProduct[]> {
   const promise = fetchProductsUncached(query).catch((err) => {
     // Don't leave a rejected promise cached -- the next call should retry
     // against Shopify instead of replaying the same failure for the TTL.
     productsCache.delete(query);
     throw err;
   });
-  productsCache.set(query, { promise, fetchedAt: Date.now() });
+  productsCache.set(query, { promise, fetchedAt: Date.now(), revalidating: false });
   return promise;
 }
 
