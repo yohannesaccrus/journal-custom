@@ -1,0 +1,19 @@
+name: Warm product cache
+
+# Vercel's own Cron Jobs feature is limited to once/day on the Hobby plan
+# (see vercel.com/docs/cron-jobs/usage-and-pricing) -- GitHub Actions has no
+# such restriction, so it hits the same /api/warm-cache route on a schedule
+# instead. Keeps the journal-cover cache (45 min TTL, see fetchProducts in
+# src/lib/shopify-admin.ts) from ever fully going cold before a real visitor
+# arrives, without needing to upgrade the Vercel plan.
+on:
+  schedule:
+    - cron: "*/20 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  warm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hit warm-cache endpoint
+        run: curl -sf --max-time 55 "https://journal-custom.vercel.app/api/warm-cache"
