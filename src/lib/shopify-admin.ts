@@ -203,33 +203,41 @@ async function fetchRemainingMedia(productId: string, cursor: string): Promise<{
   return media;
 }
 
+async function fetchProductPagination(p: RawProduct): Promise<ShopifyJournalProduct> {
+  let variants = p.variants.nodes;
+  if (p.variants.pageInfo.hasNextPage && p.variants.pageInfo.endCursor) {
+    variants = variants.concat(await fetchRemainingVariants(p.id, p.variants.pageInfo.endCursor));
+  }
+  let mediaNodes = p.media.nodes;
+  if (p.media.pageInfo.hasNextPage && p.media.pageInfo.endCursor) {
+    mediaNodes = mediaNodes.concat(await fetchRemainingMedia(p.id, p.media.pageInfo.endCursor));
+  }
+  return {
+    ...p,
+    variants,
+    media: mediaNodes.filter((m) => m.alt && m.image?.url).map((m) => ({ alt: m.alt as string, url: m.image!.url })),
+  };
+}
+
+// Covers needing a follow-up paginated fetch are processed in small
+// concurrent batches rather than one at a time or all ~13 at once -- firing
+// every cover's requests simultaneously reliably bursts past Shopify's rate
+// limiter, but a lone sequential queue means a cold cache pays for every
+// cover's round trip back to back. A batch of 3 cuts that worst-case wait
+// roughly 3x while the gap between batches (not between every single cover)
+// still keeps each burst comfortably within budget.
+const PRODUCTS_FETCH_BATCH_SIZE = 3;
+const PRODUCTS_FETCH_BATCH_DELAY_MS = 150;
+
 async function fetchProductsUncached(query: string): Promise<ShopifyJournalProduct[]> {
   const data = await shopifyAdminRequest<{ products: { nodes: RawProduct[] } }>(PRODUCTS_QUERY, { query });
 
-  // Sequential, not Promise.all — up to 13 journal covers each needing a
-  // follow-up paginated fetch would otherwise fire that many requests at
-  // once, which reliably trips Shopify's rate limiter as a burst even though
-  // each individual request would fit comfortably within it.
+  const nodes = data.products.nodes;
   const products: ShopifyJournalProduct[] = [];
-  for (const p of data.products.nodes) {
-    let variants = p.variants.nodes;
-    if (p.variants.pageInfo.hasNextPage && p.variants.pageInfo.endCursor) {
-      // Small gap between covers' follow-up fetches -- firing all ~13 back
-      // to back with zero spacing reliably bursts past Shopify's rate
-      // limiter even though each individual request is well within budget.
-      if (products.length > 0) await sleep(150);
-      variants = variants.concat(await fetchRemainingVariants(p.id, p.variants.pageInfo.endCursor));
-    }
-    let mediaNodes = p.media.nodes;
-    if (p.media.pageInfo.hasNextPage && p.media.pageInfo.endCursor) {
-      await sleep(150);
-      mediaNodes = mediaNodes.concat(await fetchRemainingMedia(p.id, p.media.pageInfo.endCursor));
-    }
-    products.push({
-      ...p,
-      variants,
-      media: mediaNodes.filter((m) => m.alt && m.image?.url).map((m) => ({ alt: m.alt as string, url: m.image!.url })),
-    });
+  for (let i = 0; i < nodes.length; i += PRODUCTS_FETCH_BATCH_SIZE) {
+    if (i > 0) await sleep(PRODUCTS_FETCH_BATCH_DELAY_MS);
+    const batch = nodes.slice(i, i + PRODUCTS_FETCH_BATCH_SIZE);
+    products.push(...(await Promise.all(batch.map(fetchProductPagination))));
   }
 
   return products;
