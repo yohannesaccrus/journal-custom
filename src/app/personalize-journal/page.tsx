@@ -244,6 +244,7 @@ export default function PersonalizeJournalPage() {
 
             <a
               href={CUSTOMIZER_URL}
+              target="_top"
               className="mt-5 block rounded-md bg-[#0f3d34] py-3.5 text-center font-medium text-white transition-colors hover:bg-[#0c332b]"
             >
               Personalize
@@ -349,6 +350,7 @@ export default function PersonalizeJournalPage() {
 
         <a
           href={CUSTOMIZER_URL}
+          target="_top"
           className="mt-10 inline-flex items-center gap-2 rounded-md bg-[#0f3d34] px-8 py-3.5 text-sm font-semibold tracking-wide text-white transition-colors hover:bg-[#0c332b]"
         >
           START PERSONALIZING
