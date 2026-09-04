@@ -48,7 +48,7 @@ const REVIEWS: Review[] = [
     meta: "Local Guide · 19 reviews",
     text: "Absolutely magical experience at Sanaya in Canggu ✨ I honestly cannot recommend this place enough. From the moment I walked in, the entire atmosphere felt so peaceful, inspiring, and full of beautiful energy. The …",
     time: "3 months ago",
-    photo: "/personalize-journal/review-1.png",
+    photo: "/personalize-journal/review-1.webp",
   },
   {
     initial: "J",
@@ -57,7 +57,7 @@ const REVIEWS: Review[] = [
     meta: "2 reviews",
     text: "This place was so fun! It was nice to personalize and create my own journal! Quality is amazing and so many different charms to add to make it really your own. Staff is so nice and comes with Matcha!!",
     time: "a month ago",
-    photo: "/personalize-journal/review-2.png",
+    photo: "/personalize-journal/review-2.webp",
   },
   {
     initial: "S",
@@ -66,7 +66,7 @@ const REVIEWS: Review[] = [
     meta: "1 review",
     text: "Such a fun, magical place! We made journals, and Sanaya has so many covers and charms to fully customize your journal. The staff was super helpful and organized. This was the perfect keepsake for our trip to Bali!",
     time: "a month ago",
-    photo: "/personalize-journal/review-3.png",
+    photo: "/personalize-journal/review-3.webp",
   },
   {
     initial: "A",
@@ -75,7 +75,7 @@ const REVIEWS: Review[] = [
     meta: "10 reviews",
     text: "We had an amazing expérience with Azima! She was verry pacient and helpfull. The store is also beautiful and there is a lot of choices in Charles and fabric. I reccomend!",
     time: "a month ago",
-    photo: "/personalize-journal/review-4.png",
+    photo: "/personalize-journal/review-4.webp",
   },
   {
     initial: "M",
@@ -84,7 +84,7 @@ const REVIEWS: Review[] = [
     meta: "Local Guide · 79 reviews",
     text: "My friends and I had the best time making our customized journals at Sanaya Jewelry. We walked in on a Saturday afternoon and spent about an hour putting together our journals choosing the journal cover, strings, journal pages, and charm …",
     time: "3 months ago",
-    photo: "/personalize-journal/review-5.png",
+    photo: "/personalize-journal/review-5.webp",
   },
   {
     initial: "S",
@@ -93,7 +93,7 @@ const REVIEWS: Review[] = [
     meta: "Local Guide · 38 reviews",
     text: "Obsessed with our custom journals! We were guided the whole process in the journal workshop, and shown exactly how to assemble them ourselves. I asked for help and the staff kindly helped attach the charms for me so it looked perfect. …",
     time: "4 months ago",
-    photo: "/personalize-journal/review-6.png",
+    photo: "/personalize-journal/review-6.webp",
   },
   {
     initial: "Z",
@@ -102,7 +102,7 @@ const REVIEWS: Review[] = [
     meta: "10 reviews",
     text: "Love everything about it. Creating your own journal to how you want it. Very friendly and helpful as well. Definitely recommend to all the girlies out there ❤️",
     time: "a month ago",
-    photo: "/personalize-journal/review-7.png",
+    photo: "/personalize-journal/review-7.webp",
   },
   {
     initial: "T",
@@ -111,7 +111,7 @@ const REVIEWS: Review[] = [
     meta: "7 reviews",
     text: "I had the best experience today at Sanaya we had Icha she helped us through the process. we made 3 fabulous journals. would definitely recommend for the girl trip!!!!",
     time: "4 months ago",
-    photo: "/personalize-journal/review-8.png",
+    photo: "/personalize-journal/review-8.webp",
   },
   {
     initial: "A",
@@ -120,7 +120,7 @@ const REVIEWS: Review[] = [
     meta: "2 reviews",
     text: "There is a lot of choices for customization, the place is calm and you have time to make you book. Amazing staff so kind, they listen to you. The matcha is excellent too. I recommend 💗",
     time: "a month ago",
-    photo: "/personalize-journal/review-9.png",
+    photo: "/personalize-journal/review-9.webp",
   },
   {
     initial: "S",
@@ -129,7 +129,7 @@ const REVIEWS: Review[] = [
     meta: "4 reviews",
     text: "Loved making the journals! They turned out super cute and the service was really nice and helpful. Overall great experience",
     time: "a month ago",
-    photo: "/personalize-journal/review-10.png",
+    photo: "/personalize-journal/review-10.webp",
   },
   {
     initial: "C",
@@ -138,7 +138,7 @@ const REVIEWS: Review[] = [
     meta: "4 reviews",
     text: "Such a fun experience! I had a great time with Rachel and Clarissa! They helped me create such a beautiful journal! Would highly recommend ❤️",
     time: "4 months ago",
-    photo: "/personalize-journal/review-11.png",
+    photo: "/personalize-journal/review-11.webp",
   },
 ];
 
