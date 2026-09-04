@@ -358,6 +358,44 @@ export interface MarketPrice {
   multipliers: { journal: number; charm: number; pouch: number };
 }
 
+// Only needs ANY one journal variant's id+price to derive the market
+// multiplier -- fetching it via the shared `fetchJournalProducts()` (all ~13
+// covers, paginated to 300+ variants each) meant every /api/market-currency
+// call rode along on that multi-second fetch whenever its cache was cold,
+// even though this only ever looks at `variants[0]` of the first result.
+// `variants(first: 1)` keeps this cheap and independent of that cache.
+const REFERENCE_JOURNAL_VARIANT_QUERY = `
+  query ReferenceJournalVariant {
+    products(first: 1, query: "tag:journal") {
+      nodes {
+        variants(first: 1) {
+          nodes { id price }
+        }
+      }
+    }
+  }
+`;
+
+const REFERENCE_JOURNAL_VARIANT_TTL_MS = 45 * 60 * 1000;
+let referenceJournalVariantCache: { promise: Promise<{ id: string; price: string } | null>; fetchedAt: number } | null = null;
+
+function fetchReferenceJournalVariant(): Promise<{ id: string; price: string } | null> {
+  if (referenceJournalVariantCache && Date.now() - referenceJournalVariantCache.fetchedAt < REFERENCE_JOURNAL_VARIANT_TTL_MS) {
+    return referenceJournalVariantCache.promise;
+  }
+  const promise = shopifyAdminRequest<{ products: { nodes: { variants: { nodes: { id: string; price: string }[] } }[] } }>(
+    REFERENCE_JOURNAL_VARIANT_QUERY,
+    {}
+  )
+    .then((data) => data.products.nodes[0]?.variants.nodes[0] ?? null)
+    .catch((err) => {
+      referenceJournalVariantCache = null;
+      throw err;
+    });
+  referenceJournalVariantCache = { promise, fetchedAt: Date.now() };
+  return promise;
+}
+
 async function fetchVariantMultiplier(
   variantId: string,
   countryCode: string
@@ -381,12 +419,11 @@ async function fetchVariantMultiplier(
 
 /** null if the country isn't recognized by Shopify, or on any lookup failure -- callers should fall back to plain EUR. */
 export async function fetchMarketPrice(countryCode: string): Promise<MarketPrice | null> {
-  const [journalProducts, charmProduct, pouchProduct] = await Promise.all([
-    fetchJournalProducts(),
+  const [journalVariant, charmProduct, pouchProduct] = await Promise.all([
+    fetchReferenceJournalVariant(),
     fetchCharmProduct(),
     fetchPouchProduct(),
   ]);
-  const journalVariant = journalProducts[0]?.variants[0];
   if (!journalVariant) return null;
 
   const [journalResult, charmResult, pouchResult] = await Promise.all([
