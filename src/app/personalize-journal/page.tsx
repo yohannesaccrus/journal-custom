@@ -264,7 +264,7 @@ export default function PersonalizeJournalPage() {
               </div>
             </div>
 
-            <p className="mt-6 text-sm font-semibold">Loved by hundreds</p>
+            <p className="mt-6 text-sm font-semibold">Loved by hundreds ✨</p>
             <LovedByHundreds
               items={[1, 2, 3, 4, 5].map((i) => ({
                 src: `/personalize-journal/loved-${i}.webp`,
