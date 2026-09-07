@@ -223,6 +223,36 @@ function JournalCustomizerContent({
     };
   }, [step]);
 
+  // Analytics handshake -- the client runs their own measurement (Meta, Snap,
+  // TikTok, Google) off a server-side GTM container and explicitly does not
+  // want this app firing its own pixels (that'd double-count conversions on
+  // their side). Instead we just postMessage plain event objects; the parent
+  // page (see jc-product-page.liquid) listens and pushes them into its own
+  // window.dataLayer, which their GTM container is already wired to. This
+  // app never touches dataLayer or any platform SDK directly.
+  const trackingStarted = useRef(false);
+  useEffect(() => {
+    if (trackingStarted.current) return;
+    trackingStarted.current = true;
+    postTrackingEvent({ event: "customization_started" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire once, not on every render
+  }, []);
+
+  const isFirstStepRender = useRef(true);
+  useEffect(() => {
+    if (isFirstStepRender.current) {
+      isFirstStepRender.current = false;
+      return;
+    }
+    postTrackingEvent({ event: "step_completed", step, stepName: STEPS[step] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire once per step change
+  }, [step]);
+
+  function postTrackingEvent(payload: Record<string, unknown>) {
+    const target = window.parent === window ? window : window.top ?? window;
+    target.postMessage({ type: "sanaya-journal-event", ...payload }, "*");
+  }
+
   const product = useMemo(
     () => products.find((p) => p.handle === selection.cover) ?? products[0],
     [products, selection.cover]
@@ -461,6 +491,30 @@ function JournalCustomizerContent({
     // other half of this handshake.
     const target = window.parent === window ? window : window.top ?? window;
     target.postMessage({ type: "sanaya-journal-add-to-cart", items, attributes }, "*");
+
+    // Separate from the message above -- that one drives the actual
+    // /cart/add.js call, this one is purely for the client's own GTM
+    // measurement (see postTrackingEvent doc comment). `total`/`currency`
+    // are the same contextual, market-converted values the customer sees
+    // on screen, so they match what checkout will actually charge.
+    postTrackingEvent({
+      event: "add_to_cart",
+      value: total,
+      currency,
+      items: items.map((item) => ({
+        variantId: item.id,
+        quantity: item.quantity,
+        price: priceForCartItem(item.variantId),
+      })),
+    });
+  }
+
+  function priceForCartItem(variantId: string): number {
+    if (variantId === variant.id) return priceFor(variant.id, Number(variant.price), "journal");
+    const charmPrice = charmPriceByVariant.get(variantId);
+    if (charmPrice !== undefined) return priceFor(variantId, charmPrice, "charm");
+    if (pouchVariant && variantId === pouchVariant.id) return priceFor(pouchVariant.id, Number(pouchVariant.price), "pouch");
+    return 0;
   }
 
   async function handleCopyDesignLink() {
