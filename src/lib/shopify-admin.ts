@@ -38,10 +38,38 @@ export interface ShopifyJournalProduct {
 // (well over the old 40-variant cap, and now over 250 for some covers) — 250
 // is Shopify's per-page connection max, so a product with >250 variants needs
 // a follow-up paginated fetch (see fetchRemainingVariants below).
-const PRODUCTS_QUERY = `
-  query Products($query: String!) {
+//
+// Split into a lightweight list query (below) plus one PRODUCT_QUERY per
+// product (further down), instead of one query returning every product's
+// full variant+media matrix at once. The combined response for ~13-20 covers
+// routinely exceeds Next's ~2MB per-fetch cache ceiling, so it was fetched
+// with `cache: "no-store"` and cached by hand in the in-memory `productsCache`
+// map instead -- which works, but that map lives in the process, so it's
+// empty again on every cold start (a new Vercel instance after a quiet
+// period), and a cold visitor pays for the full paginated fetch of every
+// cover back to back. A single cover's own variants+media, even at 300+
+// variants, comfortably fits under 2MB -- caching at that per-product
+// granularity lets Next's fetch cache (Vercel's Data Cache, which -- unlike
+// this file's Map -- survives a cold start) actually hold it, so a cold
+// instance can serve a cache hit with a fast Shopify-independent lookup
+// instead of redoing every cover's round trip.
+const PRODUCT_LIST_QUERY = `
+  query ProductList($query: String!) {
     products(first: 20, query: $query) {
       nodes {
+        id
+        handle
+        title
+        tags
+      }
+    }
+  }
+`;
+
+const PRODUCT_QUERY = `
+  query Product($id: ID!) {
+    node(id: $id) {
+      ... on Product {
         id
         handle
         title
@@ -129,7 +157,20 @@ function sleep(ms: number): Promise<void> {
 // variants), so a THROTTLED response from Shopify's rate limiter is routine
 // under normal traffic, not exceptional -- retry with backoff instead of
 // failing the whole page load on it.
-async function shopifyAdminRequest<T>(query: string, variables: Record<string, unknown>, retries = 8): Promise<T> {
+//
+// `cacheSeconds` opts a call into Next's fetch cache (Vercel's Data Cache,
+// which survives a cold start) instead of the default `no-store`. Only pass
+// it for requests scoped small enough to land under Next's ~2MB per-item
+// cache ceiling (a single product's variants+media, not the old
+// all-products-at-once query) -- past that ceiling Next silently fails to
+// cache the response at all rather than erroring, so this would otherwise
+// look like it's working while quietly doing nothing.
+async function shopifyAdminRequest<T>(
+  query: string,
+  variables: Record<string, unknown>,
+  retries = 8,
+  cacheSeconds?: number
+): Promise<T> {
   if (!STORE_DOMAIN || !ACCESS_TOKEN) {
     throw new Error("Missing SHOPIFY_STORE_DOMAIN or SHOPIFY_ADMIN_ACCESS_TOKEN env vars");
   }
@@ -141,15 +182,19 @@ async function shopifyAdminRequest<T>(query: string, variables: Record<string, u
         "X-Shopify-Access-Token": ACCESS_TOKEN,
       },
       body: JSON.stringify({ query, variables }),
-      // Journal covers routinely return several MB of variant data (300+
-      // variants x image/frontImageOverride/selectedOptions), well past
-      // Next's ~2MB per-item fetch-cache ceiling -- `next.revalidate` here
-      // silently fails to cache every single response (see the "Failed to
-      // set fetch cache ... items over 2MB" warning), which means it was
-      // never actually caching and every page load re-fetched from scratch.
-      // `fetchProducts` below does the real caching instead; opt this fetch
-      // out entirely so it stops trying (and failing) to cache it too.
-      cache: "no-store",
+      ...(cacheSeconds
+        ? { next: { revalidate: cacheSeconds } }
+        : {
+            // Journal covers routinely return several MB of variant data (300+
+            // variants x image/frontImageOverride/selectedOptions), well past
+            // Next's ~2MB per-item fetch-cache ceiling -- `next.revalidate` here
+            // silently fails to cache every single response (see the "Failed to
+            // set fetch cache ... items over 2MB" warning), which means it was
+            // never actually caching and every page load re-fetched from scratch.
+            // `fetchProducts` below does the real caching instead; opt this fetch
+            // out entirely so it stops trying (and failing) to cache it too.
+            cache: "no-store" as const,
+          }),
     });
     if (!res.ok) {
       throw new Error(`Shopify Admin API request failed: ${res.status} ${res.statusText}`);
@@ -171,14 +216,16 @@ interface RemainingVariantsResponse {
   node: { variants: { nodes: ShopifyVariant[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } } };
 }
 
-async function fetchRemainingVariants(productId: string, cursor: string): Promise<ShopifyVariant[]> {
+async function fetchRemainingVariants(productId: string, cursor: string, cacheSeconds?: number): Promise<ShopifyVariant[]> {
   let variants: ShopifyVariant[] = [];
   let nextCursor: string | null = cursor;
   while (nextCursor) {
-    const data: RemainingVariantsResponse = await shopifyAdminRequest<RemainingVariantsResponse>(REMAINING_VARIANTS_QUERY, {
-      id: productId,
-      cursor: nextCursor,
-    });
+    const data: RemainingVariantsResponse = await shopifyAdminRequest<RemainingVariantsResponse>(
+      REMAINING_VARIANTS_QUERY,
+      { id: productId, cursor: nextCursor },
+      8,
+      cacheSeconds
+    );
     variants = variants.concat(data.node.variants.nodes);
     nextCursor = data.node.variants.pageInfo.hasNextPage ? data.node.variants.pageInfo.endCursor : null;
   }
@@ -189,34 +236,53 @@ interface RemainingMediaResponse {
   node: { media: { nodes: { alt: string | null; image?: { url: string } }[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } } };
 }
 
-async function fetchRemainingMedia(productId: string, cursor: string): Promise<{ alt: string | null; image?: { url: string } }[]> {
+async function fetchRemainingMedia(
+  productId: string,
+  cursor: string,
+  cacheSeconds?: number
+): Promise<{ alt: string | null; image?: { url: string } }[]> {
   let media: { alt: string | null; image?: { url: string } }[] = [];
   let nextCursor: string | null = cursor;
   while (nextCursor) {
-    const data: RemainingMediaResponse = await shopifyAdminRequest<RemainingMediaResponse>(REMAINING_MEDIA_QUERY, {
-      id: productId,
-      cursor: nextCursor,
-    });
+    const data: RemainingMediaResponse = await shopifyAdminRequest<RemainingMediaResponse>(
+      REMAINING_MEDIA_QUERY,
+      { id: productId, cursor: nextCursor },
+      8,
+      cacheSeconds
+    );
     media = media.concat(data.node.media.nodes);
     nextCursor = data.node.media.pageInfo.hasNextPage ? data.node.media.pageInfo.endCursor : null;
   }
   return media;
 }
 
-async function fetchProductPagination(p: RawProduct): Promise<ShopifyJournalProduct> {
+async function fetchProductPagination(p: RawProduct, cacheSeconds?: number): Promise<ShopifyJournalProduct> {
   let variants = p.variants.nodes;
   if (p.variants.pageInfo.hasNextPage && p.variants.pageInfo.endCursor) {
-    variants = variants.concat(await fetchRemainingVariants(p.id, p.variants.pageInfo.endCursor));
+    variants = variants.concat(await fetchRemainingVariants(p.id, p.variants.pageInfo.endCursor, cacheSeconds));
   }
   let mediaNodes = p.media.nodes;
   if (p.media.pageInfo.hasNextPage && p.media.pageInfo.endCursor) {
-    mediaNodes = mediaNodes.concat(await fetchRemainingMedia(p.id, p.media.pageInfo.endCursor));
+    mediaNodes = mediaNodes.concat(await fetchRemainingMedia(p.id, p.media.pageInfo.endCursor, cacheSeconds));
   }
   return {
     ...p,
     variants,
     media: mediaNodes.filter((m) => m.alt && m.image?.url).map((m) => ({ alt: m.alt as string, url: m.image!.url })),
   };
+}
+
+// Each product's own variants+media (even 300+ variants) comfortably fits
+// under Next's ~2MB per-fetch cache ceiling, so -- unlike the old combined
+// all-products query -- this can actually use Next's fetch cache. That
+// cache is Vercel's Data Cache, which (unlike the in-memory `productsCache`
+// map below) survives a cold start, so a cold instance can serve this from
+// cache instead of redoing the round trip to Shopify.
+const PRODUCT_CACHE_SECONDS = 45 * 60;
+
+async function fetchFullProduct(id: string): Promise<ShopifyJournalProduct> {
+  const data = await shopifyAdminRequest<{ node: RawProduct }>(PRODUCT_QUERY, { id }, 8, PRODUCT_CACHE_SECONDS);
+  return fetchProductPagination(data.node, PRODUCT_CACHE_SECONDS);
 }
 
 // Covers needing a follow-up paginated fetch are processed in small
@@ -230,14 +296,16 @@ const PRODUCTS_FETCH_BATCH_SIZE = 3;
 const PRODUCTS_FETCH_BATCH_DELAY_MS = 150;
 
 async function fetchProductsUncached(query: string): Promise<ShopifyJournalProduct[]> {
-  const data = await shopifyAdminRequest<{ products: { nodes: RawProduct[] } }>(PRODUCTS_QUERY, { query });
+  // Lightweight -- no variants/media -- so it stays cheap to run uncached on
+  // every call; it's just the id list this query fans out from.
+  const listData = await shopifyAdminRequest<{ products: { nodes: { id: string }[] } }>(PRODUCT_LIST_QUERY, { query });
 
-  const nodes = data.products.nodes;
+  const ids = listData.products.nodes.map((n) => n.id);
   const products: ShopifyJournalProduct[] = [];
-  for (let i = 0; i < nodes.length; i += PRODUCTS_FETCH_BATCH_SIZE) {
+  for (let i = 0; i < ids.length; i += PRODUCTS_FETCH_BATCH_SIZE) {
     if (i > 0) await sleep(PRODUCTS_FETCH_BATCH_DELAY_MS);
-    const batch = nodes.slice(i, i + PRODUCTS_FETCH_BATCH_SIZE);
-    products.push(...(await Promise.all(batch.map(fetchProductPagination))));
+    const batch = ids.slice(i, i + PRODUCTS_FETCH_BATCH_SIZE);
+    products.push(...(await Promise.all(batch.map(fetchFullProduct))));
   }
 
   return products;

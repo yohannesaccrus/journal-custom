@@ -1,6 +1,7 @@
 import { Accordion } from "@/components/personalize-journal/Accordion";
 import { IframeResizeReporter } from "@/components/personalize-journal/IframeResizeReporter";
 import { LovedByHundreds } from "@/components/personalize-journal/LovedByHundreds";
+import { PriceDisplay } from "@/components/personalize-journal/PriceDisplay";
 import { ReviewsMarquee, type Review } from "@/components/personalize-journal/ReviewsMarquee";
 
 // Where the Google rating badge links to -- the business's own Google Knowledge Panel search result.
@@ -183,7 +184,12 @@ function PromiseIcon({ icon }: { icon: string }) {
   );
 }
 
-export default function PersonalizeJournalPage() {
+interface PersonalizeJournalPageProps {
+  searchParams: Promise<{ country?: string }>;
+}
+
+export default async function PersonalizeJournalPage({ searchParams }: PersonalizeJournalPageProps) {
+  const { country } = await searchParams;
   return (
     <main className="bg-white text-[#171717]">
       <IframeResizeReporter />
@@ -218,10 +224,7 @@ export default function PersonalizeJournalPage() {
 
             <h1 className="mt-4 font-[family-name:var(--font-playfair)] text-3xl">Customized Journal</h1>
 
-            <p className="mt-2 text-lg">
-              <span className="mr-2 text-[#8a887f] line-through">$69.00 SGD</span>
-              <span className="font-semibold">$52.00 SGD</span>
-            </p>
+            <PriceDisplay country={country} />
 
             <p className="mt-4 border-t border-[#e5e2da] pt-4 text-sm text-[#8a887f]">
               Configure your journal in 4 steps. Final price updates as you add options.
