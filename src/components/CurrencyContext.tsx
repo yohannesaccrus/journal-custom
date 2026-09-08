@@ -11,6 +11,15 @@ interface CurrencyContextValue {
 
 const CurrencyContext = createContext<CurrencyContextValue>({ currency: "EUR" });
 
+// Mirrors the /fr, /id, /es URL-prefix currency override already used on the
+// Liquid teaser page (jc-product-page.liquid) — a supported language prefix
+// forces that language's currency regardless of the visitor's real Shopify
+// market; any other language (or none) falls back to the market-based
+// `country` prop as before. Values are real Shopify CountryCode strings so
+// the existing contextual-pricing lookup (fetchMarketPrice) returns Shopify's
+// own real EUR/IDR prices rather than a hand-rolled conversion.
+const CURRENCY_COUNTRY_OVERRIDE: Record<string, string> = { fr: "FR", es: "ES", id: "ID" };
+
 const DEFAULT_MULTIPLIERS: Record<PriceCategory, number> = { journal: 1, charm: 1, pouch: 1 };
 
 const MultiplierContext = createContext<Record<PriceCategory, number>>(DEFAULT_MULTIPLIERS);
@@ -34,7 +43,7 @@ const SetPricedVariantIdsContext = createContext<(ids: string[]) => void>(() => 
  * provider fetches THEIR exact contextual price so the total shown matches
  * checkout to the cent.
  */
-export function CurrencyProvider({ country, children }: { country?: string; children: React.ReactNode }) {
+export function CurrencyProvider({ country, lang, children }: { country?: string; lang?: string; children: React.ReactNode }) {
   const [state, setState] = useState<{
     currency: string;
     multipliers: Record<PriceCategory, number>;
@@ -42,12 +51,14 @@ export function CurrencyProvider({ country, children }: { country?: string; chil
   }>({ currency: "EUR", multipliers: DEFAULT_MULTIPLIERS, variantPrices: {} });
   const [pricedVariantIds, setPricedVariantIds] = useState<string[]>([]);
 
+  const effectiveCountry = (lang && CURRENCY_COUNTRY_OVERRIDE[lang.toLowerCase()]) || country;
+
   const variantIdsKey = pricedVariantIds.slice().sort().join(",");
 
   useEffect(() => {
-    if (!country) return;
+    if (!effectiveCountry) return;
     let cancelled = false;
-    const params = new URLSearchParams({ country });
+    const params = new URLSearchParams({ country: effectiveCountry });
     if (variantIdsKey) params.set("variantIds", variantIdsKey);
     fetch(`/api/market-currency?${params.toString()}`)
       .then((res) => res.json())
@@ -60,7 +71,7 @@ export function CurrencyProvider({ country, children }: { country?: string; chil
     return () => {
       cancelled = true;
     };
-  }, [country, variantIdsKey]);
+  }, [effectiveCountry, variantIdsKey]);
 
   const setPricedVariantIdsStable = useCallback((ids: string[]) => {
     setPricedVariantIds((prev) => {

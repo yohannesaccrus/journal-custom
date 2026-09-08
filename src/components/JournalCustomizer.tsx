@@ -80,7 +80,7 @@ interface JournalCustomizerProps {
 export function JournalCustomizer(props: JournalCustomizerProps) {
   return (
     <LocaleProvider lang={props.lang}>
-      <CurrencyProvider country={props.country}>
+      <CurrencyProvider country={props.country} lang={props.lang}>
         <JournalCustomizerContent {...props} />
       </CurrencyProvider>
     </LocaleProvider>
