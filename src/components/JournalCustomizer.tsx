@@ -16,6 +16,7 @@ import { BackgroundSwitcher, type BackgroundMode } from "@/components/Background
 import { MobileViewSwitcher } from "@/components/MobileViewSwitcher";
 import { DisabledHint } from "@/components/DisabledHint";
 import { CurrencyProvider, useCurrencyFormat, useReportPricedVariants } from "@/components/CurrencyContext";
+import { LocaleProvider, useTranslation } from "@/components/LocaleContext";
 import {
   buildCharmEntries,
   buildCordEntries,
@@ -34,7 +35,11 @@ import { buildDesignUrl } from "@/lib/design-link";
 import type { ShopifyJournalProduct, SwatchColors } from "@/lib/shopify-admin";
 import type { CharmSide, CoverCategory, JournalSelection, PlacedCharm } from "@/lib/types";
 
+// English labels, kept stable for analytics (`postTrackingEvent`'s `stepName`)
+// regardless of display language — see `STEP_LABEL_KEYS` for the translated
+// labels actually shown to the customer.
 const STEPS = ["Journal Covers", "Charms", "Accessories", "Content", "Preview"] as const;
+const STEP_LABEL_KEYS = ["steps.covers", "steps.charms", "steps.accessories", "steps.content", "steps.preview"] as const;
 const JOURNAL_COVERS_STEP = 0;
 const CHARMS_STEP = 1;
 const ACCESSORIES_STEP = 2;
@@ -68,13 +73,17 @@ interface JournalCustomizerProps {
   initialBackground?: BackgroundMode;
   /** Visitor's Shopify market country (e.g. "AU"), passed down from the theme embed via `?country=` — see CurrencyContext.tsx. */
   country?: string;
+  /** Visitor's Shopify URL locale (e.g. "fr"), passed down from the theme embed via `?lang=` — see LocaleContext.tsx. Unsupported/missing values fall back to English. */
+  lang?: string;
 }
 
 export function JournalCustomizer(props: JournalCustomizerProps) {
   return (
-    <CurrencyProvider country={props.country}>
-      <JournalCustomizerContent {...props} />
-    </CurrencyProvider>
+    <LocaleProvider lang={props.lang}>
+      <CurrencyProvider country={props.country}>
+        <JournalCustomizerContent {...props} />
+      </CurrencyProvider>
+    </LocaleProvider>
   );
 }
 
@@ -156,6 +165,7 @@ function JournalCustomizerContent({
   const [mobilePreview, setMobilePreview] = useState(false);
 
   const { formatConverted, priceFor, currency } = useCurrencyFormat();
+  const { t } = useTranslation();
 
   const [step, setStep] = useState(0);
   const [category, setCategory] = useState<CoverCategory>("classic");
@@ -283,27 +293,27 @@ function JournalCustomizerContent({
   const backCharms = selection.charms.filter((c) => c.side === "back");
   const sideCharms = selection.charms.filter((c) => c.side === "side");
   const orderConfirmRows = [
-    { label: "Cover", value: buildCoverEntries(products).find((c) => c.handle === product.handle)?.label ?? product.title },
-    { label: "String", value: selection.cord !== "none" ? selection.cord : "None" },
-    { label: "Pen holder", value: selection.penHolder === "none" ? "None" : selection.penHolder === "black" ? "Black" : "Brown" },
+    { label: t("customizer.row.cover"), value: buildCoverEntries(products).find((c) => c.handle === product.handle)?.label ?? product.title },
+    { label: t("customizer.row.string"), value: selection.cord !== "none" ? selection.cord : t("common.none") },
+    { label: t("customizer.row.penHolder"), value: selection.penHolder === "none" ? t("common.none") : selection.penHolder === "black" ? t("common.black") : t("common.brown") },
     {
-      label: "Charms",
+      label: t("customizer.row.charms"),
       value:
         selection.charms.length === 0
-          ? "None"
+          ? t("common.none")
           : [
-              frontCharms.length > 0 ? `${frontCharms.length} front` : null,
-              backCharms.length > 0 ? `${backCharms.length} back` : null,
-              sideCharms.length > 0 ? `${sideCharms.length} side` : null,
+              frontCharms.length > 0 ? t("customizer.charmCount.front", { count: frontCharms.length }) : null,
+              backCharms.length > 0 ? t("customizer.charmCount.back", { count: backCharms.length }) : null,
+              sideCharms.length > 0 ? t("customizer.charmCount.side", { count: sideCharms.length }) : null,
             ]
               .filter(Boolean)
               .join(", "),
     },
     {
-      label: "Notebooks",
+      label: t("customizer.row.notebooks"),
       value:
         Object.keys(selection.notebooks).length === 0
-          ? "None"
+          ? t("common.none")
           : Object.entries(selection.notebooks).map(([design, count]) => `${count}× ${design}`).join(", "),
     },
   ];
@@ -535,9 +545,12 @@ function JournalCustomizerContent({
     (step !== JOURNAL_COVERS_STEP || selection.cord !== "none") && (step !== NOTEBOOKS_STEP || notebooksComplete);
   const continueDisabledReason =
     step === JOURNAL_COVERS_STEP && selection.cord === "none"
-      ? "Pick a string color first"
+      ? t("common.pickStringFirst")
       : step === NOTEBOOKS_STEP && !notebooksComplete
-        ? `Pick ${NOTEBOOKS_PER_JOURNAL - notebooksChosen} more notebook${NOTEBOOKS_PER_JOURNAL - notebooksChosen > 1 ? "s" : ""} to continue`
+        ? t("common.pickMoreNotebooks", {
+            count: NOTEBOOKS_PER_JOURNAL - notebooksChosen,
+            plural: NOTEBOOKS_PER_JOURNAL - notebooksChosen > 1 ? "s" : "",
+          })
         : null;
   const showBackSide = step === PREVIEW_STEP;
   const showNotebookPreview = step === NOTEBOOKS_STEP || step === PREVIEW_STEP;
@@ -590,8 +603,8 @@ function JournalCustomizerContent({
         {/* header / stepper */}
         <header className="flex items-center justify-between gap-6 border-b border-[var(--border)] px-6 sm:px-10 py-5">
           <nav className="hidden shrink-0 items-center gap-6 md:flex">
-            {STEPS.map((label, i) => (
-              <button key={label} type="button" onClick={() => setStep(i)} className="flex items-center gap-2 text-sm">
+            {STEP_LABEL_KEYS.map((labelKey, i) => (
+              <button key={labelKey} type="button" onClick={() => setStep(i)} className="flex items-center gap-2 text-sm">
                 <span
                   className={`flex h-6 w-6 items-center justify-center rounded-[var(--radius-chip)] text-xs font-medium ${
                     i === step
@@ -603,14 +616,14 @@ function JournalCustomizerContent({
                 >
                   {theme === "atelier" ? ROMAN_NUMERALS[i] ?? i + 1 : i + 1}
                 </span>
-                <span className={i === step ? "text-[var(--ink)] font-medium" : "text-[var(--faint)]"}>{label}</span>
+                <span className={i === step ? "text-[var(--ink)] font-medium" : "text-[var(--faint)]"}>{t(labelKey)}</span>
               </button>
             ))}
           </nav>
 
           <div className="flex min-w-0 flex-1 justify-end text-right">
             <div>
-              <div className="text-xs text-[var(--faint)]">Total</div>
+              <div className="text-xs text-[var(--faint)]">{t("common.total")}</div>
               <div className="text-lg font-semibold text-[var(--ink)] font-heading">{formatConverted(total)}</div>
             </div>
           </div>
@@ -714,7 +727,7 @@ function JournalCustomizerContent({
                         )}
                       </div>
                       <span className="rounded-full bg-white/95 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide text-[var(--muted)] shadow-sm">
-                        Pouch included
+                        {t("customizer.pouchIncluded")}
                       </span>
                     </div>
                   )}
@@ -724,13 +737,13 @@ function JournalCustomizerContent({
 
             {isCharmsStep && (
               <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--faint)]">
-                {mainView} view
+                {t("customizer.viewSuffix", { view: t(`common.view.${mainView}`) })}
               </span>
             )}
 
             {showNotebookPreview && (
               <div className="w-full max-w-[360px]">
-                <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--faint)]">Inside</span>
+                <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--faint)]">{t("customizer.inside")}</span>
                 <div className="mt-2 grid grid-cols-3 items-start gap-4 rounded-[var(--radius-panel)] bg-[var(--surface-panel-2)] p-4">
                   {notebookSlots.map((design, i) => (
                     <div key={i} className="flex flex-col items-center gap-2">
@@ -746,7 +759,7 @@ function JournalCustomizerContent({
                           </>
                         ) : (
                           <div className="flex h-full w-full items-center justify-center rounded-md border border-dashed border-[var(--faint)] text-center text-[9px] leading-tight text-[var(--faint)]">
-                            Choose a notebook
+                            {t("customizer.chooseNotebook")}
                           </div>
                         )}
                       </div>
@@ -762,7 +775,7 @@ function JournalCustomizerContent({
             {showBackSide && (
               <div className="flex items-start gap-6">
                 <div className="flex flex-col items-center gap-1.5">
-                  <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--faint)]">Back</span>
+                  <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--faint)]">{t("customizer.back")}</span>
                   <div className="relative w-[100px] aspect-[560/660] rounded-lg overflow-hidden shadow-md">
                     {backImageSrc && (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -780,7 +793,7 @@ function JournalCustomizerContent({
                   </div>
                 </div>
                 <div className="flex flex-col items-center gap-1.5">
-                  <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--faint)]">Side</span>
+                  <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--faint)]">{t("customizer.side")}</span>
                   <div className="relative w-[52px] aspect-[200/660] rounded-lg overflow-hidden shadow-md">
                     {sideImageSrc && (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -896,7 +909,7 @@ function JournalCustomizerContent({
               disabled={step === 0}
               className="text-sm font-medium text-[var(--muted)] disabled:opacity-0"
             >
-              ← Back
+              {t("common.back")}
             </button>
           </div>
           {step < STEPS.length - 1 ? (
@@ -907,11 +920,11 @@ function JournalCustomizerContent({
                 disabled={!canContinue}
                 className="btn-continue rounded-[var(--radius-button)] bg-[var(--accent)] px-8 py-3 text-white font-medium hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[var(--accent)]"
               >
-                Continue →
+                {t("common.continue")}
               </button>
             </DisabledHint>
           ) : (
-            <span className="hidden md:inline text-sm text-[var(--faint)]">Ready to add to cart</span>
+            <span className="hidden md:inline text-sm text-[var(--faint)]">{t("common.readyToAddToCart")}</span>
           )}
         </footer>
       </div>
@@ -929,7 +942,7 @@ function JournalCustomizerContent({
             disabled={step === 0}
             className="flex-1 rounded-[var(--radius-button)] border border-[var(--border)] py-2.5 text-sm font-medium text-[var(--muted)] transition-opacity disabled:opacity-40"
           >
-            ← Back
+            {t("common.back")}
           </button>
           {step < STEPS.length - 1 ? (
             <button
@@ -938,16 +951,16 @@ function JournalCustomizerContent({
               disabled={!canContinue}
               className="btn-continue flex-[2] rounded-[var(--radius-button)] bg-[var(--accent)] py-2.5 text-sm font-medium text-white transition-colors disabled:cursor-not-allowed disabled:opacity-40"
             >
-              Continue →
+              {t("common.continue")}
             </button>
           ) : (
-            <span className="flex-[2] text-center text-sm text-[var(--faint)]">Ready to add to cart</span>
+            <span className="flex-[2] text-center text-sm text-[var(--faint)]">{t("common.readyToAddToCart")}</span>
           )}
         </div>
         <div className="flex items-center justify-between">
           <span className="text-xs font-medium text-[var(--faint)]">{currency}</span>
           <div className="text-right">
-            <div className="text-xs text-[var(--faint)]">Total</div>
+            <div className="text-xs text-[var(--faint)]">{t("common.total")}</div>
             <div className="text-base font-semibold text-[var(--ink)] font-heading">{formatConverted(total)}</div>
           </div>
         </div>
@@ -959,7 +972,7 @@ function JournalCustomizerContent({
         type="button"
         onClick={goBack}
         disabled={step === 0}
-        aria-label="Previous step"
+        aria-label={t("common.previousStep")}
         className="md:hidden fixed left-3 top-1/2 z-50 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--card-bg)] text-[var(--accent)] shadow-xl transition-opacity disabled:opacity-0 disabled:pointer-events-none"
       >
         <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
@@ -970,7 +983,7 @@ function JournalCustomizerContent({
         type="button"
         onClick={goNext}
         disabled={step === STEPS.length - 1 || !canContinue}
-        aria-label="Next step"
+        aria-label={t("common.nextStep")}
         className={`md:hidden fixed right-3 top-1/2 z-50 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--card-bg)] text-[var(--accent)] shadow-xl transition-opacity ${
           step === STEPS.length - 1 ? "opacity-0 pointer-events-none" : !canContinue ? "opacity-40 pointer-events-none" : ""
         }`}

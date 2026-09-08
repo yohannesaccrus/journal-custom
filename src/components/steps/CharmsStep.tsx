@@ -13,6 +13,7 @@ import {
   type CharmEntry,
 } from "@/lib/catalog";
 import { useCurrencyFormat } from "@/components/CurrencyContext";
+import { useTranslation } from "@/components/LocaleContext";
 import { PatchIcon } from "@/components/PatchIcon";
 import type { ShopifyJournalProduct } from "@/lib/shopify-admin";
 import type { CharmSide, JournalSelection, PlacedCharm } from "@/lib/types";
@@ -28,10 +29,10 @@ interface CharmsStepProps {
   onSelectSide: (side: CharmSide) => void;
 }
 
-const VIEWS: { key: CharmSide; label: string; wide: boolean }[] = [
-  { key: "front", label: "Front", wide: true },
-  { key: "side", label: "Side", wide: false },
-  { key: "back", label: "Back", wide: true },
+const VIEWS: { key: CharmSide; labelKey: string; wide: boolean }[] = [
+  { key: "front", labelKey: "charms.viewLabel.front", wide: true },
+  { key: "side", labelKey: "charms.viewLabel.side", wide: false },
+  { key: "back", labelKey: "charms.viewLabel.back", wide: true },
 ];
 
 function clamp(n: number, min: number, max: number) {
@@ -83,6 +84,7 @@ function CharmCanvas({
   onMove,
   onRemove,
 }: CharmCanvasProps) {
+  const { t } = useTranslation();
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragId = useRef<string | null>(null);
 
@@ -158,7 +160,7 @@ function CharmCanvas({
         onDrop={handleDrop}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        title={atLimit ? "This view is full" : undefined}
+        title={atLimit ? t("charms.viewFull") : undefined}
         className={`relative rounded-[var(--radius-panel)] overflow-hidden border-2 select-none bg-[var(--surface-soft)] transition-colors cursor-pointer ${
           active ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/20" : "border-[var(--border)] hover:border-[var(--accent)]/30"
         } ${wide ? "w-[170px] aspect-[560/660]" : "w-[92px] aspect-[200/660]"}`}
@@ -227,6 +229,7 @@ export function CharmsStep({
   onSelectSide,
 }: CharmsStepProps) {
   const { format } = useCurrencyFormat();
+  const { t } = useTranslation();
   const charms = selection.charms;
   const entries = buildCharmEntries(charmProduct);
   // A native HTML5 drag doesn't reliably suppress the "click" the browser
@@ -258,9 +261,9 @@ export function CharmsStep({
 
   return (
     <div className="step-fade-in">
-      <h2 className="text-xl font-heading text-[var(--ink)]">Add charms</h2>
+      <h2 className="text-xl font-heading text-[var(--ink)]">{t("charms.title")}</h2>
       <p className="mt-1 text-sm text-[var(--muted)]">
-        Drag a charm onto the front, back, or side cover — up to {MAX_CHARMS_TOTAL} per journal.
+        {t("charms.subtitle", { max: MAX_CHARMS_TOTAL })}
       </p>
 
       <div className="mt-4 flex flex-wrap gap-4">
@@ -269,7 +272,15 @@ export function CharmsStep({
           return (
             <DisabledHint
               key={c.variantId}
-              message={!c.inStock ? "Out of stock" : totalAtLimit ? `${MAX_CHARMS_TOTAL} charm limit reached` : activeSideAtLimit ? `${activeSide} is full` : null}
+              message={
+                !c.inStock
+                  ? t("common.outOfStock")
+                  : totalAtLimit
+                    ? t("charms.limitReached", { max: MAX_CHARMS_TOTAL })
+                    : activeSideAtLimit
+                      ? t("charms.sideFull", { side: t(`common.view.${activeSide}`) })
+                      : null
+              }
             >
               <div
                 draggable={!disabled}
@@ -308,10 +319,7 @@ export function CharmsStep({
       <div className="mt-3 flex items-start gap-2 rounded-lg bg-[var(--surface-soft)] px-3 py-2 text-xs text-[var(--muted)]">
         <span aria-hidden>💡</span>
         <span>
-          Drag a charm from above and drop it onto any view below to place it there. Once placed, drag a
-          charm to fine-tune its spot, or click the × that appears on hover to remove it. Mix charms across
-          front, side, and back — up to {MAX_CHARMS_FRONT} on the front, {MAX_CHARMS_SIDE} on the side,{" "}
-          {MAX_CHARMS_TOTAL} in total.
+          {t("charms.tip", { front: MAX_CHARMS_FRONT, side: MAX_CHARMS_SIDE, total: MAX_CHARMS_TOTAL })}
         </span>
       </div>
 
@@ -322,7 +330,7 @@ export function CharmsStep({
           return (
             <CharmCanvas
               key={v.key}
-              label={v.label}
+              label={t(v.labelKey)}
               wide={v.wide}
               imageUrl={imageFor(v.key)}
               patch={v.key === "front" ? selection.patch : undefined}
@@ -344,7 +352,7 @@ export function CharmsStep({
       </div>
 
       <p className="mt-4 text-sm text-[var(--muted)]">
-        {totalCharms === 0 ? "No charms added yet." : `${totalCharms} of ${MAX_CHARMS_TOTAL} charms placed.`}
+        {totalCharms === 0 ? t("charms.noneAdded") : t("charms.placedCount", { count: totalCharms, max: MAX_CHARMS_TOTAL })}
       </p>
     </div>
   );

@@ -3,6 +3,7 @@
 import { buildCoverEntries } from "@/lib/catalog";
 import type { ShopifyJournalProduct } from "@/lib/shopify-admin";
 import { useCurrencyFormat } from "@/components/CurrencyContext";
+import { useTranslation } from "@/components/LocaleContext";
 import { Swatch } from "@/components/Swatch";
 import { DisabledHint } from "@/components/DisabledHint";
 import type { CoverCategory } from "@/lib/types";
@@ -17,6 +18,7 @@ interface CoverStepProps {
 
 export function CoverStep({ products, cover, category, onCategoryChange, onCoverChange }: CoverStepProps) {
   const { format } = useCurrencyFormat();
+  const { t } = useTranslation();
   const entries = buildCoverEntries(products);
   const options = entries.filter((o) => o.category === category);
   const current = entries.find((o) => o.handle === cover);
@@ -26,8 +28,8 @@ export function CoverStep({ products, cover, category, onCategoryChange, onCover
 
   return (
     <div className="step-fade-in">
-      <h2 className="text-xl font-heading text-[var(--ink)]">Choose your leather cover</h2>
-      <p className="mt-1 text-sm text-[var(--muted)]">All covers are hand-stitched from full-grain leather.</p>
+      <h2 className="text-xl font-heading text-[var(--ink)]">{t("cover.title")}</h2>
+      <p className="mt-1 text-sm text-[var(--muted)]">{t("cover.subtitle")}</p>
 
       <div className="mt-3 inline-flex rounded-[var(--radius-button)] bg-[var(--surface-pill)] p-1">
         <button
@@ -37,7 +39,7 @@ export function CoverStep({ products, cover, category, onCategoryChange, onCover
             category === "classic" ? "bg-[var(--card-bg)] shadow text-[var(--accent)]" : "text-[var(--muted)]"
           }`}
         >
-          Classic Leather
+          {t("cover.classicLeather")}
         </button>
         <button
           type="button"
@@ -46,13 +48,13 @@ export function CoverStep({ products, cover, category, onCategoryChange, onCover
             category === "pattern" ? "bg-[var(--card-bg)] shadow text-[var(--accent)]" : "text-[var(--muted)]"
           }`}
         >
-          Animal Print <span className="text-[var(--brand)]">+{format(patternDeltaMin)}</span>
+          {t("cover.animalPrint")} <span className="text-[var(--brand)]">+{format(patternDeltaMin)}</span>
         </button>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-4">
         {options.map((o) => (
-          <DisabledHint key={o.handle} message={!o.inStock ? "Out of stock" : null}>
+          <DisabledHint key={o.handle} message={!o.inStock ? t("common.outOfStock") : null}>
             <Swatch
               label={o.label}
               selected={cover === o.handle}

@@ -2,6 +2,7 @@
 
 import { PATCH_POSITION, type CharmEntry } from "@/lib/catalog";
 import { PatchIcon } from "@/components/PatchIcon";
+import { useTranslation } from "@/components/LocaleContext";
 import type { JournalSelection, PlacedCharm } from "@/lib/types";
 
 interface SummaryRow {
@@ -38,6 +39,7 @@ export function OrderConfirmModal({
   onConfirm,
   confirming,
 }: OrderConfirmModalProps) {
+  const { t } = useTranslation();
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onEdit} />
@@ -45,13 +47,13 @@ export function OrderConfirmModal({
       <div className="step-fade-in relative flex w-full max-w-lg flex-col overflow-hidden rounded-[var(--radius-panel)] bg-[var(--card-bg)] shadow-2xl max-h-[90vh]">
         <div className="flex items-start justify-between gap-4 border-b border-[var(--border)] px-6 py-5">
           <div>
-            <h2 className="text-xl font-heading text-[var(--ink)]">Your journal is one step away</h2>
-            <p className="mt-1 text-sm text-[var(--muted)]">Take a last look before we send you to payment.</p>
+            <h2 className="text-xl font-heading text-[var(--ink)]">{t("orderConfirm.title")}</h2>
+            <p className="mt-1 text-sm text-[var(--muted)]">{t("orderConfirm.subtitle")}</p>
           </div>
           <button
             type="button"
             onClick={onEdit}
-            aria-label="Close"
+            aria-label={t("orderConfirm.close")}
             className="shrink-0 rounded-full p-1.5 text-[var(--muted)] transition-colors hover:bg-[var(--surface-soft)] hover:text-[var(--ink)]"
           >
             <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
@@ -102,7 +104,7 @@ export function OrderConfirmModal({
               </div>
             ))}
             <div className="flex items-center justify-between py-2.5">
-              <dt className="text-sm text-[var(--muted)]">Total</dt>
+              <dt className="text-sm text-[var(--muted)]">{t("common.total")}</dt>
               <dd className="text-base font-semibold text-[var(--ink)]">{formattedTotal}</dd>
             </div>
           </dl>
@@ -123,7 +125,7 @@ export function OrderConfirmModal({
                 />
                 <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.6" />
               </svg>
-              View full design
+              {t("orderConfirm.viewFullDesign")}
             </a>
             <button
               type="button"
@@ -135,7 +137,7 @@ export function OrderConfirmModal({
                   <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
                     <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                  Link copied
+                  {t("orderConfirm.linkCopied")}
                 </>
               ) : (
                 <>
@@ -143,7 +145,7 @@ export function OrderConfirmModal({
                     <rect x="8" y="8" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.6" />
                     <path d="M4 16V6a2 2 0 0 1 2-2h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
                   </svg>
-                  Copy Design Link
+                  {t("orderConfirm.copyDesignLink")}
                 </>
               )}
             </button>
@@ -156,7 +158,7 @@ export function OrderConfirmModal({
             onClick={onEdit}
             className="text-sm font-medium text-[var(--muted)] hover:text-[var(--ink)] transition-colors"
           >
-            ← Keep editing
+            {t("orderConfirm.keepEditing")}
           </button>
           <button
             type="button"
@@ -164,7 +166,7 @@ export function OrderConfirmModal({
             disabled={confirming}
             className="btn-continue rounded-[var(--radius-button)] bg-[var(--accent)] px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {confirming ? "Adding to cart…" : "Continue to payment →"}
+            {confirming ? t("orderConfirm.addingToCart") : t("orderConfirm.continueToPayment")}
           </button>
         </div>
       </div>

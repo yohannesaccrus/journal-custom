@@ -9,11 +9,11 @@ import {
 } from "@/lib/shopify-admin";
 
 interface HomeProps {
-  searchParams: Promise<{ country?: string }>;
+  searchParams: Promise<{ country?: string; lang?: string }>;
 }
 
 export default async function Home({ searchParams }: HomeProps) {
-  const { country } = await searchParams;
+  const { country, lang } = await searchParams;
   const [products, charmProduct, notebookProduct, patchProduct, pouchProduct, swatchColors] = await Promise.all([
     fetchJournalProducts(),
     fetchCharmProduct(),
@@ -45,6 +45,7 @@ export default async function Home({ searchParams }: HomeProps) {
       pouchProduct={pouchProduct}
       swatchColors={swatchColors}
       country={country}
+      lang={lang}
     />
   );
 }

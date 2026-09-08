@@ -2,6 +2,7 @@
 
 import { buildPatchEntries, PATCH_LABEL, PATCH_VALUES } from "@/lib/catalog";
 import { useCurrencyFormat } from "@/components/CurrencyContext";
+import { useTranslation } from "@/components/LocaleContext";
 import type { ShopifyJournalProduct } from "@/lib/shopify-admin";
 import { Swatch } from "@/components/Swatch";
 import { DisabledHint } from "@/components/DisabledHint";
@@ -29,6 +30,7 @@ export function PatchStep({
   onPatchChange,
 }: PatchStepProps) {
   const { format } = useCurrencyFormat();
+  const { t } = useTranslation();
   // Before a string is picked there's no combo to price/stock-check yet
   // (buildPatchEntries needs one) — show every patch anyway, just disabled,
   // so the options aren't a mystery until the previous step is done.
@@ -44,11 +46,9 @@ export function PatchStep({
 
   return (
     <div className="step-fade-in">
-      <h2 className="text-xl font-heading text-[var(--ink)]">Patch</h2>
+      <h2 className="text-xl font-heading text-[var(--ink)]">{t("patch.title")}</h2>
       <p className="mt-1 text-sm text-[var(--muted)]">
-        {cordSelected
-          ? "A stitched leather patch sitting right where the string ties."
-          : "Pick a string first to unlock a patch."}
+        {cordSelected ? t("patch.subtitleReady") : t("patch.subtitleLocked")}
       </p>
 
       <div className="mt-4 flex flex-wrap gap-4">
@@ -65,11 +65,11 @@ export function PatchStep({
           >
             <span className="text-[10px] text-[var(--faint)]">None</span>
           </span>
-          <span className="text-xs text-[var(--ink)]">No patch</span>
+          <span className="text-xs text-[var(--ink)]">{t("patch.noPatch")}</span>
         </button>
 
         {patchEntries.map((p) => (
-          <DisabledHint key={p.value} message={cordSelected && !p.inStock ? "Out of stock" : null}>
+          <DisabledHint key={p.value} message={cordSelected && !p.inStock ? t("common.outOfStock") : null}>
             <Swatch
               label={p.label}
               selected={patch === p.value}

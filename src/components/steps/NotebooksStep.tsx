@@ -1,8 +1,9 @@
 "use client";
 
-import { buildNotebookEntries, NOTEBOOK_SPEC_NOTE, NOTEBOOKS_PER_JOURNAL, notebookCount } from "@/lib/catalog";
+import { buildNotebookEntries, NOTEBOOKS_PER_JOURNAL, notebookCount } from "@/lib/catalog";
 import { NotebookIcon } from "@/components/NotebookIcon";
 import { DisabledHint } from "@/components/DisabledHint";
+import { useTranslation } from "@/components/LocaleContext";
 import type { ShopifyJournalProduct } from "@/lib/shopify-admin";
 
 interface NotebooksStepProps {
@@ -13,14 +14,15 @@ interface NotebooksStepProps {
   onNoteChange: (note: string) => void;
 }
 
-const DESCRIPTIONS: Record<string, string> = {
-  "To-Do List": "Checklists & daily tasks",
-  "Lined Notebook": "Writing & journaling",
-  "Blank Notebook": "Sketching & freeform",
-  "Extra Notebook": "Tell us what you'd like inside",
+const DESCRIPTION_KEYS: Record<string, string> = {
+  "To-Do List": "notebooks.desc.toDoList",
+  "Lined Notebook": "notebooks.desc.linedNotebook",
+  "Blank Notebook": "notebooks.desc.blankNotebook",
+  "Extra Notebook": "notebooks.desc.extraNotebook",
 };
 
 export function NotebooksStep({ notebookProduct, notebooks, notebooksNote, onChange, onNoteChange }: NotebooksStepProps) {
+  const { t } = useTranslation();
   const entries = buildNotebookEntries(notebookProduct);
   const total = notebookCount(notebooks);
   const remaining = NOTEBOOKS_PER_JOURNAL - total;
@@ -36,8 +38,8 @@ export function NotebooksStep({ notebookProduct, notebooks, notebooksNote, onCha
 
   return (
     <div className="step-fade-in">
-      <h2 className="text-xl font-heading text-[var(--ink)]">Choose your 3 notebooks</h2>
-      <p className="mt-1 text-sm text-[var(--muted)]">Every journal ships with 3 refill notebooks inside. Mix &amp; match freely.</p>
+      <h2 className="text-xl font-heading text-[var(--ink)]">{t("notebooks.title")}</h2>
+      <p className="mt-1 text-sm text-[var(--muted)]">{t("notebooks.subtitle")}</p>
 
       <div className="mt-4 flex items-center gap-3">
         <div className="flex flex-1 gap-1.5">
@@ -48,7 +50,7 @@ export function NotebooksStep({ notebookProduct, notebooks, notebooksNote, onCha
             />
           ))}
         </div>
-        <span className="whitespace-nowrap text-sm text-[var(--muted)]">{total} of {NOTEBOOKS_PER_JOURNAL} chosen</span>
+        <span className="whitespace-nowrap text-sm text-[var(--muted)]">{t("notebooks.chosenCount", { count: total, max: NOTEBOOKS_PER_JOURNAL })}</span>
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 step-fade-in">
@@ -72,7 +74,7 @@ export function NotebooksStep({ notebookProduct, notebooks, notebooksNote, onCha
               <div className="min-w-0 flex-1">
                 <div className="font-medium text-[var(--ink)]">{n.design}</div>
                 <div className="text-xs text-[var(--faint)]">
-                  {n.inStock ? DESCRIPTIONS[n.design] : "Out of stock"}
+                  {n.inStock ? t(DESCRIPTION_KEYS[n.design] ?? "") : t("common.outOfStock")}
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
@@ -85,7 +87,7 @@ export function NotebooksStep({ notebookProduct, notebooks, notebooksNote, onCha
                   −
                 </button>
                 <span className="w-4 text-center text-sm font-medium text-[var(--ink)]">{count}</span>
-                <DisabledHint message={!n.inStock ? "Out of stock" : null}>
+                <DisabledHint message={!n.inStock ? t("common.outOfStock") : null}>
                   <button
                     type="button"
                     onClick={() => setCount(n.design, 1)}
@@ -104,24 +106,24 @@ export function NotebooksStep({ notebookProduct, notebooks, notebooksNote, onCha
       {(notebooks["Extra Notebook"] ?? 0) > 0 && (
         <div className="mt-4 step-fade-in">
           <label htmlFor="extra-notebook-note" className="text-sm font-medium text-[var(--ink)]">
-            What would you like in your Extra Notebook{(notebooks["Extra Notebook"] ?? 0) > 1 ? "s" : ""}?
+            {t("notebooks.extraNotebookLabel", { plural: (notebooks["Extra Notebook"] ?? 0) > 1 ? "s" : "" })}
           </label>
           <textarea
             id="extra-notebook-note"
             value={notebooksNote}
             onChange={(e) => onNoteChange(e.target.value)}
-            placeholder="e.g. recipe cards, a travel itinerary template, a habit tracker…"
+            placeholder={t("notebooks.extraNotebookPlaceholder")}
             rows={3}
             className="mt-1.5 w-full resize-none rounded-[var(--radius-panel)] border-2 border-[var(--border)] bg-white p-3 text-sm text-[var(--ink)] placeholder:text-[var(--faint)] focus:border-[var(--accent)] focus:outline-none"
           />
         </div>
       )}
 
-      <p className="mt-5 text-xs text-[var(--faint)]">{NOTEBOOK_SPEC_NOTE}</p>
+      <p className="mt-5 text-xs text-[var(--faint)]">{t("notebooks.specNote")}</p>
 
       {remaining > 0 && (
         <p className="mt-3 text-sm text-[var(--brand)]">
-          Pick {remaining} more notebook{remaining > 1 ? "s" : ""} to continue.
+          {t("notebooks.pickMore", { count: remaining, plural: remaining > 1 ? "s" : "" })}
         </p>
       )}
     </div>

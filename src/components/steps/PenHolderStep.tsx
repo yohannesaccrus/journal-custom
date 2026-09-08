@@ -3,6 +3,7 @@
 import { buildCordEntries, buildPenHolderEntries, EDGE_LABEL, EDGE_VALUES, isEdgeInStock, resolveVariant } from "@/lib/catalog";
 import type { ShopifyJournalProduct, ShopifyVariant } from "@/lib/shopify-admin";
 import { useCurrencyFormat } from "@/components/CurrencyContext";
+import { useTranslation } from "@/components/LocaleContext";
 import { Swatch } from "@/components/Swatch";
 import { DisabledHint } from "@/components/DisabledHint";
 import type { JournalSelection } from "@/lib/types";
@@ -34,6 +35,7 @@ export function PenHolderStep({
   onPouchChange,
 }: PenHolderStepProps) {
   const { format } = useCurrencyFormat();
+  const { t } = useTranslation();
   const hasPenHolder = selection.penHolder !== "none";
 
   // Shopify only has pen-holder variants paired with an actual cord color —
@@ -60,12 +62,12 @@ export function PenHolderStep({
 
   return (
     <div className="step-fade-in">
-      <h2 className="text-xl font-heading text-[var(--ink)]">Pen holder & corner edge</h2>
-      <p className="mt-1 text-sm text-[var(--muted)]">An elastic loop that holds a pen against the spine.</p>
+      <h2 className="text-xl font-heading text-[var(--ink)]">{t("penHolder.title")}</h2>
+      <p className="mt-1 text-sm text-[var(--muted)]">{t("penHolder.subtitle")}</p>
 
       <div className="mt-4 flex flex-wrap gap-4">
         <Swatch
-          label="No pen holder"
+          label={t("penHolder.noPenHolder")}
           selected={selection.penHolder === "none"}
           onClick={() => onPenHolderChange("none")}
           color="#ffffff"
@@ -74,7 +76,7 @@ export function PenHolderStep({
           const slug = o.label.toLowerCase() as JournalSelection["penHolder"];
           const delta = priceAt(slug, "none") - basePrice;
           return (
-            <DisabledHint key={o.label} message={!o.inStock ? "Out of stock" : null}>
+            <DisabledHint key={o.label} message={!o.inStock ? t("common.outOfStock") : null}>
               <Swatch
                 label={o.label}
                 selected={selection.penHolder === slug}
@@ -89,17 +91,17 @@ export function PenHolderStep({
       </div>
 
       <div className="mt-5 border-t border-[var(--border)] pt-5">
-        <h3 className="text-base font-heading text-[var(--ink)]">Corner edge accents</h3>
+        <h3 className="text-base font-heading text-[var(--ink)]">{t("penHolder.cornerEdgeAccents")}</h3>
         <p className="mt-1 text-xs text-[var(--muted)]">
-          Reinforced leather corners on all four edges of the cover.
+          {t("penHolder.cornerEdgeSubtitle")}
         </p>
         <div className="mt-3 flex flex-wrap gap-4">
-          <Swatch label="No edge" selected={selection.edge === "none"} onClick={() => onEdgeChange("none")} color="#ffffff" />
+          <Swatch label={t("penHolder.noEdge")} selected={selection.edge === "none"} onClick={() => onEdgeChange("none")} color="#ffffff" />
           {EDGE_VALUES.map((color) => {
             const inStockColor = edgeStockByColor[color];
             const delta = priceAt(selection.penHolder, color) - priceAt(selection.penHolder, "none");
             return (
-              <DisabledHint key={color} message={hasPenHolder && !inStockColor ? "Out of stock" : null}>
+              <DisabledHint key={color} message={hasPenHolder && !inStockColor ? t("common.outOfStock") : null}>
                 <Swatch
                   label={EDGE_LABEL[color]}
                   selected={selection.edge === color}
@@ -113,23 +115,23 @@ export function PenHolderStep({
           })}
         </div>
         {!hasPenHolder && (
-          <p className="mt-2 text-xs text-[var(--faint)]">Select a pen holder color to unlock corner edges.</p>
+          <p className="mt-2 text-xs text-[var(--faint)]">{t("penHolder.selectPenHolderFirst")}</p>
         )}
       </div>
 
       {pouchVariant && (
         <div className="mt-5 border-t border-[var(--border)] pt-5">
-          <h3 className="text-base font-heading text-[var(--ink)]">Protective pouch</h3>
-          <p className="mt-1 text-xs text-[var(--muted)]">A clear plastic sleeve to keep your journal safe in transit.</p>
+          <h3 className="text-base font-heading text-[var(--ink)]">{t("penHolder.protectivePouch")}</h3>
+          <p className="mt-1 text-xs text-[var(--muted)]">{t("penHolder.pouchSubtitle")}</p>
           <div className="mt-3 flex flex-wrap gap-4">
-            <Swatch label="No pouch" selected={!selection.pouch} onClick={() => onPouchChange(false)} color="#ffffff" />
-            <DisabledHint message={pouchVariant.inventoryQuantity <= 0 ? "Out of stock" : null}>
+            <Swatch label={t("penHolder.noPouch")} selected={!selection.pouch} onClick={() => onPouchChange(false)} color="#ffffff" />
+            <DisabledHint message={pouchVariant.inventoryQuantity <= 0 ? t("common.outOfStock") : null}>
               <Swatch
-                label="Plastic Pouch"
+                label={t("penHolder.plasticPouch")}
                 selected={selection.pouch}
                 onClick={() => onPouchChange(true)}
                 thumbnail={pouchVariant.image?.url}
-                priceLabel={Number(pouchVariant.price) > 0 ? `+${format(Number(pouchVariant.price), "pouch")}` : "Free"}
+                priceLabel={Number(pouchVariant.price) > 0 ? `+${format(Number(pouchVariant.price), "pouch")}` : t("penHolder.free")}
                 disabled={pouchVariant.inventoryQuantity <= 0}
               />
             </DisabledHint>
