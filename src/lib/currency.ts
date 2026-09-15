@@ -24,6 +24,9 @@ export interface CurrencyConfig {
   pattern: string;
 }
 
+/** Fallback used until the live rate (Shopify shop metafield) has loaded. */
+export const FALLBACK_IDR_RATE = 20800;
+
 export const CURRENCIES: Record<string, CurrencyConfig> = {
   EUR: {
     code: "EUR",
@@ -40,9 +43,10 @@ export const CURRENCIES: Record<string, CurrencyConfig> = {
     symbol: "Rp",
     label: "Indonesian Rupiah",
     decimals: 0,
-    // Approximate — update here (or wire to a live rate) as needed; every
-    // display and edit path reads from this single source of truth.
-    rateFromEUR: 17200,
+    // Default/fallback only — overridden at runtime by `setIdrRate` from the
+    // `sanaya.eur_idr_rate` shop metafield, the same single source of truth
+    // the storefront theme reads for /id pricing. See setIdrRate below.
+    rateFromEUR: FALLBACK_IDR_RATE,
     decimalSeparator: ",",
     groupSeparator: ".",
     pattern: "! #",
@@ -54,7 +58,7 @@ export const CURRENCIES: Record<string, CurrencyConfig> = {
     // Approximate — update here (or wire to a live rate) as needed; every
     // display and edit path reads from this single source of truth.
     decimals: 2,
-    rateFromEUR: 17200 / 15800,
+    rateFromEUR: FALLBACK_IDR_RATE / 15800,
     decimalSeparator: ".",
     groupSeparator: ",",
     pattern: "!#",
@@ -62,6 +66,19 @@ export const CURRENCIES: Record<string, CurrencyConfig> = {
 };
 
 export const DEFAULT_CURRENCY = "EUR";
+
+/**
+ * Overrides the live EUR->IDR rate at runtime — called once per request by
+ * the admin layout after reading the `sanaya.eur_idr_rate` shop metafield
+ * (see `lib/admin/exchange-rate.ts`), which is the same value the storefront
+ * theme reads for /id pricing. USD is derived off the same IDR figure (via
+ * an assumed ~15800 IDR/USD) rather than tracked separately.
+ */
+export function setIdrRate(rate: number): void {
+  if (!Number.isFinite(rate) || rate <= 0) return;
+  CURRENCIES.IDR.rateFromEUR = rate;
+  CURRENCIES.USD.rateFromEUR = rate / 15800;
+}
 
 function money(amount: number, cfg: CurrencyConfig) {
   return currency(amount, {

@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { CURRENCIES, DEFAULT_CURRENCY } from "@/lib/currency";
+import { CURRENCIES, DEFAULT_CURRENCY, setIdrRate } from "@/lib/currency";
 
 const STORAGE_KEY = "sanaya-admin-currency";
 
@@ -15,7 +15,22 @@ const CurrencyContext = createContext<CurrencyContextValue>({
   setCurrency: () => {},
 });
 
-export function CurrencyProvider({ children }: { children: React.ReactNode }) {
+export function CurrencyProvider({
+  children,
+  liveIdrRate,
+}: {
+  children: React.ReactNode;
+  /** The `sanaya.eur_idr_rate` shop metafield value, read server-side in
+   * layout.tsx — applied here too since this client bundle's `currency.ts`
+   * module is a separate instance from the server's. Keeps this admin's
+   * client-rendered prices matching what /id storefront visitors are
+   * actually charged instead of the hardcoded fallback rate. */
+  liveIdrRate?: number | null;
+}) {
+  // Runs during render (not an effect) so it's applied before any child
+  // (e.g. VariantRow) reads CURRENCIES to format a price.
+  if (liveIdrRate) setIdrRate(liveIdrRate);
+
   const [currency, setCurrencyState] = useState(DEFAULT_CURRENCY);
 
   // Restore after mount (not during the initial render) so server and

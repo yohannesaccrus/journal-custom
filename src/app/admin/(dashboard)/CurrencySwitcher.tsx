@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CURRENCIES } from "@/lib/currency";
+import { useRouter } from "next/navigation";
+import { CURRENCIES, formatAmountInput, sanitizeAmountInput } from "@/lib/currency";
 import { useCurrency } from "./CurrencyContext";
 
 /**
@@ -16,6 +17,36 @@ export function CurrencySwitcher() {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const active = CURRENCIES[currency];
+  const router = useRouter();
+
+  const [editingRate, setEditingRate] = useState(false);
+  const [rateInput, setRateInput] = useState(() => String(Math.round(CURRENCIES.IDR.rateFromEUR)));
+  const [savingRate, setSavingRate] = useState(false);
+  const [rateError, setRateError] = useState<string | null>(null);
+
+  async function saveRate() {
+    const parsed = Number(rateInput.replace(/\./g, "").replace(/,/g, ""));
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      setRateError("Enter a positive number");
+      return;
+    }
+    setSavingRate(true);
+    setRateError(null);
+    try {
+      const res = await fetch("/api/admin/settings/exchange-rate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rate: parsed }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? "Failed to save");
+      setEditingRate(false);
+      router.refresh();
+    } catch (err) {
+      setRateError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSavingRate(false);
+    }
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -105,6 +136,51 @@ export function CurrencySwitcher() {
                 </li>
               );
             })}
+
+            <li className="mt-1 border-t border-white/10 px-3 pt-2 pb-1.5">
+              {editingRate ? (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] uppercase tracking-wide text-white/50">EUR &rarr; IDR rate</label>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      autoFocus
+                      type="text"
+                      inputMode="numeric"
+                      value={rateInput}
+                      onChange={(e) => setRateInput(formatAmountInput(sanitizeAmountInput(e.target.value, "IDR"), "IDR"))}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveRate();
+                        if (e.key === "Escape") setEditingRate(false);
+                      }}
+                      className="w-full min-w-0 rounded-md border border-white/15 bg-black/30 px-2 py-1 text-xs text-white outline-none focus:border-[#e0a870]/60"
+                    />
+                    <button
+                      type="button"
+                      disabled={savingRate}
+                      onClick={saveRate}
+                      className="shrink-0 rounded-md bg-[#b1632f] px-2 py-1 text-xs font-semibold text-white hover:bg-[#c17038] disabled:opacity-50"
+                    >
+                      {savingRate ? "..." : "Save"}
+                    </button>
+                  </div>
+                  {rateError && <span className="text-[10px] text-red-400">{rateError}</span>}
+                  <p className="text-[10px] leading-snug text-white/40">
+                    Shared with the storefront — updates what /id shoppers are charged too.
+                  </p>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRateInput(String(Math.round(CURRENCIES.IDR.rateFromEUR)));
+                    setEditingRate(true);
+                  }}
+                  className="w-full rounded-md px-1 py-1 text-left text-[11px] text-white/50 hover:text-white/80"
+                >
+                  Edit EUR&rarr;IDR rate ({Math.round(CURRENCIES.IDR.rateFromEUR).toLocaleString("id-ID")})
+                </button>
+              )}
+            </li>
           </ul>
         )}
       </div>

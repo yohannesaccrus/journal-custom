@@ -1,4 +1,6 @@
 import { fetchJournalOrders } from "@/lib/admin/shopify-admin-data";
+import { getEurIdrRate } from "@/lib/admin/exchange-rate";
+import { setIdrRate } from "@/lib/currency";
 import { AdminNav } from "./AdminNav";
 import { AdminMobileNav } from "./AdminMobileNav";
 import { CurrencyProvider } from "./CurrencyContext";
@@ -16,8 +18,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     .then(({ orders }) => orders.length)
     .catch(() => 0);
 
+  // Same shop metafield the storefront theme reads for /id pricing — keeps
+  // every IDR/USD price shown in this admin in sync with what's actually
+  // charged. Falls back to the constant in lib/currency.ts if unset/unreachable.
+  const liveIdrRate = await getEurIdrRate().catch(() => null);
+  if (liveIdrRate) setIdrRate(liveIdrRate);
+
   return (
-    <CurrencyProvider>
+    <CurrencyProvider liveIdrRate={liveIdrRate}>
       <CurrencySwitcher />
       <AdminMobileNav orderCount={orderCount} />
       <div className="min-h-screen bg-gradient-to-br from-[#faf8f3] via-[#f7f5f0] to-[#efe9dc] text-[#1c1c1a]">
