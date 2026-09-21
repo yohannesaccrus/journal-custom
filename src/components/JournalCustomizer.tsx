@@ -601,7 +601,7 @@ function JournalCustomizerContent({
       )}
       <div className="w-full max-w-6xl md:rounded-[var(--radius-card)] bg-[var(--card-bg)] md:shadow-2xl overflow-hidden">
         {/* header / stepper */}
-        <header className="flex items-center justify-between gap-6 border-b border-[var(--border)] px-6 sm:px-10 py-5">
+        <header className="hidden md:flex items-center justify-between gap-6 border-b border-[var(--border)] px-6 sm:px-10 py-5">
           <nav className="hidden shrink-0 items-center gap-6 md:flex">
             {STEP_LABEL_KEYS.map((labelKey, i) => (
               <button key={labelKey} type="button" onClick={() => setStep(i)} className="flex items-center gap-2 text-sm">
