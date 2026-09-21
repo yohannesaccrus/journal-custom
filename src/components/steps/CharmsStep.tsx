@@ -126,7 +126,6 @@ function CharmCanvas({
   // cover's 560x660 aspect at 170px wide; the side canvas uses the spine's
   // 200x660 aspect at 92px wide — scaling off canvas height (the shared 660
   // unit) keeps both consistent with the main preview.
-  const CHARM_ICON_SIZE = wide ? 17 : 26;
 
   return (
     <div className="flex flex-col items-center gap-2">
@@ -162,7 +161,7 @@ function CharmCanvas({
         title={atLimit ? t("charms.viewFull") : undefined}
         className={`relative rounded-[var(--radius-panel)] overflow-hidden border-2 select-none bg-[var(--surface-soft)] transition-colors cursor-pointer ${
           active ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/20" : "border-[var(--border)] hover:border-[var(--accent)]/30"
-        } ${wide ? "w-[170px] aspect-[560/660]" : "w-[92px] aspect-[200/660]"}`}
+        } h-[clamp(190px,32vh,290px)] ${wide ? "aspect-[560/660]" : "aspect-[200/660]"}`}
       >
         {imageUrl && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -195,7 +194,7 @@ function CharmCanvas({
               (e.target as Element).setPointerCapture?.(e.pointerId);
             }}
             className="group absolute -translate-x-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing touch-none rounded-full bg-white/40 ring-1 ring-[var(--accent)] ring-offset-1 ring-offset-white/60 shadow-sm hover:ring-2 select-none"
-            style={{ left: `${c.x}%`, top: `${c.y}%`, width: CHARM_ICON_SIZE, height: CHARM_ICON_SIZE }}
+            style={{ left: `${c.x}%`, top: `${c.y}%`, width: wide ? "10%" : "28%", aspectRatio: "1" }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -318,7 +317,7 @@ export function CharmsStep({
         })}
       </div>
 
-      <div className="mt-3 rounded-lg bg-[var(--surface-soft)] px-3 py-2.5 text-xs text-[var(--muted)]">
+      <div className="mt-3 rounded-lg bg-[var(--surface-soft)] px-3 py-2 text-xs text-[var(--muted)]">
         <ul className="flex flex-wrap gap-x-4 gap-y-1.5 text-[var(--ink)]">
           <li className="flex items-center gap-1.5">
             <span aria-hidden className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent)] text-white">
@@ -337,10 +336,10 @@ export function CharmsStep({
             {t("charms.tipRemove")}
           </li>
         </ul>
-        <p className="mt-1.5">{t("charms.tipLimits", { front: MAX_CHARMS_FRONT, side: MAX_CHARMS_SIDE, total: MAX_CHARMS_TOTAL })}</p>
+        <p className="mt-1">{t("charms.tipLimits", { front: MAX_CHARMS_FRONT, side: MAX_CHARMS_SIDE, total: MAX_CHARMS_TOTAL })}</p>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-start gap-6">
+      <div className="mt-4 flex items-end justify-center gap-8">
         {VIEWS.map((v) => {
           const sideCharms = charms.filter((c) => c.side === v.key);
           const limit = charmSideLimit(v.key);
