@@ -195,7 +195,7 @@ function CharmCanvas({
               dragId.current = c.instanceId;
               (e.target as Element).setPointerCapture?.(e.pointerId);
             }}
-            className="group absolute -translate-x-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing touch-none"
+            className="group absolute -translate-x-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing touch-none rounded-full outline outline-1 outline-dashed outline-offset-2 outline-[var(--accent)]/50 hover:outline-[var(--accent)]"
             style={{ left: `${c.x}%`, top: `${c.y}%`, width: CHARM_ICON_SIZE, height: CHARM_ICON_SIZE }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -208,7 +208,7 @@ function CharmCanvas({
               type="button"
               onPointerDown={(e) => e.stopPropagation()}
               onClick={() => onRemove(c.instanceId)}
-              className="absolute -top-1.5 -right-1.5 hidden h-4 w-4 items-center justify-center rounded-full bg-[var(--ink)] text-white text-[10px] leading-none group-hover:flex"
+              className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--ink)] text-white text-[10px] leading-none [@media(hover:hover)]:hidden [@media(hover:hover)]:group-hover:flex"
             >
               ×
             </button>

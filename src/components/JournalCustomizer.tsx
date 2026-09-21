@@ -8,7 +8,6 @@ import { PenHolderStep } from "@/components/steps/PenHolderStep";
 import { CharmsStep, DRAG_MIME, newPlacement } from "@/components/steps/CharmsStep";
 import { NotebooksStep } from "@/components/steps/NotebooksStep";
 import { PreviewStep } from "@/components/steps/PreviewStep";
-import { OrderConfirmModal } from "@/components/OrderConfirmModal";
 import { NotebookIcon } from "@/components/NotebookIcon";
 import { PatchIcon } from "@/components/PatchIcon";
 import { ThemeSwitcher, THEMES, type Theme } from "@/components/ThemeSwitcher";
@@ -180,9 +179,8 @@ function JournalCustomizerContent({
     notebooksNote: "",
     pouch: false,
   });
-  const [orderConfirm, setOrderConfirm] = useState<{ designUrl: string } | null>(null);
-  const [confirmingCheckout, setConfirmingCheckout] = useState(false);
-  const [designLinkCopied, setDesignLinkCopied] = useState(false);
+  const [addingToCart, setAddingToCart] = useState(false);
+  const [addToCartError, setAddToCartError] = useState<string | null>(null);
   // True when `selection.cord` was auto-picked by handlePenHolderChange
   // (only so a real Shopify variant resolves) rather than chosen by the
   // user — Patch should still read as locked in that case, since the user
@@ -292,31 +290,6 @@ function JournalCustomizerContent({
   const frontCharms = selection.charms.filter((c) => c.side === "front");
   const backCharms = selection.charms.filter((c) => c.side === "back");
   const sideCharms = selection.charms.filter((c) => c.side === "side");
-  const orderConfirmRows = [
-    { label: t("customizer.row.cover"), value: buildCoverEntries(products).find((c) => c.handle === product.handle)?.label ?? product.title },
-    { label: t("customizer.row.string"), value: selection.cord !== "none" ? selection.cord : t("common.none") },
-    { label: t("customizer.row.penHolder"), value: selection.penHolder === "none" ? t("common.none") : selection.penHolder === "black" ? t("common.black") : t("common.brown") },
-    {
-      label: t("customizer.row.charms"),
-      value:
-        selection.charms.length === 0
-          ? t("common.none")
-          : [
-              frontCharms.length > 0 ? t("customizer.charmCount.front", { count: frontCharms.length }) : null,
-              backCharms.length > 0 ? t("customizer.charmCount.back", { count: backCharms.length }) : null,
-              sideCharms.length > 0 ? t("customizer.charmCount.side", { count: sideCharms.length }) : null,
-            ]
-              .filter(Boolean)
-              .join(", "),
-    },
-    {
-      label: t("customizer.row.notebooks"),
-      value:
-        Object.keys(selection.notebooks).length === 0
-          ? t("common.none")
-          : Object.entries(selection.notebooks).map(([design, count]) => `${count}× ${design}`).join(", "),
-    },
-  ];
   const backImageSrc = resolveSideImage(product, "back", selection);
   const sideImageSrc = resolveSideImage(product, "side", selection);
   const isCharmsStep = step === CHARMS_STEP;
@@ -389,7 +362,9 @@ function JournalCustomizerContent({
             : undefined
         }
         className={`group absolute -translate-x-1/2 -translate-y-1/2 touch-none ${
-          isCharmsStep ? "cursor-grab active:cursor-grabbing" : "pointer-events-none"
+          isCharmsStep
+            ? "cursor-grab active:cursor-grabbing rounded-full outline outline-1 outline-dashed outline-offset-2 outline-[var(--accent)]/50 hover:outline-[var(--accent)]"
+            : "pointer-events-none"
         }`}
         style={{
           left: `${c.x}%`,
@@ -412,7 +387,7 @@ function JournalCustomizerContent({
             type="button"
             onPointerDown={(e) => e.stopPropagation()}
             onClick={() => removeMainCharm(c.instanceId)}
-            className="absolute -top-1.5 -right-1.5 hidden h-4 w-4 items-center justify-center rounded-full bg-[var(--ink)] text-white text-[10px] leading-none group-hover:flex"
+            className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--ink)] text-white text-[10px] leading-none [@media(hover:hover)]:hidden [@media(hover:hover)]:group-hover:flex"
           >
             ×
           </button>
@@ -482,17 +457,12 @@ function JournalCustomizerContent({
   // channel (published, not Draft), so the real storefront cart works for
   // them — no need to go through a Shopify Draft Order + hosted invoice page
   // anymore (that path skipped the native cart/checkout entirely, which also
-  // meant no discount-code field). Just show the confirmation preview here;
-  // the real add-to-cart happens on confirm, in `handleConfirmCheckout`.
+  // meant no discount-code field).
   function handleAddToCart() {
-    setDesignLinkCopied(false);
-    setOrderConfirm({ designUrl: buildDesignUrl(window.location.origin, selection) });
-  }
-
-  function handleConfirmCheckout() {
-    if (!orderConfirm) return;
+    if (addingToCart) return;
+    setAddToCartError(null);
     const { items, attributes } = buildCartItems(variant, charmProduct, pouchProduct, selection, window.location.origin);
-    setConfirmingCheckout(true);
+    setAddingToCart(true);
     // The iframe is cross-origin from the shop, so it can't call
     // /cart/add.js itself — it messages the parent page instead. The parent
     // (sections/jc-embed.liquid, same-origin with the shop) listens for this,
@@ -519,24 +489,33 @@ function JournalCustomizerContent({
     });
   }
 
+  // The parent page reports back after its /cart/add.js attempt: "done" when
+  // the theme's cart drawer took over, "error" with Shopify's own message
+  // (e.g. a charm that just sold out) so the shopper isn't left on a silent alert.
+  useEffect(() => {
+    function onMessage(event: MessageEvent) {
+      const data = event.data as { type?: string; message?: string } | null;
+      if (!data || typeof data !== "object") return;
+      if (data.type === "sanaya-journal-add-to-cart-done") {
+        setAddingToCart(false);
+      } else if (data.type === "sanaya-journal-add-to-cart-error") {
+        setAddingToCart(false);
+        const message = data.message ?? "";
+        setAddToCartError(message || t("preview.addToCartError"));
+        const soldOutCharm = charmEntries.some((c) => c.design && message.toLowerCase().includes(c.design.toLowerCase()));
+        if (soldOutCharm) setStep(CHARMS_STEP);
+      }
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  });
+
   function priceForCartItem(variantId: string): number {
     if (variantId === variant.id) return priceFor(variant.id, Number(variant.price), "journal");
     const charmPrice = charmPriceByVariant.get(variantId);
     if (charmPrice !== undefined) return priceFor(variantId, charmPrice, "charm");
     if (pouchVariant && variantId === pouchVariant.id) return priceFor(pouchVariant.id, Number(pouchVariant.price), "pouch");
     return 0;
-  }
-
-  async function handleCopyDesignLink() {
-    if (!orderConfirm) return;
-    try {
-      await navigator.clipboard.writeText(orderConfirm.designUrl);
-      setDesignLinkCopied(true);
-      setTimeout(() => setDesignLinkCopied(false), 2000);
-    } catch {
-      // Clipboard API unavailable (e.g. insecure context) — link is still
-      // reachable via the "View full design" button, so fail silently.
-    }
   }
 
   // Cord is the one required add-on (per client feedback) — patch, pen
@@ -889,6 +868,8 @@ function JournalCustomizerContent({
                 pouchVariant={pouchVariant}
                 selection={selection}
                 onAddToCart={handleAddToCart}
+                adding={addingToCart}
+                error={addToCartError}
               />
             )}
           </div>
@@ -1001,22 +982,6 @@ function JournalCustomizerContent({
         </div>
       )}
 
-      {orderConfirm && (
-        <OrderConfirmModal
-          imageSrc={imageSrc}
-          patch={selection.patch}
-          frontCharms={frontCharms}
-          charmEntries={charmEntries}
-          rows={orderConfirmRows}
-          formattedTotal={formatConverted(total)}
-          designUrl={orderConfirm.designUrl}
-          copied={designLinkCopied}
-          onCopyLink={handleCopyDesignLink}
-          onEdit={() => setOrderConfirm(null)}
-          onConfirm={handleConfirmCheckout}
-          confirming={confirmingCheckout}
-        />
-      )}
     </div>
   );
 }

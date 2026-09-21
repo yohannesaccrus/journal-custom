@@ -87,7 +87,7 @@ export function buildCartItems(
   // copy is the one that actually survives once the order is created — see
   // `CartPayload`.
   const designUrl = buildDesignUrl(designPageOrigin, selection);
-  properties["✨ Design page Link"] = designUrl;
+  properties["_design_link"] = designUrl;
   properties["_bundle_id"] = bundleId;
   // The variant's own Shopify photo can't show the corner edge (variants share
   // one image per pen holder, see `resolveFrontImage`), so the cart thumbnail

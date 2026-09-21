@@ -139,6 +139,7 @@ const en: Dict = {
   "preview.price": "Price",
   "preview.addToCart": "Add to cart — {total}",
   "preview.addingToCart": "Adding to cart…",
+  "preview.addToCartError": "We couldn't add your journal to the cart. Please try again.",
 };
 
 const fr: Dict = {
@@ -257,6 +258,7 @@ const fr: Dict = {
   "preview.price": "Prix",
   "preview.addToCart": "Ajouter au panier — {total}",
   "preview.addingToCart": "Ajout au panier…",
+  "preview.addToCartError": "Impossible d'ajouter votre journal au panier. Veuillez réessayer.",
 };
 
 const id: Dict = {
@@ -375,6 +377,7 @@ const id: Dict = {
   "preview.price": "Harga",
   "preview.addToCart": "Tambah ke keranjang — {total}",
   "preview.addingToCart": "Menambahkan ke keranjang…",
+  "preview.addToCartError": "Jurnal Anda tidak dapat ditambahkan ke keranjang. Silakan coba lagi.",
 };
 
 const es: Dict = {
@@ -493,6 +496,7 @@ const es: Dict = {
   "preview.price": "Precio",
   "preview.addToCart": "Añadir al carrito — {total}",
   "preview.addingToCart": "Añadiendo al carrito…",
+  "preview.addToCartError": "No pudimos añadir tu diario al carrito. Inténtalo de nuevo.",
 };
 
 const DICTS: Record<Locale, Dict> = { en, fr, id, es };
