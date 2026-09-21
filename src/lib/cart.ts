@@ -1,4 +1,4 @@
-import { EDGE_LABEL, resolvePouchVariant } from "./catalog";
+import { EDGE_LABEL, PATCH_LABEL, resolveFrontImage, resolvePouchVariant } from "./catalog";
 import type { ShopifyJournalProduct, ShopifyVariant } from "./shopify-admin";
 import type { JournalSelection } from "./types";
 import { buildDesignUrl, encodeDesign } from "./design-link";
@@ -59,10 +59,15 @@ export function buildCartItems(
 ): CartPayload {
   const bundleId = newBundleId();
 
+  // The theme's cart hides the variant's own option lines (String "Orange +
+  // Brown Heart", Pen Holder "Black + Gold Edge") for these lines and shows
+  // only the clean properties below, so Cover has to be one of them too.
   const properties: Record<string, string> = {};
+  const coverName = variant.selectedOptions.find((o) => o.name === "Cover")?.value;
+  if (coverName) properties["Cover"] = coverName;
   if (selection.cord !== "none") properties["String"] = selection.cord;
   if (selection.patch !== "none") {
-    properties["Patch"] = selection.patch.charAt(0).toUpperCase() + selection.patch.slice(1);
+    properties["Patch"] = PATCH_LABEL[selection.patch];
   }
   if (selection.penHolder !== "none") {
     properties["Pen Holder"] = selection.penHolder === "black" ? "Black" : "Brown";
@@ -84,6 +89,12 @@ export function buildCartItems(
   const designUrl = buildDesignUrl(designPageOrigin, selection);
   properties["✨ Design page Link"] = designUrl;
   properties["_bundle_id"] = bundleId;
+  // The variant's own Shopify photo can't show the corner edge (variants share
+  // one image per pen holder, see `resolveFrontImage`), so the cart thumbnail
+  // is swapped for the same photo the customizer showed -- hidden from the
+  // customer by the "_" prefix, read by the theme's cart snippets.
+  const previewImage = resolveFrontImage(variant);
+  if (previewImage) properties["_preview_image"] = previewImage;
 
   // Patch is now a real 4th option baked into the journal variant itself
   // (Cover×String×Pen Holder×Patch) — its price and stock come along with
