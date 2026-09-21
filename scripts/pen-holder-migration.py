@@ -121,8 +121,9 @@ def download(url):
         for attempt in range(4):
             try:
                 data = urllib.request.urlopen(url, timeout=40).read()
-                with open(path + ".tmp", "wb") as f: f.write(data)
-                os.replace(path + ".tmp", path)
+                tmp = f"{path}.{threading.get_ident()}.tmp"
+                with open(tmp, "wb") as f: f.write(data)
+                os.replace(tmp, path)
                 break
             except Exception:
                 if attempt == 3: raise
@@ -147,13 +148,17 @@ def cmd_composite(limit_handle=None):
         slug, c = j
         path = os.path.join(OUT, "composites", slug + ".png")
         if os.path.exists(path): return slug, "cached"
-        make_composite(c).save(path, optimize=True)
-        return slug, "ok"
+        try:
+            make_composite(c).save(path, optimize=True)
+            return slug, "ok"
+        except Exception as e:  # a slow/timed-out CDN read must not stop the whole run; rerun fills the gaps
+            print("FAILED", slug, type(e).__name__, flush=True)
+            return slug, "failed"
     n = 0
-    with cf.ThreadPoolExecutor(max_workers=8) as ex:
+    with cf.ThreadPoolExecutor(max_workers=5) as ex:
         for slug, st in ex.map(run, jobs):
             n += 1
-            if n % 25 == 0: print(n, "/", len(jobs))
+            if n % 25 == 0: print(n, "/", len(jobs), flush=True)
     print("done", len(jobs))
 
 
@@ -220,6 +225,15 @@ def cmd_apply(only=None, yes=False):
             save()
         # 2. restructure the option: rename + drop the holder values (Shopify removes their variants)
         if pl["handle"] in state["restructured"]: continue
+        # Shopify refuses to drop option values that still have variants, so delete those variants first.
+        prod = next(x for x in fetch_products() if x["id"] == pl["productId"])
+        keep_vals = {"None", "Black + Gold Edge", "Black + Silver Edge"}
+        third = next(o["name"] for o in prod["options"] if o["id"] == pl["optionId"])
+        doomed = [v["id"] for v in prod["variants"] if opt(v, third) not in keep_vals]
+        for i in range(0, len(doomed), 100):
+            r = gql("mutation($p:ID!,$v:[ID!]!){productVariantsBulkDelete(productId:$p,variantsIds:$v){userErrors{field message}}}", {"p": pl["productId"], "v": doomed[i:i + 100]})["productVariantsBulkDelete"]
+            if r["userErrors"]: raise RuntimeError(r["userErrors"])
+        print("   deleted holder variants:", len(doomed))
         ov = pl["optionValues"]
         upd = [{"id": ov["Black + Gold Edge"], "name": "Gold"}, {"id": ov["Black + Silver Edge"], "name": "Silver"}]
         dele = [ov[n] for n in ("Black", "Brown", "Brown + Gold Edge", "Brown + Silver Edge") if n in ov]
