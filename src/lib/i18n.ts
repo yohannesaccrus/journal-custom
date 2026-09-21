@@ -38,7 +38,7 @@ const en: Dict = {
   "common.pickMoreNotebooks": "Pick {count} more notebook{plural} to continue",
 
   // JournalCustomizer main
-  "customizer.pouchIncluded": "Plastic pouch included",
+  "customizer.pouchIncluded": "Plastic Pouch",
   "customizer.inside": "Inside",
   "customizer.chooseNotebook": "Choose a notebook",
   "customizer.viewSuffix": "{view} view",
@@ -171,7 +171,7 @@ const fr: Dict = {
   "common.pickStringFirst": "Choisissez d'abord une couleur de cordon",
   "common.pickMoreNotebooks": "Choisissez encore {count} carnet{plural} pour continuer",
 
-  "customizer.pouchIncluded": "Pochette plastique incluse",
+  "customizer.pouchIncluded": "Pochette plastique",
   "customizer.inside": "Intérieur",
   "customizer.chooseNotebook": "Choisissez un carnet",
   "customizer.viewSuffix": "vue {view}",
@@ -296,7 +296,7 @@ const id: Dict = {
   "common.pickStringFirst": "Pilih warna tali dahulu",
   "common.pickMoreNotebooks": "Pilih {count} notebook lagi untuk melanjutkan",
 
-  "customizer.pouchIncluded": "Termasuk plastic pouch",
+  "customizer.pouchIncluded": "Plastic Pouch",
   "customizer.inside": "Bagian dalam",
   "customizer.chooseNotebook": "Pilih notebook",
   "customizer.viewSuffix": "tampilan {view}",
@@ -421,7 +421,7 @@ const es: Dict = {
   "common.pickStringFirst": "Elige primero un color de cordón",
   "common.pickMoreNotebooks": "Elige {count} cuaderno{plural} más para continuar",
 
-  "customizer.pouchIncluded": "Plastic pouch incluido",
+  "customizer.pouchIncluded": "Plastic Pouch",
   "customizer.inside": "Interior",
   "customizer.chooseNotebook": "Elige un cuaderno",
   "customizer.viewSuffix": "vista {view}",
