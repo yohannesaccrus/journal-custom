@@ -70,7 +70,7 @@ export default async function DesignPage({ searchParams }: DesignPageProps) {
     },
     {
       label: "Corner edge",
-      value: selection.edge !== "none" && selection.penHolder !== "none" ? EDGE_LABEL[selection.edge] : "None",
+      value: selection.edge !== "none" ? EDGE_LABEL[selection.edge] : "None",
     },
     {
       label: "Notebooks",

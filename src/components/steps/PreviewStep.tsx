@@ -11,13 +11,14 @@ interface PreviewStepProps {
   product: ShopifyJournalProduct;
   charmProduct: ShopifyJournalProduct;
   pouchVariant?: ShopifyVariant;
+  penHolderVariant?: ShopifyVariant;
   selection: JournalSelection;
   onAddToCart: () => void;
   adding?: boolean;
   error?: string | null;
 }
 
-export function PreviewStep({ products, product, charmProduct, pouchVariant, selection, onAddToCart, adding, error }: PreviewStepProps) {
+export function PreviewStep({ products, product, charmProduct, pouchVariant, penHolderVariant, selection, onAddToCart, adding, error }: PreviewStepProps) {
   const { formatConverted, priceFor } = useCurrencyFormat();
   const { t } = useTranslation();
   const cover = buildCoverEntries(products).find((c) => c.handle === product.handle);
@@ -32,7 +33,8 @@ export function PreviewStep({ products, product, charmProduct, pouchVariant, sel
   const total =
     priceFor(variant.id, Number(variant.price), "journal") +
     selection.charms.reduce((sum, c) => sum + priceFor(c.variantId, charmPriceByVariant.get(c.variantId) ?? 0, "charm"), 0) +
-    (selection.pouch && pouchVariant ? priceFor(pouchVariant.id, Number(pouchVariant.price), "pouch") : 0);
+    (selection.pouch && pouchVariant ? priceFor(pouchVariant.id, Number(pouchVariant.price), "pouch") : 0) +
+    (penHolderVariant ? priceFor(penHolderVariant.id, Number(penHolderVariant.price), "pouch") : 0);
   const extraNotebookNote = (selection.notebooks["Extra Notebook"] ?? 0) > 0 ? selection.notebooksNote.trim() : "";
 
   const frontCharms = selection.charms.filter((c) => c.side === "front").length;
@@ -63,7 +65,7 @@ export function PreviewStep({ products, product, charmProduct, pouchVariant, sel
     { label: t("preview.row.penHolder"), value: selection.penHolder === "none" ? t("common.none") : selection.penHolder === "black" ? t("common.black") : t("common.brown") },
     {
       label: t("preview.row.cornerEdge"),
-      value: selection.edge !== "none" && selection.penHolder !== "none" ? EDGE_LABEL[selection.edge] : t("common.none"),
+      value: selection.edge !== "none" ? EDGE_LABEL[selection.edge] : t("common.none"),
     },
     { label: t("preview.row.charms"), value: charmSummary },
     { label: t("preview.row.notebooks"), value: notebookSummary },

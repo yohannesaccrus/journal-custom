@@ -12,7 +12,6 @@ interface PatchStepProps {
   product: ShopifyJournalProduct;
   patchProduct?: ShopifyJournalProduct;
   cord: JournalSelection["cord"];
-  penHolder: JournalSelection["penHolder"];
   edge: JournalSelection["edge"];
   cordSelected: boolean;
   patch: JournalSelection["patch"];
@@ -23,7 +22,6 @@ export function PatchStep({
   product,
   patchProduct,
   cord,
-  penHolder,
   edge,
   cordSelected,
   patch,
@@ -35,7 +33,7 @@ export function PatchStep({
   // (buildPatchEntries needs one) — show every patch anyway, just disabled,
   // so the options aren't a mystery until the previous step is done.
   const patchEntries = cordSelected
-    ? buildPatchEntries(product, cord, penHolder, edge, patchProduct)
+    ? buildPatchEntries(product, cord, edge, patchProduct)
     : PATCH_VALUES.map((value) => ({
         value,
         label: PATCH_LABEL[value],

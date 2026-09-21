@@ -402,6 +402,12 @@ export async function fetchPouchProduct(): Promise<ShopifyJournalProduct | undef
   return products[0];
 }
 
+/** The standalone pen holder add-on (one variant per color, like the Pouch). Tagged "pen-holder" -- the same tag the admin's internal "[JC] Sanaya Component — Pen Holder" tracker carries, which is the product this reads. Absent means the section is simply hidden. */
+export async function fetchPenHolderProduct(): Promise<ShopifyJournalProduct | undefined> {
+  const products = await fetchProducts("tag:pen-holder");
+  return products[0];
+}
+
 // ---------- Market-aware pricing ----------
 // Shopify Markets applies a per-market price adjustment (dynamic FX + a
 // flat +/-% set by the merchant, e.g. Australia is +25%, EU is +20%) that's

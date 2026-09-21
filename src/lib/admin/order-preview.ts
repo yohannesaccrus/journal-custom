@@ -68,7 +68,7 @@ export function buildOrderJournalPreview(
     },
     {
       label: "Corner edge",
-      value: spec.edge !== "none" && spec.penHolder !== "none" ? EDGE_LABEL[spec.edge] : "None",
+      value: spec.edge !== "none" ? EDGE_LABEL[spec.edge] : "None",
     },
     {
       label: "Notebooks",

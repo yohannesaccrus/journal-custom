@@ -1,4 +1,4 @@
-import { fetchCharmProduct, fetchJournalProducts, fetchNotebookProduct, fetchPatchProduct, fetchPouchProduct, fetchSwatchColors } from "@/lib/shopify-admin";
+import { fetchCharmProduct, fetchJournalProducts, fetchNotebookProduct, fetchPatchProduct, fetchPenHolderProduct, fetchPouchProduct, fetchSwatchColors } from "@/lib/shopify-admin";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -28,6 +28,7 @@ export async function GET(request: Request) {
     fetchNotebookProduct(),
     fetchPatchProduct(),
     fetchPouchProduct(),
+    fetchPenHolderProduct(),
     fetchSwatchColors(),
   ]);
 

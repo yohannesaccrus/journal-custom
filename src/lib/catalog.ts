@@ -53,6 +53,29 @@ function optionValue(variant: ShopifyVariant, name: string): string | undefined 
   return variant.selectedOptions.find((o) => o.name === name)?.value;
 }
 
+/**
+ * The journal products' third Shopify option. It used to be "Pen Holder"
+ * (values like "Black + Gold Edge" -- holder and edge fused), and is now
+ * "Corner Edge" (None / Gold / Silver) since the pen holder became its own
+ * add-on product, like the Plastic Pouch. Both shapes are read here so the
+ * customizer keeps working on whichever one the store currently has.
+ */
+function edgeOptionValue(variant: ShopifyVariant): string | undefined {
+  return optionValue(variant, "Corner Edge") ?? optionValue(variant, "Pen Holder");
+}
+
+function usesCornerEdgeOption(product: ShopifyJournalProduct): boolean {
+  return product.variants[0]?.selectedOptions.some((o) => o.name === "Corner Edge") ?? false;
+}
+
+/** The value of the journal's third option that stands for a given corner-edge choice. */
+function edgeValueFor(product: ShopifyJournalProduct, edge: JournalSelection["edge"]): string {
+  if (edge === "none") return "None";
+  if (usesCornerEdgeOption(product)) return EDGE_LABEL[edge];
+  // Legacy shape: an edge only existed fused to a pen holder. Black is the closest stand-in.
+  return `Black + ${EDGE_LABEL[edge]} Edge`;
+}
+
 /** Whether a variant can actually be added to cart right now. */
 function inStock(variant: ShopifyVariant | undefined): boolean {
   return (variant?.inventoryQuantity ?? 0) > 0;
@@ -60,7 +83,7 @@ function inStock(variant: ShopifyVariant | undefined): boolean {
 
 function baseVariant(product: ShopifyJournalProduct): ShopifyVariant | undefined {
   return product.variants.find(
-    (v) => optionValue(v, "String") === "No Cord" && optionValue(v, "Pen Holder") === "None"
+    (v) => optionValue(v, "String") === "No Cord" && edgeOptionValue(v) === "None"
   );
 }
 
@@ -142,7 +165,7 @@ export function buildCordEntries(product: ShopifyJournalProduct, swatchByLabel: 
   );
   return Array.from(values).map((label) => {
     const variant = product.variants.find(
-      (v) => optionValue(v, "String") === label && optionValue(v, "Pen Holder") === "None"
+      (v) => optionValue(v, "String") === label && edgeOptionValue(v) === "None"
     );
     return { label, swatch: swatchByLabel[label] ?? SWATCH_HEX[label] ?? "#999999", inStock: inStock(variant) };
   });
@@ -154,55 +177,64 @@ export const EDGE_LABEL: Record<Exclude<JournalSelection["edge"], "none">, strin
   silver: "Silver",
 };
 
-/** Builds the Pen Holder option value for a given pen holder + edge color, e.g. "Black + Gold Edge". `penHolder` must not be "none". */
-function penHolderValueFor(penHolder: Exclude<JournalSelection["penHolder"], "none">, edge: JournalSelection["edge"]): string {
-  const cap = penHolder === "black" ? "Black" : "Brown";
-  return edge === "none" ? cap : `${cap} + ${EDGE_LABEL[edge]} Edge`;
-}
-
 export interface PenHolderEntry {
+  /** "black" | "brown" -- the same slug stored on `JournalSelection.penHolder`. */
+  slug: Exclude<JournalSelection["penHolder"], "none">;
   label: string;
   swatch: string;
+  thumbnail?: string;
+  variantId: string;
+  price: number;
   inStock: boolean;
 }
 
-/** `cord`/`patch` are the currently selected/effective values -- stock is per (cover, string [+ patch], pen holder) variant. */
+/** The pen holder is its own add-on product now (one variant per color), like the Plastic Pouch -- not part of the journal variant matrix. */
 export function buildPenHolderEntries(
-  product: ShopifyJournalProduct,
-  cord: string,
-  patch: JournalSelection["patch"],
+  penHolderProduct: ShopifyJournalProduct | undefined,
   swatchByLabel: Record<string, string> = {}
 ): PenHolderEntry[] {
-  const stringValue = stringValueFor(cord, patch);
-  const values = new Set(
-    product.variants
-      .map((v) => optionValue(v, "Pen Holder"))
-      .filter((v): v is string => !!v && v !== "None" && !v.includes(" + "))
-  );
-  return Array.from(values).map((label) => {
-    const variant = product.variants.find(
-      (v) => optionValue(v, "String") === stringValue && optionValue(v, "Pen Holder") === label
-    );
-    return { label, swatch: swatchByLabel[label] ?? SWATCH_HEX[label] ?? "#999999", inStock: inStock(variant) };
-  });
+  if (!penHolderProduct) return [];
+  const entries: PenHolderEntry[] = [];
+  for (const v of penHolderProduct.variants) {
+    const label = optionValue(v, "Color") ?? v.title;
+    const slug = label.toLowerCase();
+    if (slug !== "black" && slug !== "brown") continue;
+    entries.push({
+      slug,
+      label,
+      swatch: swatchByLabel[label] ?? SWATCH_HEX[label] ?? "#999999",
+      thumbnail: v.image?.url,
+      variantId: v.id,
+      price: Number(v.price),
+      inStock: inStock(v),
+    });
+  }
+  return entries;
 }
 
-/** Whether the given corner-edge color is in stock for the current cord [+ patch] + pen holder. */
+export function resolvePenHolderVariant(
+  penHolderProduct: ShopifyJournalProduct | undefined,
+  penHolder: JournalSelection["penHolder"]
+): ShopifyVariant | undefined {
+  if (!penHolderProduct || penHolder === "none") return undefined;
+  return penHolderProduct.variants.find((v) => (optionValue(v, "Color") ?? v.title).toLowerCase() === penHolder);
+}
+
+/** Whether the given corner-edge color is in stock for the current cord [+ patch]. */
 export function isEdgeInStock(
   product: ShopifyJournalProduct,
   cord: string,
-  penHolder: Exclude<JournalSelection["penHolder"], "none">,
   edge: Exclude<JournalSelection["edge"], "none">,
   patch: JournalSelection["patch"] = "none"
 ): boolean {
   const stringValue = stringValueFor(cord, patch);
   const variant = product.variants.find(
-    (v) => optionValue(v, "String") === stringValue && optionValue(v, "Pen Holder") === penHolderValueFor(penHolder, edge)
+    (v) => optionValue(v, "String") === stringValue && edgeOptionValue(v) === edgeValueFor(product, edge)
   );
   return inStock(variant);
 }
 
-/** Resolves the exact Shopify variant matching a customizer selection. */
+/** Resolves the exact Shopify variant matching a customizer selection. The pen holder isn't part of it -- see `buildPenHolderEntries`. */
 export function resolveVariant(
   product: ShopifyJournalProduct,
   selection: JournalSelection
@@ -210,13 +242,13 @@ export function resolveVariant(
   // The patch is stitched onto the string itself, so it can never apply
   // without one -- same rule enforced client-side in PatchStep/JournalCustomizer.
   const stringValue = stringValueFor(selection.cord, selection.patch);
-  const penValue = selection.penHolder === "none" ? "None" : penHolderValueFor(selection.penHolder, selection.edge);
+  const edgeValue = edgeValueFor(product, selection.edge);
 
   const match = product.variants.find(
-    (v) => optionValue(v, "String") === stringValue && optionValue(v, "Pen Holder") === penValue
+    (v) => optionValue(v, "String") === stringValue && edgeOptionValue(v) === edgeValue
   );
   if (!match) {
-    throw new Error(`No variant found for ${product.handle} with String=${stringValue}, Pen Holder=${penValue}`);
+    throw new Error(`No variant found for ${product.handle} with String=${stringValue}, Corner Edge=${edgeValue}`);
   }
   return match;
 }
@@ -349,15 +381,14 @@ export interface PatchEntry {
 export function buildPatchEntries(
   product: ShopifyJournalProduct,
   cord: JournalSelection["cord"],
-  penHolder: JournalSelection["penHolder"],
   edge: JournalSelection["edge"],
   patchProduct?: ShopifyJournalProduct
 ): PatchEntry[] {
   if (cord === "none") return [];
-  const penValue = penHolder === "none" ? "None" : penHolderValueFor(penHolder, edge);
+  const edgeValue = edgeValueFor(product, edge);
   const findVariant = (patch: JournalSelection["patch"]) =>
     product.variants.find(
-      (v) => optionValue(v, "String") === stringValueFor(cord, patch) && optionValue(v, "Pen Holder") === penValue
+      (v) => optionValue(v, "String") === stringValueFor(cord, patch) && edgeOptionValue(v) === edgeValue
     );
   const baseline = Number(findVariant("none")?.price ?? 0);
   return PATCH_VALUES.map((value) => {

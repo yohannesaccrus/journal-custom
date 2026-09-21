@@ -4,6 +4,7 @@ import {
   fetchJournalProducts,
   fetchNotebookProduct,
   fetchPatchProduct,
+  fetchPenHolderProduct,
   fetchPouchProduct,
   fetchSwatchColors,
 } from "@/lib/shopify-admin";
@@ -23,12 +24,13 @@ interface MobilePreviewProps {
  * dynamically per request.
  */
 export default async function MobilePreview({ searchParams }: MobilePreviewProps) {
-  const [products, charmProduct, notebookProduct, patchProduct, pouchProduct, swatchColors, params] = await Promise.all([
+  const [products, charmProduct, notebookProduct, patchProduct, pouchProduct, penHolderProduct, swatchColors, params] = await Promise.all([
     fetchJournalProducts(),
     fetchCharmProduct(),
     fetchNotebookProduct(),
     fetchPatchProduct(),
     fetchPouchProduct(),
+    fetchPenHolderProduct(),
     fetchSwatchColors(),
     searchParams,
   ]);
@@ -66,6 +68,7 @@ export default async function MobilePreview({ searchParams }: MobilePreviewProps
         notebookProduct={notebookProduct}
         patchProduct={patchProduct}
         pouchProduct={pouchProduct}
+        penHolderProduct={penHolderProduct}
         swatchColors={swatchColors}
         hideDevControls
         initialTheme={initialTheme}

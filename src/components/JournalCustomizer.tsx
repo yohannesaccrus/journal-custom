@@ -20,11 +20,13 @@ import {
   buildCharmEntries,
   buildCordEntries,
   buildCoverEntries,
+  buildPenHolderEntries,
   canPlaceCharm,
   NOTEBOOKS_PER_JOURNAL,
   notebookCount,
   PATCH_POSITION,
   resolveFrontImage,
+  resolvePenHolderVariant,
   resolvePouchVariant,
   resolveSideImage,
   resolveVariant,
@@ -61,6 +63,8 @@ interface JournalCustomizerProps {
   notebookProduct: ShopifyJournalProduct;
   patchProduct: ShopifyJournalProduct;
   pouchProduct: ShopifyJournalProduct;
+  /** Standalone pen holder add-on (Black/Brown). Missing means the option is simply not offered. */
+  penHolderProduct?: ShopifyJournalProduct;
   /** Admin-edited swatch colors for String/Pen Holder — see `fetchSwatchColors`. */
   swatchColors: SwatchColors;
   // Set when this render is the phone-sized <iframe> embed the "Mobile View"
@@ -86,12 +90,30 @@ export function JournalCustomizer(props: JournalCustomizerProps) {
   );
 }
 
+/** Small floating thumbnail + caption shown over the cover preview for an add-on (pen holder, plastic pouch). */
+function AddOnBadge({ imageUrl, alt, label }: { imageUrl?: string; alt: string; label: string }) {
+  return (
+    <div className="flex w-[84px] flex-col items-center gap-1">
+      <div className="aspect-square w-full overflow-hidden rounded-[var(--radius-chip)] border-2 border-white bg-white shadow-[0_8px_20px_-6px_rgba(28,28,26,0.35)]">
+        {imageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={imageUrl} alt={alt} className="h-full w-full object-cover" />
+        )}
+      </div>
+      <span className="rounded-full bg-white/95 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide text-[var(--muted)] shadow-sm">
+        {label}
+      </span>
+    </div>
+  );
+}
+
 function JournalCustomizerContent({
   products,
   charmProduct,
   notebookProduct,
   patchProduct,
   pouchProduct,
+  penHolderProduct,
   swatchColors,
   hideDevControls,
   initialTheme,
@@ -269,6 +291,8 @@ function JournalCustomizerContent({
   const imageSrc = resolveFrontImage(variant);
   const charmEntries = useMemo(() => buildCharmEntries(charmProduct), [charmProduct]);
   const pouchVariant = useMemo(() => resolvePouchVariant(pouchProduct), [pouchProduct]);
+  const penHolderEntries = useMemo(() => buildPenHolderEntries(penHolderProduct, swatchColors.penHolder), [penHolderProduct, swatchColors.penHolder]);
+  const penHolderVariant = useMemo(() => resolvePenHolderVariant(penHolderProduct, selection.penHolder), [penHolderProduct, selection.penHolder]);
   const charmPriceByVariant = useMemo(() => new Map(charmProduct.variants.map((v) => [v.id, Number(v.price)])), [charmProduct]);
   // Report the exact variant ids in the cart so CurrencyContext fetches
   // their real contextual price (see useReportPricedVariants doc comment) --
@@ -278,15 +302,17 @@ function JournalCustomizerContent({
     const ids = new Set<string>([variant.id]);
     for (const c of selection.charms) ids.add(c.variantId);
     if (selection.pouch && pouchVariant) ids.add(pouchVariant.id);
+    if (penHolderVariant) ids.add(penHolderVariant.id);
     return Array.from(ids);
-  }, [variant.id, selection.charms, selection.pouch, pouchVariant]);
+  }, [variant.id, selection.charms, selection.pouch, pouchVariant, penHolderVariant]);
   useReportPricedVariants(pricedVariantIds);
   // Patch price is now baked straight into the resolved variant's own price
   // (a real Cover×String×Pen Holder×Patch combo), not a separate add-on total.
   const total =
     priceFor(variant.id, Number(variant.price), "journal") +
     selection.charms.reduce((sum, c) => sum + priceFor(c.variantId, charmPriceByVariant.get(c.variantId) ?? 0, "charm"), 0) +
-    (selection.pouch && pouchVariant ? priceFor(pouchVariant.id, Number(pouchVariant.price), "pouch") : 0);
+    (selection.pouch && pouchVariant ? priceFor(pouchVariant.id, Number(pouchVariant.price), "pouch") : 0) +
+    (penHolderVariant ? priceFor(penHolderVariant.id, Number(penHolderVariant.price), "pouch") : 0);
   const frontCharms = selection.charms.filter((c) => c.side === "front");
   const backCharms = selection.charms.filter((c) => c.side === "back");
   const sideCharms = selection.charms.filter((c) => c.side === "side");
@@ -423,32 +449,29 @@ function JournalCustomizerContent({
     // that was only auto-picked to make a pen holder's variant resolve.
     setCordAutoSelected(false);
     if (cord === "none") {
-      // Patch requires a cord, and a pen holder can't exist without one
-      // either (no such Shopify variant) — both reset along with it.
-      updateSelection({ cord, patch: "none", penHolder: "none", edge: "none" });
+      // Patch requires a cord, and a corner edge can't exist without one
+      // either (no such Shopify variant) — both reset along with it. The pen
+      // holder is its own add-on now, so it stays.
+      updateSelection({ cord, patch: "none", edge: "none" });
     } else {
       updateSelection({ cord });
     }
   }
 
-  function handlePenHolderChange(penHolder: JournalSelection["penHolder"]) {
-    if (penHolder === "none") {
-      updateSelection({ penHolder, edge: "none" });
-      return;
-    }
-    // Pen holder is selectable without a cord in the UI, but Shopify only
-    // has pen-holder variants paired with an actual cord color — auto-pick
-    // the first one behind the scenes so a real variant always resolves.
-    // Patch stays locked until the user picks a cord themselves.
-    if (selection.cord === "none") {
+  function handleEdgeChange(edge: JournalSelection["edge"]) {
+    // Corner-edge variants, like pen-holder ones used to, only exist paired
+    // with an actual cord color — auto-pick the first one behind the scenes
+    // so a real variant always resolves. Patch stays locked until the user
+    // picks a cord themselves.
+    if (edge !== "none" && selection.cord === "none") {
       const fallbackCord = buildCordEntries(product, swatchColors.string)[0]?.label;
       if (fallbackCord) {
         setCordAutoSelected(true);
-        updateSelection({ penHolder, cord: fallbackCord });
+        updateSelection({ edge, cord: fallbackCord });
         return;
       }
     }
-    updateSelection({ penHolder });
+    updateSelection({ edge });
   }
 
   function goNext() {
@@ -466,7 +489,7 @@ function JournalCustomizerContent({
   function handleAddToCart() {
     if (addingToCart) return;
     setAddToCartError(null);
-    const { items, attributes } = buildCartItems(variant, charmProduct, pouchProduct, selection, window.location.origin);
+    const { items, attributes } = buildCartItems(variant, charmProduct, pouchProduct, penHolderVariant, selection, window.location.origin);
     setAddingToCart(true);
     // The iframe is cross-origin from the shop, so it can't call
     // /cart/add.js itself — it messages the parent page instead. The parent
@@ -516,6 +539,7 @@ function JournalCustomizerContent({
   });
 
   function priceForCartItem(variantId: string): number {
+    if (penHolderVariant && variantId === penHolderVariant.id) return priceFor(penHolderVariant.id, Number(penHolderVariant.price), "pouch");
     if (variantId === variant.id) return priceFor(variant.id, Number(variant.price), "journal");
     const charmPrice = charmPriceByVariant.get(variantId);
     if (charmPrice !== undefined) return priceFor(variantId, charmPrice, "charm");
@@ -542,6 +566,9 @@ function JournalCustomizerContent({
   // Pouch is chosen — otherwise it'd float over the cover before it means
   // anything, on the Cover/Charms steps.
   const showPouchPreview = selection.pouch && step >= ACCESSORIES_STEP;
+  const showPenHolderPreview = !!penHolderVariant && step >= ACCESSORIES_STEP;
+  const showAddOnBadges = showPouchPreview || showPenHolderPreview;
+  const penHolderLabel = selection.penHolder === "black" ? t("common.black") : t("common.brown");
 
   if (isDev && mobilePreview) {
     const embedSrc = `/mobile-preview?theme=${theme}&background=${background}`;
@@ -702,17 +729,14 @@ function JournalCustomizerContent({
                   {/* Plastic pouch add-on — floats over the cover's bottom-right
                       corner as a small "included" badge, echoing how it'll sit
                       draped over the finished journal, rather than a plain list row. */}
-                  {showPouchPreview && (
-                    <div className="step-fade-in pointer-events-none absolute -bottom-3 -right-3 translate-x-1/4 flex w-[34%] max-w-[110px] flex-col items-center gap-1">
-                      <div className="aspect-square w-full overflow-hidden rounded-[var(--radius-chip)] border-2 border-white bg-white shadow-[0_8px_20px_-6px_rgba(28,28,26,0.35)]">
-                        {pouchVariant?.image?.url && (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={pouchVariant.image.url} alt="Plastic pouch" className="h-full w-full object-cover" />
-                        )}
-                      </div>
-                      <span className="rounded-full bg-white/95 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide text-[var(--muted)] shadow-sm">
-                        {t("customizer.pouchIncluded")}
-                      </span>
+                  {showAddOnBadges && (
+                    <div className="step-fade-in pointer-events-none absolute -bottom-3 -right-3 translate-x-1/4 flex gap-2">
+                      {showPenHolderPreview && (
+                        <AddOnBadge imageUrl={penHolderVariant?.image?.url} alt="Pen holder" label={penHolderLabel} />
+                      )}
+                      {showPouchPreview && (
+                        <AddOnBadge imageUrl={pouchVariant?.image?.url} alt="Plastic pouch" label={t("customizer.pouchIncluded")} />
+                      )}
                     </div>
                   )}
                 </div>
@@ -806,7 +830,6 @@ function JournalCustomizerContent({
                     product={product}
                     patchProduct={patchProduct}
                     cord={selection.cord}
-                    penHolder={selection.penHolder}
                     edge={selection.edge}
                     cordSelected={selection.cord !== "none" && !cordAutoSelected}
                     patch={selection.patch}
@@ -830,10 +853,10 @@ function JournalCustomizerContent({
               <PenHolderStep
                 product={product}
                 selection={selection}
-                onPenHolderChange={handlePenHolderChange}
-                onEdgeChange={(edge) => updateSelection({ edge })}
+                onPenHolderChange={(penHolder) => updateSelection({ penHolder })}
+                onEdgeChange={handleEdgeChange}
                 cordSwatchByLabel={swatchColors.string}
-                penHolderSwatchByLabel={swatchColors.penHolder}
+                penHolderEntries={penHolderEntries}
                 pouchVariant={pouchVariant}
                 onPouchChange={(pouch) => updateSelection({ pouch })}
               />
@@ -853,6 +876,7 @@ function JournalCustomizerContent({
                 product={product}
                 charmProduct={charmProduct}
                 pouchVariant={pouchVariant}
+                penHolderVariant={penHolderVariant}
                 selection={selection}
                 onAddToCart={handleAddToCart}
                 adding={addingToCart}

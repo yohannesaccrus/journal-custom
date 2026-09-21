@@ -4,6 +4,7 @@ import {
   fetchJournalProducts,
   fetchNotebookProduct,
   fetchPatchProduct,
+  fetchPenHolderProduct,
   fetchPouchProduct,
   fetchSwatchColors,
 } from "@/lib/shopify-admin";
@@ -14,12 +15,13 @@ interface HomeProps {
 
 export default async function Home({ searchParams }: HomeProps) {
   const { country, lang } = await searchParams;
-  const [products, charmProduct, notebookProduct, patchProduct, pouchProduct, swatchColors] = await Promise.all([
+  const [products, charmProduct, notebookProduct, patchProduct, pouchProduct, penHolderProduct, swatchColors] = await Promise.all([
     fetchJournalProducts(),
     fetchCharmProduct(),
     fetchNotebookProduct(),
     fetchPatchProduct(),
     fetchPouchProduct(),
+    fetchPenHolderProduct(),
     fetchSwatchColors(),
   ]);
 
@@ -43,6 +45,7 @@ export default async function Home({ searchParams }: HomeProps) {
       notebookProduct={notebookProduct}
       patchProduct={patchProduct}
       pouchProduct={pouchProduct}
+      penHolderProduct={penHolderProduct}
       swatchColors={swatchColors}
       country={country}
       lang={lang}

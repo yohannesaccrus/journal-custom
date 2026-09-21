@@ -54,6 +54,7 @@ export function buildCartItems(
   variant: ShopifyVariant,
   charmProduct: ShopifyJournalProduct,
   pouchProduct: ShopifyJournalProduct,
+  penHolderVariant: ShopifyVariant | undefined,
   selection: JournalSelection,
   designPageOrigin: string
 ): CartPayload {
@@ -69,10 +70,8 @@ export function buildCartItems(
   if (selection.patch !== "none") {
     properties["Patch"] = PATCH_LABEL[selection.patch];
   }
-  if (selection.penHolder !== "none") {
-    properties["Pen Holder"] = selection.penHolder === "black" ? "Black" : "Brown";
-    properties["Corner Edge"] = selection.edge === "none" ? "No" : EDGE_LABEL[selection.edge];
-  }
+  if (selection.penHolder !== "none") properties["Pen Holder"] = selection.penHolder === "black" ? "Black" : "Brown";
+  if (selection.edge !== "none") properties["Corner Edge"] = EDGE_LABEL[selection.edge];
   const notebookEntries = Object.entries(selection.notebooks);
   if (notebookEntries.length > 0) {
     properties["Notebooks"] = notebookEntries.map(([design, count]) => `${count}× ${design}`).join(", ");
@@ -119,6 +118,17 @@ export function buildCartItems(
         Placement: g.side.charAt(0).toUpperCase() + g.side.slice(1),
         _for_journal: bundleId,
       },
+    });
+  }
+
+  // Pen holder: its own add-on product (one variant per color), same
+  // standalone-line pattern as the pouch below -- it no longer shapes the journal variant.
+  if (penHolderVariant) {
+    items.push({
+      id: toLegacyId(penHolderVariant.id),
+      variantId: penHolderVariant.id,
+      quantity: 1,
+      properties: { _for_journal: bundleId },
     });
   }
 
