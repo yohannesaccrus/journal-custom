@@ -195,7 +195,7 @@ function CharmCanvas({
               dragId.current = c.instanceId;
               (e.target as Element).setPointerCapture?.(e.pointerId);
             }}
-            className="group absolute -translate-x-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing touch-none rounded-full outline outline-1 outline-dashed outline-offset-2 outline-[var(--accent)]/50 hover:outline-[var(--accent)]"
+            className="group absolute -translate-x-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing touch-none rounded-full bg-white/40 ring-1 ring-[var(--accent)] ring-offset-1 ring-offset-white/60 shadow-sm hover:ring-2 select-none"
             style={{ left: `${c.x}%`, top: `${c.y}%`, width: CHARM_ICON_SIZE, height: CHARM_ICON_SIZE }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -204,11 +204,14 @@ function CharmCanvas({
               alt={c.design}
               className="h-full w-full object-contain drop-shadow-md pointer-events-none"
             />
+            <span aria-hidden className="pointer-events-none absolute -top-1.5 -left-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow">
+              <svg viewBox="0 0 16 16" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2v12M2 8h12M8 2 6.3 3.7M8 2l1.7 1.7M8 14l-1.7-1.7M8 14l1.7-1.7M2 8l1.7-1.7M2 8l1.7 1.7M14 8l-1.7-1.7M14 8l-1.7 1.7"/></svg>
+            </span>
             <button
               type="button"
               onPointerDown={(e) => e.stopPropagation()}
               onClick={() => onRemove(c.instanceId)}
-              className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--ink)] text-white text-[10px] leading-none [@media(hover:hover)]:hidden [@media(hover:hover)]:group-hover:flex"
+              aria-label="Remove charm" title="Remove" className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--ink)] text-white text-[10px] leading-none shadow"
             >
               ×
             </button>
@@ -316,11 +319,26 @@ export function CharmsStep({
         })}
       </div>
 
-      <div className="mt-3 flex items-start gap-2 rounded-lg bg-[var(--surface-soft)] px-3 py-2 text-xs text-[var(--muted)]">
-        <span aria-hidden>💡</span>
-        <span>
-          {t("charms.tip", { front: MAX_CHARMS_FRONT, side: MAX_CHARMS_SIDE, total: MAX_CHARMS_TOTAL })}
-        </span>
+      <div className="mt-3 rounded-lg bg-[var(--surface-soft)] px-3 py-2.5 text-xs text-[var(--muted)]">
+        <ul className="flex flex-wrap gap-x-4 gap-y-1.5 text-[var(--ink)]">
+          <li className="flex items-center gap-1.5">
+            <span aria-hidden className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent)] text-white">
+              <svg viewBox="0 0 16 16" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2v12M2 8h12"/></svg>
+            </span>
+            {t("charms.tipAdd")}
+          </li>
+          <li className="flex items-center gap-1.5">
+            <span aria-hidden className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent)] text-white">
+              <svg viewBox="0 0 16 16" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2v12M2 8h12M8 2 6.3 3.7M8 2l1.7 1.7M8 14l-1.7-1.7M8 14l1.7-1.7M2 8l1.7-1.7M2 8l1.7 1.7M14 8l-1.7-1.7M14 8l-1.7 1.7"/></svg>
+            </span>
+            {t("charms.tipMove")}
+          </li>
+          <li className="flex items-center gap-1.5">
+            <span aria-hidden className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--ink)] text-[10px] leading-none text-white">×</span>
+            {t("charms.tipRemove")}
+          </li>
+        </ul>
+        <p className="mt-1.5">{t("charms.tipLimits", { front: MAX_CHARMS_FRONT, side: MAX_CHARMS_SIDE, total: MAX_CHARMS_TOTAL })}</p>
       </div>
 
       <div className="mt-4 flex flex-wrap items-start gap-6">
@@ -354,6 +372,28 @@ export function CharmsStep({
       <p className="mt-4 text-sm text-[var(--muted)]">
         {totalCharms === 0 ? t("charms.noneAdded") : t("charms.placedCount", { count: totalCharms, max: MAX_CHARMS_TOTAL })}
       </p>
+
+      {totalCharms > 0 && (
+        <ul className="mt-2 flex flex-wrap gap-2" aria-label={t("charms.placedList")}>
+          {charms.map((c) => (
+            <li key={c.instanceId} className="flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--card-bg)] py-1 pl-1.5 pr-1 text-xs text-[var(--ink)]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={entries.find((e) => e.variantId === c.variantId)?.imageUrl} alt="" className="h-5 w-5 object-contain" />
+              <span>
+                {c.design} · {t(`charms.viewLabel.${c.side}`)}
+              </span>
+              <button
+                type="button"
+                onClick={() => removeCharm(c.instanceId)}
+                aria-label={t("charms.removeOne", { design: c.design })}
+                className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--surface-soft)] text-[11px] leading-none text-[var(--muted)] hover:bg-[var(--ink)] hover:text-white"
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

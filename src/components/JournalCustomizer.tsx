@@ -363,7 +363,7 @@ function JournalCustomizerContent({
         }
         className={`group absolute -translate-x-1/2 -translate-y-1/2 touch-none ${
           isCharmsStep
-            ? "cursor-grab active:cursor-grabbing rounded-full outline outline-1 outline-dashed outline-offset-2 outline-[var(--accent)]/50 hover:outline-[var(--accent)]"
+            ? "cursor-grab active:cursor-grabbing rounded-full bg-white/40 ring-1 ring-[var(--accent)] ring-offset-1 ring-offset-white/60 shadow-sm hover:ring-2 select-none"
             : "pointer-events-none"
         }`}
         style={{
@@ -383,14 +383,19 @@ function JournalCustomizerContent({
           className="h-full w-full object-contain drop-shadow-md pointer-events-none"
         />
         {isCharmsStep && (
+          <>
+          <span aria-hidden className="pointer-events-none absolute -top-1.5 -left-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow">
+              <svg viewBox="0 0 16 16" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2v12M2 8h12M8 2 6.3 3.7M8 2l1.7 1.7M8 14l-1.7-1.7M8 14l1.7-1.7M2 8l1.7-1.7M2 8l1.7 1.7M14 8l-1.7-1.7M14 8l-1.7 1.7"/></svg>
+            </span>
           <button
             type="button"
             onPointerDown={(e) => e.stopPropagation()}
             onClick={() => removeMainCharm(c.instanceId)}
-            className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--ink)] text-white text-[10px] leading-none [@media(hover:hover)]:hidden [@media(hover:hover)]:group-hover:flex"
+            aria-label="Remove charm" title="Remove" className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--ink)] text-white text-[10px] leading-none shadow"
           >
             ×
           </button>
+          </>
         )}
       </div>
     );

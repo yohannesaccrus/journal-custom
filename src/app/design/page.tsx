@@ -11,7 +11,6 @@ import {
   resolveVariant,
 } from "@/lib/catalog";
 import { decodeDesign } from "@/lib/design-link";
-import { formatIDR } from "@/lib/pricing";
 import { fetchCharmProduct, fetchJournalProducts } from "@/lib/shopify-admin";
 
 export const metadata = {
@@ -133,7 +132,6 @@ export default async function DesignPage({ searchParams }: DesignPageProps) {
                         )}
                         <span>
                           {c.design} — {c.side.charAt(0).toUpperCase() + c.side.slice(1)}
-                          {entry ? ` (${formatIDR(entry.price)})` : ""}
                         </span>
                       </li>
                     );
