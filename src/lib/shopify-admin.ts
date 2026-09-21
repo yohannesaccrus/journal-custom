@@ -66,7 +66,11 @@ const PRODUCT_LIST_QUERY = `
   }
 `;
 
+// Bump the trailing number to change the request body -- that is the cache key of Next's
+// persistent Data Cache (45 min), so this forces every product to be re-read from Shopify
+// right away after images/prices are edited there (the `# cache-bust` line inside the query).
 const PRODUCT_QUERY = `
+  # cache-bust: 2
   query Product($id: ID!) {
     node(id: $id) {
       ... on Product {
