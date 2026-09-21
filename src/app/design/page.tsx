@@ -85,8 +85,10 @@ export default async function DesignPage({ searchParams }: DesignPageProps) {
 
   const views = [
     { label: "Front", image: frontImage, charms: frontCharms, charmSize: "h-10 w-10" },
-    { label: "Back", image: backImage, charms: backCharms, charmSize: "h-8 w-8" },
     { label: "Side", image: sideImage, charms: sideCharms, charmSize: "h-6 w-6" },
+    // The customizer no longer offers a Back view; only designs saved before
+    // that (which may carry back charms) still show it.
+    ...(backCharms.length > 0 ? [{ label: "Back", image: backImage, charms: backCharms, charmSize: "h-8 w-8" }] : []),
   ];
 
   return (

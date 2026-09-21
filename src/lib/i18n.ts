@@ -98,7 +98,7 @@ const en: Dict = {
 
   // CharmsStep
   "charms.title": "Add charms",
-  "charms.subtitle": "Drag a charm onto the front, back, or side cover — up to {max} per journal.",
+  "charms.subtitle": "Drag a charm onto the front or side cover — up to {max} per journal.",
   "charms.limitReached": "{max} charm limit reached",
   "charms.sideFull": "{side} is full",
   "charms.tip": "Drag a charm from above and drop it onto any view below to place it there. Once placed, drag a charm to fine-tune its spot, or click the × that appears on hover to remove it. Mix charms across front, side, and back — up to {front} on the front, {side} on the side, {total} in total.",
@@ -225,7 +225,7 @@ const fr: Dict = {
   "penHolder.free": "Gratuit",
 
   "charms.title": "Ajouter des breloques",
-  "charms.subtitle": "Faites glisser une breloque sur la couverture avant, arrière ou latérale — jusqu'à {max} par journal.",
+  "charms.subtitle": "Faites glisser une breloque sur la couverture avant ou latérale — jusqu'à {max} par journal.",
   "charms.limitReached": "Limite de {max} breloques atteinte",
   "charms.sideFull": "{side} est complet",
   "charms.tip": "Faites glisser une breloque ci-dessus et déposez-la sur une vue ci-dessous pour la placer. Une fois placée, faites-la glisser pour ajuster sa position, ou cliquez sur le × qui apparaît au survol pour la retirer. Mélangez les breloques entre l'avant, le côté et l'arrière — jusqu'à {front} à l'avant, {side} sur le côté, {total} au total.",
@@ -350,7 +350,7 @@ const id: Dict = {
   "penHolder.free": "Gratis",
 
   "charms.title": "Tambahkan charm",
-  "charms.subtitle": "Seret charm ke sampul depan, belakang, atau samping — hingga {max} per jurnal.",
+  "charms.subtitle": "Seret charm ke sampul depan atau samping — hingga {max} per jurnal.",
   "charms.limitReached": "Batas {max} charm tercapai",
   "charms.sideFull": "{side} sudah penuh",
   "charms.tip": "Seret charm dari atas lalu lepaskan pada salah satu tampilan di bawah untuk menempatkannya. Setelah ditempatkan, seret charm untuk menyesuaikan posisinya, atau klik × yang muncul saat kursor diarahkan untuk menghapusnya. Campur charm di depan, samping, dan belakang — hingga {front} di depan, {side} di samping, {total} total.",
@@ -475,7 +475,7 @@ const es: Dict = {
   "penHolder.free": "Gratis",
 
   "charms.title": "Añadir dijes",
-  "charms.subtitle": "Arrastra un dije a la cubierta frontal, trasera o lateral — hasta {max} por diario.",
+  "charms.subtitle": "Arrastra un dije a la cubierta frontal o lateral — hasta {max} por diario.",
   "charms.limitReached": "Límite de {max} dijes alcanzado",
   "charms.sideFull": "{side} está completo",
   "charms.tip": "Arrastra un dije desde arriba y suéltalo en cualquier vista de abajo para colocarlo. Una vez colocado, arrástralo para ajustar su posición, o haz clic en la × que aparece al pasar el cursor para quitarlo. Combina dijes entre frontal, lateral y trasera — hasta {front} en el frente, {side} en el lateral, {total} en total.",

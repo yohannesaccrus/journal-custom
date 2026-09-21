@@ -32,7 +32,6 @@ interface CharmsStepProps {
 const VIEWS: { key: CharmSide; labelKey: string; wide: boolean }[] = [
   { key: "front", labelKey: "charms.viewLabel.front", wide: true },
   { key: "side", labelKey: "charms.viewLabel.side", wide: false },
-  { key: "back", labelKey: "charms.viewLabel.back", wide: true },
 ];
 
 function clamp(n: number, min: number, max: number) {

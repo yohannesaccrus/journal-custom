@@ -85,8 +85,11 @@ export function buildOrderJournalPreview(
     coverLabel: cover?.label ?? product.title,
     views: [
       { label: "Front", image: frontImage, charms: spec.charms.filter((c) => c.side === "front"), charmSize: "h-10 w-10" },
-      { label: "Back", image: backImage, charms: spec.charms.filter((c) => c.side === "back"), charmSize: "h-8 w-8" },
       { label: "Side", image: sideImage, charms: spec.charms.filter((c) => c.side === "side"), charmSize: "h-6 w-6" },
+      // Back is no longer offered in the customizer; only orders that already carry back charms show it.
+      ...(spec.charms.some((c) => c.side === "back")
+        ? [{ label: "Back", image: backImage, charms: spec.charms.filter((c) => c.side === "back"), charmSize: "h-8 w-8" }]
+        : []),
     ],
     charmEntries,
     patch: spec.patch,

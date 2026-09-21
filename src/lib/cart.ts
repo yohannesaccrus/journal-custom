@@ -145,7 +145,6 @@ export function buildCartItems(
   const attributes: Record<string, string> = {
     [`✨ Design page Link — ${bundleId}`]: designUrl,
     [`✨ Design Front — ${bundleId}`]: `${imageBase}&view=front`,
-    [`✨ Design Back — ${bundleId}`]: `${imageBase}&view=back`,
     [`✨ Design Side — ${bundleId}`]: `${imageBase}&view=side`,
   };
   // Cart-level, not just the line-item `properties` above — the journal line
