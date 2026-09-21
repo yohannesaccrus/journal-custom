@@ -601,10 +601,10 @@ function JournalCustomizerContent({
       )}
       <div className="w-full max-w-6xl md:rounded-[var(--radius-card)] bg-[var(--card-bg)] md:shadow-2xl overflow-hidden">
         {/* header / stepper */}
-        <header className="hidden md:flex items-center justify-between gap-6 border-b border-[var(--border)] px-6 sm:px-10 py-5">
-          <nav className="hidden shrink-0 items-center gap-6 md:flex">
+        <header className="flex items-center justify-between gap-6 border-b border-[var(--border)] pl-4 pr-14 py-3 sm:px-10 md:py-5">
+          <nav className="flex min-w-0 flex-1 items-center gap-2 md:flex-none md:shrink-0 md:gap-6">
             {STEP_LABEL_KEYS.map((labelKey, i) => (
-              <button key={labelKey} type="button" onClick={() => setStep(i)} className="flex items-center gap-2 text-sm">
+              <button key={labelKey} type="button" onClick={() => setStep(i)} className={`flex items-center gap-2 text-sm ${i === step ? "min-w-0" : "shrink-0"}`}>
                 <span
                   className={`flex h-6 w-6 items-center justify-center rounded-[var(--radius-chip)] text-xs font-medium ${
                     i === step
@@ -616,12 +616,12 @@ function JournalCustomizerContent({
                 >
                   {theme === "atelier" ? ROMAN_NUMERALS[i] ?? i + 1 : i + 1}
                 </span>
-                <span className={i === step ? "text-[var(--ink)] font-medium" : "text-[var(--faint)]"}>{t(labelKey)}</span>
+                <span className={i === step ? "truncate text-[var(--ink)] font-medium" : "hidden text-[var(--faint)] md:inline"}>{t(labelKey)}</span>
               </button>
             ))}
           </nav>
 
-          <div className="flex min-w-0 flex-1 justify-end text-right">
+          <div className="hidden min-w-0 flex-1 justify-end text-right md:flex">
             <div>
               <div className="text-xs text-[var(--faint)]">{t("common.total")}</div>
               <div className="text-lg font-semibold text-[var(--ink)] font-heading">{formatConverted(total)}</div>
