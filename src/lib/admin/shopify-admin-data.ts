@@ -658,10 +658,14 @@ export async function createJournalCoverProduct(
   if (!refProduct) throw new Error("No existing journal product found to copy String/Pen Holder options from");
 
   const stringValues = refProduct.options.find((o) => o.name === "String")?.optionValues.map((v) => v.name) ?? [];
-  const penHolderValues =
-    refProduct.options.find((o) => o.name === "Pen Holder")?.optionValues.map((v) => v.name) ?? [];
+  // The journals' third option is "Corner Edge" now (None/Gold/Silver); "Pen Holder" is the
+  // older holder+edge shape, still copied faithfully when that's what the store has.
+  const thirdOption =
+    refProduct.options.find((o) => o.name === "Corner Edge") ?? refProduct.options.find((o) => o.name === "Pen Holder");
+  const thirdOptionName = thirdOption?.name ?? "Corner Edge";
+  const penHolderValues = thirdOption?.optionValues.map((v) => v.name) ?? [];
   if (stringValues.length === 0 || penHolderValues.length === 0) {
-    throw new Error("Reference journal product is missing String/Pen Holder option values");
+    throw new Error(`Reference journal product is missing String/${thirdOptionName} option values`);
   }
 
   const handle = `sanaya-journal-${slugify(style)}`;
@@ -692,7 +696,7 @@ export async function createJournalCoverProduct(
     const hasBase = existingProduct.variants.nodes.some(
       (v) =>
         v.selectedOptions.some((o) => o.name === "String" && o.value === "No Cord") &&
-        v.selectedOptions.some((o) => o.name === "Pen Holder" && o.value === "None")
+        v.selectedOptions.some((o) => (o.name === "Corner Edge" || o.name === "Pen Holder") && o.value === "None")
     );
     if (hasBase) {
       throw new Error(`A cover named "${style}" already exists -- choose a different name.`);
@@ -729,7 +733,7 @@ export async function createJournalCoverProduct(
   if (!productId) throw new Error("Shopify did not return the created product");
 
   try {
-    return await finishJournalCoverProduct(productId, handle, style, price, stringValues, penHolderValues);
+    return await finishJournalCoverProduct(productId, handle, style, price, stringValues, penHolderValues, thirdOptionName);
   } catch (err) {
     // Anything short of a fully-formed base ("No Cord" / "None") variant
     // would otherwise sit around tagged "journal" and crash the whole
@@ -761,7 +765,8 @@ async function finishJournalCoverProduct(
   style: string,
   price: string,
   stringValues: string[],
-  penHolderValues: string[]
+  penHolderValues: string[],
+  thirdOptionName: string
 ): Promise<{ productId: string; handle: string; created: number }> {
   // Step 2: add String and Pen Holder as brand-new options on that product --
   // productOptionsCreate is the dedicated mutation for adding options after
@@ -780,11 +785,11 @@ async function finishJournalCoverProduct(
     productId,
     options: [
       { name: "String", values: stringValues.map((name) => ({ name })) },
-      { name: "Pen Holder", values: penHolderValues.map((name) => ({ name })) },
+      { name: thirdOptionName, values: penHolderValues.map((name) => ({ name })) },
     ],
   });
   const optionsErrs = optionsRes.productOptionsCreate.userErrors;
-  if (optionsErrs.length) throw new Error(`Add String/Pen Holder options: ${optionsErrs.map((e) => e.message).join("; ")}`);
+  if (optionsErrs.length) throw new Error(`Add String/${thirdOptionName} options: ${optionsErrs.map((e) => e.message).join("; ")}`);
 
   // Re-fetch fresh -- both steps above may have auto-generated placeholder
   // variants for the option value combinations Shopify computed on its own,
@@ -824,7 +829,7 @@ async function finishJournalCoverProduct(
 
   const coverOption = state.node.options.find((o) => o.name === "Cover");
   const cordOption = state.node.options.find((o) => o.name === "String");
-  const penOption = state.node.options.find((o) => o.name === "Pen Holder");
+  const penOption = state.node.options.find((o) => o.name === thirdOptionName);
   if (!coverOption || !cordOption || !penOption) throw new Error("Created product is missing an expected option");
 
   // Same combo rule as syncJournalOptionAdd: any String value (a base cord,
@@ -854,7 +859,7 @@ async function finishJournalCoverProduct(
   const toUpdate: { id: string; price: string; sku: string }[] = [];
   for (const v of state.node.variants.nodes) {
     const cord = v.selectedOptions.find((o) => o.name === "String")?.value;
-    const pen = v.selectedOptions.find((o) => o.name === "Pen Holder")?.value;
+    const pen = v.selectedOptions.find((o) => o.name === thirdOptionName)?.value;
     const key = cord && pen ? comboKey(cord, pen) : null;
     if (key && validKeys.has(key)) {
       existingValidKeys.add(key);
@@ -979,7 +984,7 @@ export async function syncJournalOptionAdd(componentTags: string[], newValue: st
   for (const product of data.products.nodes) {
     const coverOption = product.options.find((o) => o.name === "Cover");
     const cordOption = product.options.find((o) => o.name === "String");
-    const penOption = product.options.find((o) => o.name === "Pen Holder");
+    const penOption = product.options.find((o) => o.name === "Corner Edge") ?? product.options.find((o) => o.name === "Pen Holder");
     const coverValue = coverOption?.optionValues[0]?.name;
     if (!coverOption || !coverValue || !cordOption || !penOption) {
       results.push({
@@ -987,7 +992,7 @@ export async function syncJournalOptionAdd(componentTags: string[], newValue: st
         coverTitle: product.title,
         created: 0,
         skipped: false,
-        error: "Missing Cover/String/Pen Holder option",
+        error: "Missing Cover/String/Corner Edge option",
       });
       continue;
     }
@@ -1017,6 +1022,10 @@ export async function syncJournalOptionAdd(componentTags: string[], newValue: st
           price
         );
         results.push({ coverHandle: product.handle, coverTitle: product.title, created, skipped: false });
+      } else if (tag === "pen-holder" && penOption.name === "Corner Edge") {
+        // The pen holder is its own add-on product now -- it isn't a journal option value, so
+        // there is nothing to add onto the journal products.
+        results.push({ coverHandle: product.handle, coverTitle: product.title, created: 0, skipped: true });
       } else if (tag === "pen-holder") {
         const goldEdgeValue = `${newValue} + Gold Edge`;
         const silverEdgeValue = `${newValue} + Silver Edge`;
@@ -1096,6 +1105,7 @@ async function fetchPriceComponents(): Promise<{
   coverPrice: Record<string, number>;
   stringDelta: Record<string, number>;
   penHolderDelta: Record<string, number>;
+  edgeDelta: Record<string, number>;
   patchDelta: Record<string, number>;
 }> {
   const data = await shopifyAdmin<{
@@ -1138,7 +1148,7 @@ async function fetchPriceComponents(): Promise<{
     penHolderDelta[`${base} + Gold Edge`] = penHolderDelta[base] + (edgeDelta.Gold ?? 0);
     penHolderDelta[`${base} + Silver Edge`] = penHolderDelta[base] + (edgeDelta.Silver ?? 0);
   }
-  return { coverPrice, stringDelta, penHolderDelta, patchDelta };
+  return { coverPrice, stringDelta, penHolderDelta, edgeDelta, patchDelta };
 }
 
 /**
@@ -1150,7 +1160,7 @@ async function fetchPriceComponents(): Promise<{
  * the journal products.
  */
 export async function syncJournalPricing(): Promise<void> {
-  const { coverPrice, stringDelta, penHolderDelta, patchDelta } = await fetchPriceComponents();
+  const { coverPrice, stringDelta, penHolderDelta, edgeDelta, patchDelta } = await fetchPriceComponents();
 
   const JOURNAL_QUERY = `
     query JournalPricingSync {
@@ -1199,14 +1209,26 @@ export async function syncJournalPricing(): Promise<void> {
       const cover = v.selectedOptions.find((o) => o.name === "Cover")?.value;
       if (!cover || !(cover in coverPrice)) continue;
       const stringValue = v.selectedOptions.find((o) => o.name === "String")?.value ?? "";
+      // Third option: "Corner Edge" (None/Gold/Silver) now that the pen holder is its own
+      // add-on product; the older "Pen Holder" shape (holder + edge fused) is still read
+      // so pricing keeps working on a store that hasn't been converted yet.
+      const cornerEdgeValue = v.selectedOptions.find((o) => o.name === "Corner Edge")?.value;
       const penHolderValue = v.selectedOptions.find((o) => o.name === "Pen Holder")?.value;
+      const thirdOptionDelta =
+        cornerEdgeValue !== undefined
+          ? cornerEdgeValue === "None"
+            ? 0
+            : edgeDelta[cornerEdgeValue] ?? 0
+          : penHolderValue
+            ? penHolderDelta[penHolderValue] ?? 0
+            : 0;
       // "<cord> + <patch>" suffix -- see `stringValueFor` in catalog.ts.
       const plusIndex = stringValue.indexOf(" + ");
       const baseCord = plusIndex === -1 ? stringValue : stringValue.slice(0, plusIndex);
       const patchLabel = plusIndex === -1 ? "None" : stringValue.slice(plusIndex + 3);
       const delta =
         (stringDelta[baseCord] ?? 0) +
-        (penHolderValue ? penHolderDelta[penHolderValue] ?? 0 : 0) +
+        thirdOptionDelta +
         (patchDelta[patchLabel] ?? 0);
       const newPrice = (coverPrice[cover] + delta).toFixed(2);
       if (newPrice !== Number(v.price).toFixed(2)) updates.push({ id: v.id, price: newPrice });
@@ -1351,6 +1373,10 @@ export async function syncJournalStock(): Promise<JournalStockResult[]> {
         continue;
       }
       const stringValue = v.selectedOptions.find((o) => o.name === "String")?.value ?? "No Cord";
+      // Third option: "Corner Edge" (None/Gold/Silver) once the pen holder became its own
+      // add-on product; the older fused "Pen Holder" shape is still understood so stock keeps
+      // syncing on a store that hasn't been converted yet.
+      const cornerEdgeValue = v.selectedOptions.find((o) => o.name === "Corner Edge")?.value;
       const penHolderValue = v.selectedOptions.find((o) => o.name === "Pen Holder")?.value ?? "None";
 
       // "<cord> + <patch>" suffix -- see `stringValueFor` in catalog.ts.
@@ -1358,8 +1384,23 @@ export async function syncJournalStock(): Promise<JournalStockResult[]> {
       const baseCord = plusIndex === -1 ? stringValue : stringValue.slice(0, plusIndex);
       const patchLabel = plusIndex === -1 ? "None" : stringValue.slice(plusIndex + 3);
 
-      const edgeColor = penHolderValue.endsWith(" + Gold Edge") ? "Gold" : penHolderValue.endsWith(" + Silver Edge") ? "Silver" : null;
-      const basePen = edgeColor ? penHolderValue.slice(0, -` + ${edgeColor} Edge`.length) : penHolderValue;
+      const edgeColor =
+        cornerEdgeValue !== undefined
+          ? cornerEdgeValue === "None"
+            ? null
+            : cornerEdgeValue
+          : penHolderValue.endsWith(" + Gold Edge")
+            ? "Gold"
+            : penHolderValue.endsWith(" + Silver Edge")
+              ? "Silver"
+              : null;
+      // Only the legacy shape consumes a pen holder from the journal's own stock.
+      const basePen =
+        cornerEdgeValue !== undefined
+          ? "None"
+          : edgeColor
+            ? penHolderValue.slice(0, -` + ${edgeColor} Edge`.length)
+            : penHolderValue;
 
       const cordAvail = baseCord === "No Cord" ? UNLIMITED_STOCK : stringStock[baseCord] ?? 0;
       const penAvail = basePen === "None" ? UNLIMITED_STOCK : penHolderStock[basePen] ?? 0;
@@ -1436,6 +1477,8 @@ export async function syncJournalOptionDelete(componentTags: string[], value: st
   if (!tag) return [];
 
   const optionName = tag === "pen-holder" ? "Pen Holder" : "String";
+  // Once the pen holder is its own add-on product, deleting one only removes that product's
+  // variant (handled by the caller) -- the journals have no "Pen Holder" option to clean.
 
   const JOURNAL_PRODUCTS_QUERY = `
     query JournalProductsForDeleteSync {

@@ -46,14 +46,15 @@ export default function AssetCategoryCard({
   const [journalDeleteSync, setJournalDeleteSync] = useState<JournalDeleteResult[] | null>(null);
   const [journalStockSync, setJournalStockSync] = useState<JournalStockResult[] | null>(null);
 
-  // String, Pen Holder and Patch values also live as option values on every
-  // sellable journal cover product — adding one here needs to propagate
-  // there too, or customers can never actually pick the new value.
-  const syncsToJournal =
-    product.tags.includes("string") || product.tags.includes("pen-holder") || product.tags.includes("patch");
+  // String and Patch values also live as option values on every sellable
+  // journal cover product — adding one here needs to propagate there too, or
+  // customers can never actually pick the new value. The Pen Holder used to
+  // work the same way, but it is its own add-on product now (like the Pouch):
+  // its price, stock and photo are edited straight on this product.
+  const syncsToJournal = product.tags.includes("string") || product.tags.includes("patch");
 
   // Each Cover row can expand into an accordion showing that cover's real
-  // journal variants (String × Pen Holder combos) — only one open at a time.
+  // journal variants (String × Corner Edge combos) — only one open at a time.
   const isCoverTracker = product.tags.includes("cover") && !!journalByCoverName;
   const [expandedVariantId, setExpandedVariantId] = useState<string | null>(null);
 
@@ -75,6 +76,8 @@ export default function AssetCategoryCard({
   // (not a color), and that photo is what the customer actually sees on the
   // Accessories step's Pouch toggle.
   const isPouch = product.tags.includes("pouch");
+  // Standalone add-on too (Black/Brown): its own variant photo is what the customer sees.
+  const isPenHolder = product.tags.includes("pen-holder");
   // Every raw-material component tracker — Cover, String, Pen Holder,
   // Corner Edge, Patch — feeds the shared stock pool `syncJournalStock`
   // recomputes from (see the banner below).
@@ -104,7 +107,7 @@ export default function AssetCategoryCard({
   // Pen Holder/Patch/Notebook/Edge) is admin-only reference; the photo
   // customers see for a cover combo comes from the real journal product's
   // own image in the accordion below instead.
-  const imageCaption = isCharm || isPouch ? "Shown to customer" : "Admin only";
+  const imageCaption = isCharm || isPouch || isPenHolder ? "Shown to customer" : "Admin only";
   // String and Pen Holder's Swatch columns stay editable — they actually
   // drive the live customizer's color pickers (see `fetchSwatchColors`) —
   // but like Cover/Charm/Patch/Corner Edge/Notebook their titles shouldn't
@@ -499,8 +502,8 @@ export default function AssetCategoryCard({
                 <path d="M10 2a1 1 0 01.894.553l1.382 2.764 3.05.443a1 1 0 01.554 1.706l-2.207 2.152.521 3.038a1 1 0 01-1.451 1.054L10 12.202l-2.743 1.508a1 1 0 01-1.451-1.054l.521-3.038-2.207-2.152a1 1 0 01.554-1.706l3.05-.443L9.106 2.553A1 1 0 0110 2z" />
               </svg>
               {submittingVariant
-                ? "Creating a new sellable journal product with every String × Pen Holder combination — this can take a while…"
-                : "This creates a brand-new sellable journal product with every String × Pen Holder combination, priced automatically. Starts at 0 stock and no photo — set those next in its own accordion row below."}
+                ? "Creating a new sellable journal product with every String × Corner Edge combination — this can take a while…"
+                : "This creates a brand-new sellable journal product with every String × Corner Edge combination, priced automatically. Starts at 0 stock and no photo — set those next in its own accordion row below."}
             </p>
           )}
         </form>

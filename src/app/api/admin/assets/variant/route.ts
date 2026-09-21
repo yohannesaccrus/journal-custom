@@ -16,7 +16,7 @@ import {
 import type { CoverCategory } from "@/lib/types";
 
 /** Tracker tags whose own `price` field feeds the additive journal-pricing formula (base cover price + string/pen-holder/patch add-ons). */
-const PRICE_COMPONENT_TAGS = ["cover", "string", "pen-holder", "patch"];
+const PRICE_COMPONENT_TAGS = ["cover", "string", "edge", "patch"];
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
