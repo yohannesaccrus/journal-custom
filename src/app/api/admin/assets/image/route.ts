@@ -1,8 +1,10 @@
+import { LEGACY_ADMIN_ENABLED } from "@/lib/admin/feature-flags";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { uploadVariantImage } from "@/lib/admin/shopify-admin-data";
 
 export async function POST(request: NextRequest) {
+  if (!LEGACY_ADMIN_ENABLED) return Response.json({ error: "Disabled" }, { status: 404 });
   const form = await request.formData();
   const productId = String(form.get("productId") ?? "");
   const variantId = String(form.get("variantId") ?? "");

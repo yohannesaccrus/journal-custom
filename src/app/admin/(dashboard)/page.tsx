@@ -1,9 +1,12 @@
+import { redirect } from "next/navigation";
+import { LEGACY_ADMIN_ENABLED, CZ_STOCK_PATH } from "@/lib/admin/feature-flags";
 import { fetchAssetProducts, fetchJournalOrderCount } from "@/lib/admin/shopify-admin-data";
 import { NeedsAttentionTable, type NeedsAttentionRow } from "@/components/admin/NeedsAttentionTable";
 
 const LOW_STOCK_THRESHOLD = 10;
 
 export default async function AdminDashboardPage() {
+  if (!LEGACY_ADMIN_ENABLED) redirect(CZ_STOCK_PATH);
   const [products, orderCount] = await Promise.all([fetchAssetProducts(), fetchJournalOrderCount()]);
 
   const lowStock: NeedsAttentionRow[] = products.flatMap((p) =>

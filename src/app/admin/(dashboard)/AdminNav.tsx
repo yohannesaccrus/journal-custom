@@ -2,12 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { LEGACY_ADMIN_ENABLED, CZ_STOCK_PATH } from "@/lib/admin/feature-flags";
 
-const NAV = [
+const LEGACY_NAV = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/assets", label: "Assets & Stock" },
   { href: "/admin/orders", label: "Orders" },
 ];
+
+const NAV = [...(LEGACY_ADMIN_ENABLED ? LEGACY_NAV : []), { href: CZ_STOCK_PATH, label: "Customizer Stock" }];
 
 export function AdminNav({ orderCount }: { orderCount: number }) {
   const pathname = usePathname();

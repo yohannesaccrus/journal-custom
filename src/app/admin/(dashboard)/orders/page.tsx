@@ -1,9 +1,12 @@
+import { redirect } from "next/navigation";
+import { LEGACY_ADMIN_ENABLED, CZ_STOCK_PATH } from "@/lib/admin/feature-flags";
 import { fetchAssetProducts, fetchJournalOrders } from "@/lib/admin/shopify-admin-data";
 import { buildOrderJournalPreview } from "@/lib/admin/order-preview";
 import { fetchCharmProduct, fetchJournalProducts } from "@/lib/shopify-admin";
 import { OrdersPageBody } from "@/components/admin/OrdersPageBody";
 
 export default async function AdminOrdersPage() {
+  if (!LEGACY_ADMIN_ENABLED) redirect(CZ_STOCK_PATH);
   const [{ orders }, products, journalProducts, charmProduct] = await Promise.all([
     fetchJournalOrders(),
     fetchAssetProducts(),

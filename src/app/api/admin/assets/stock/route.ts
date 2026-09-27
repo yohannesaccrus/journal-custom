@@ -1,3 +1,4 @@
+import { LEGACY_ADMIN_ENABLED } from "@/lib/admin/feature-flags";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { setVariantStock, syncJournalStock, type JournalStockResult } from "@/lib/admin/shopify-admin-data";
@@ -6,6 +7,7 @@ import { setVariantStock, syncJournalStock, type JournalStockResult } from "@/li
 const STOCK_COMPONENT_TAGS = ["cover", "string", "edge", "patch"];
 
 export async function POST(request: NextRequest) {
+  if (!LEGACY_ADMIN_ENABLED) return Response.json({ error: "Disabled" }, { status: 404 });
   const body = await request.json();
   const { inventoryItemId, quantity, productTags } = body as {
     inventoryItemId?: string;

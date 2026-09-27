@@ -93,14 +93,14 @@ export function JournalCustomizer(props: JournalCustomizerProps) {
 /** Small floating thumbnail + caption shown over the cover preview for an add-on (pen holder, plastic pouch). */
 function AddOnBadge({ imageUrl, alt, label }: { imageUrl?: string; alt: string; label: string }) {
   return (
-    <div className="flex w-[84px] flex-col items-center gap-1">
+    <div className="flex w-[68px] flex-col items-center gap-1">
       <div className="aspect-square w-full overflow-hidden rounded-[var(--radius-chip)] border-2 border-white bg-white shadow-[0_8px_20px_-6px_rgba(28,28,26,0.35)]">
         {imageUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={imageUrl} alt={alt} className="h-full w-full object-cover" />
         )}
       </div>
-      <span className="rounded-full bg-white/95 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide text-[var(--muted)] shadow-sm">
+      <span className="whitespace-nowrap rounded-full bg-white/95 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wide text-[var(--muted)] shadow-sm">
         {label}
       </span>
     </div>
@@ -730,7 +730,7 @@ function JournalCustomizerContent({
                       corner as a small "included" badge, echoing how it'll sit
                       draped over the finished journal, rather than a plain list row. */}
                   {showAddOnBadges && (
-                    <div className="step-fade-in pointer-events-none absolute -bottom-3 -right-3 translate-x-1/4 flex gap-2">
+                    <div className="step-fade-in pointer-events-none absolute bottom-3 right-3 flex items-end gap-2">
                       {showPenHolderPreview && (
                         <AddOnBadge imageUrl={penHolderVariant?.image?.url} alt="Pen holder" label={penHolderLabel} />
                       )}

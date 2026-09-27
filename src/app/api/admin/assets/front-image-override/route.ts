@@ -1,8 +1,10 @@
+import { LEGACY_ADMIN_ENABLED } from "@/lib/admin/feature-flags";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { setVariantFrontImageOverride, uploadFrontImageOverride } from "@/lib/admin/shopify-admin-data";
 
 export async function POST(request: NextRequest) {
+  if (!LEGACY_ADMIN_ENABLED) return Response.json({ error: "Disabled" }, { status: 404 });
   const form = await request.formData();
   const variantId = String(form.get("variantId") ?? "");
   const file = form.get("file");
@@ -29,6 +31,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  if (!LEGACY_ADMIN_ENABLED) return Response.json({ error: "Disabled" }, { status: 404 });
   const body = await request.json();
   const { variantId } = body as { variantId?: string };
 

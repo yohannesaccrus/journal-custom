@@ -1,7 +1,10 @@
+import { redirect } from "next/navigation";
+import { LEGACY_ADMIN_ENABLED, CZ_STOCK_PATH } from "@/lib/admin/feature-flags";
 import { fetchAssetProducts, fetchJournalCoverProducts } from "@/lib/admin/shopify-admin-data";
 import { AssetsPageBody } from "@/components/admin/AssetsPageBody";
 
 export default async function AdminAssetsPage() {
+  if (!LEGACY_ADMIN_ENABLED) redirect(CZ_STOCK_PATH);
   const [products, journalCoverProducts] = await Promise.all([fetchAssetProducts(), fetchJournalCoverProducts()]);
 
   const coverImage =

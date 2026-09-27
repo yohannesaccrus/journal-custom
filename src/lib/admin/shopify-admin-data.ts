@@ -8,7 +8,7 @@ const STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN;
 const ACCESS_TOKEN = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
 const API_VERSION = process.env.SHOPIFY_ADMIN_API_VERSION ?? "2026-01";
 
-async function shopifyAdmin<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
+export async function shopifyAdmin<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
   if (!STORE_DOMAIN || !ACCESS_TOKEN) {
     throw new Error("Missing SHOPIFY_STORE_DOMAIN or SHOPIFY_ADMIN_ACCESS_TOKEN env vars");
   }

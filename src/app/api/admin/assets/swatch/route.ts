@@ -1,8 +1,10 @@
+import { LEGACY_ADMIN_ENABLED } from "@/lib/admin/feature-flags";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { setVariantSwatchColor } from "@/lib/admin/shopify-admin-data";
 
 export async function POST(request: NextRequest) {
+  if (!LEGACY_ADMIN_ENABLED) return Response.json({ error: "Disabled" }, { status: 404 });
   const body = await request.json();
   const { variantId, hex } = body as { variantId?: string; hex?: string | null };
 

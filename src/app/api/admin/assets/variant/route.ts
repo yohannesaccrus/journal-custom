@@ -1,3 +1,4 @@
+import { LEGACY_ADMIN_ENABLED } from "@/lib/admin/feature-flags";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import {
@@ -19,6 +20,7 @@ import type { CoverCategory } from "@/lib/types";
 const PRICE_COMPONENT_TAGS = ["cover", "string", "edge", "patch"];
 
 export async function POST(request: NextRequest) {
+  if (!LEGACY_ADMIN_ENABLED) return Response.json({ error: "Disabled" }, { status: 404 });
   const body = await request.json();
   const { productId, optionId, optionName, value, price, sku, productTags, category } = body as {
     productId?: string;
@@ -65,6 +67,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  if (!LEGACY_ADMIN_ENABLED) return Response.json({ error: "Disabled" }, { status: 404 });
   const body = await request.json();
   const { productId, variantId, price, sku, name, previousName, productTags, optionId, optionValueId } = body as {
     productId?: string;
@@ -105,6 +108,7 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  if (!LEGACY_ADMIN_ENABLED) return Response.json({ error: "Disabled" }, { status: 404 });
   const body = await request.json();
   const { productId, variantId, value, productTags } = body as {
     productId?: string;

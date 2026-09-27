@@ -1,6 +1,7 @@
 import { fetchJournalOrders } from "@/lib/admin/shopify-admin-data";
 import { getEurIdrRate } from "@/lib/admin/exchange-rate";
 import { setIdrRate } from "@/lib/currency";
+import { LEGACY_ADMIN_ENABLED } from "@/lib/admin/feature-flags";
 import { AdminNav } from "./AdminNav";
 import { AdminMobileNav } from "./AdminMobileNav";
 import { CurrencyProvider } from "./CurrencyContext";
@@ -14,9 +15,11 @@ export const metadata = {
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   // Best-effort — the sidebar badge shouldn't break the whole admin shell if
   // the Shopify Admin API call fails.
-  const orderCount = await fetchJournalOrders()
-    .then(({ orders }) => orders.length)
-    .catch(() => 0);
+  const orderCount = LEGACY_ADMIN_ENABLED
+    ? await fetchJournalOrders()
+        .then(({ orders }) => orders.length)
+        .catch(() => 0)
+    : 0;
 
   // Same shop metafield the storefront theme reads for /id pricing — keeps
   // every IDR/USD price shown in this admin in sync with what's actually
