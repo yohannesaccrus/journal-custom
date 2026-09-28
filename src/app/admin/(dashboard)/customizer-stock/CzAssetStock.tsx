@@ -2,6 +2,12 @@
 
 import { StockEditor } from "./StockEditor";
 import { AddAssetForm } from "./AddAssetForm";
+import { PricingPanel, type CzPricing } from "./PricingPanel";
+import { ShopPrice } from "./ShopPrice";
+import { assetStatus } from "./status";
+import { Pill } from "./ui";
+import { CARD, TD, TH } from "./styles";
+import type { CzPrice } from "@/lib/admin/cz-stock";
 
 export interface CzAssetRow {
   key: string;
@@ -13,72 +19,117 @@ export interface CzAssetRow {
   asOf: string | null;
   /** Times used by orders since `asOf` (or in the loaded window when never counted). */
   used: number;
+  /** Read-only preview of what the customer pays for choosing it; null when included or unreadable. */
+  price: CzPrice | null;
+  /** Which price group it comes from, e.g. "Size S price". */
+  priceNote: string | null;
 }
 export interface CzAssetSection {
+  /** Unique per section: the kind, or "charm-S" / "charm-M" / "charm-L" for charms split by size. */
+  id: string;
   kind: string;
   title: string;
+  /** Group given to assets added from this section (e.g. "Size S"), so they land back in it. */
+  group: string | null;
   rows: CzAssetRow[];
   ids: string[];
+  /** The category's editable prices, shown above its table. */
+  pricing: CzPricing;
 }
 
-const LOW = 5;
-
 function Row({ row }: { row: CzAssetRow }) {
-  const remaining = row.counted == null ? null : row.counted - row.used;
-  const status =
-    remaining == null ? { text: "Not counted", cls: "text-[#6b6a63]" }
-    : remaining <= 0 ? { text: "Sold out", cls: "text-[#b5342c] font-medium" }
-    : remaining <= LOW ? { text: "Low", cls: "text-[#b1632f] font-medium" }
-    : { text: "OK", cls: "text-[#2f7a63]" };
-
+  const s = assetStatus(row.counted, row.used);
   return (
-    <tr className="border-t border-[#e6e0d2]">
-      <td className="py-2 pr-3">
-        <div className="flex items-center gap-2">
-          {row.imageUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={row.imageUrl} alt="" className="h-8 w-8 rounded object-cover" onError={(e) => (e.currentTarget.style.display = "none")} />
-          )}
-          <span>{row.label}</span>
+    <tr className="border-t border-[#e6e0d2]/80 transition-colors hover:bg-white/60">
+      <td className={`${TD} pl-5`}>
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-[#efe9dc] to-[#e6dfcf] ring-1 ring-black/5">
+            {row.imageUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={row.imageUrl} alt="" loading="lazy" className="h-full w-full object-cover" onError={(e) => (e.currentTarget.style.display = "none")} />
+            )}
+          </div>
+          <span className="font-medium text-[#1c1c1a]">{row.label}</span>
         </div>
       </td>
-      <td className="py-2 pr-3 tabular-nums">{row.counted ?? "—"}</td>
-      <td className="py-2 pr-3 tabular-nums text-[#6b6a63]">{row.used}</td>
-      <td className={`py-2 pr-3 tabular-nums ${remaining != null && remaining <= LOW ? "font-medium" : ""}`}>{remaining ?? "—"}</td>
-      <td className={`py-2 pr-3 ${status.cls}`}>{status.text}</td>
-      <td className="py-2">
+      <td className={`${TD} tabular-nums`}>
+        {row.price != null ? <span className="text-[#3d3c37]"><ShopPrice price={row.price} /></span> : <span className="text-[#b9b4a6]">—</span>}
+        {row.priceNote && <span className="mt-0.5 block text-[11px] text-[#8a877c]">{row.priceNote}</span>}
+      </td>
+      <td className={`${TD} tabular-nums`}>{row.counted ?? <span className="text-[#b9b4a6]">—</span>}</td>
+      <td className={`${TD} tabular-nums text-[#6b6a63]`}>{row.used}</td>
+      <td className={`${TD} font-medium tabular-nums ${s.tone === "out" ? "text-[#9a2a23]" : s.tone === "low" ? "text-[#8a4a22]" : ""}`}>
+        {s.remaining ?? <span className="font-normal text-[#b9b4a6]">—</span>}
+      </td>
+      <td className={TD}>
+        <Pill tone={s.tone}>{s.text}</Pill>
+      </td>
+      <td className={`${TD} pr-5`}>
         <StockEditor endpoint="/api/admin/cz-stock" target={{ key: row.key }} initial="" canAdjust={row.counted != null} setLabel="Set count" />
       </td>
     </tr>
   );
 }
 
-export function CzAssetStock({ sections }: { sections: CzAssetSection[] }) {
+function SectionSummary({ rows }: { rows: CzAssetRow[] }) {
+  const counts = { out: 0, low: 0, muted: 0 };
+  for (const r of rows) {
+    const t = assetStatus(r.counted, r.used).tone;
+    if (t !== "ok") counts[t]++;
+  }
+  return (
+    <span className="flex flex-wrap justify-end gap-1.5">
+      {counts.out > 0 && <Pill tone="out">{counts.out} sold out</Pill>}
+      {counts.low > 0 && <Pill tone="low">{counts.low} low</Pill>}
+      {counts.muted > 0 && <Pill tone="muted">{counts.muted} not counted</Pill>}
+      {!counts.out && !counts.low && !counts.muted && <Pill tone="ok">All in stock</Pill>}
+    </span>
+  );
+}
+
+export function CzAssetStock({ sections, pricesEditable }: { sections: CzAssetSection[]; pricesEditable: boolean }) {
   return (
     <div className="space-y-4">
       {sections.map((s) => (
-        <details key={s.kind} className="rounded-xl border border-white/70 bg-white/40 p-5 ring-1 ring-inset ring-white/50 backdrop-blur-3xl" open={s.rows.length <= 12}>
-          <summary className="cursor-pointer font-medium">
-            {s.title} <span className="text-xs font-normal text-[#6b6a63]">({s.rows.length})</span>
+        <details key={s.id} id={s.id} className={`group/section scroll-mt-6 overflow-hidden ${CARD}`} open>
+          <summary className="flex cursor-pointer list-none flex-wrap items-center gap-3 px-5 py-4 transition-colors hover:bg-white/40 [&::-webkit-details-marker]:hidden">
+            <svg className="h-4 w-4 shrink-0 text-[#b1632f] transition-transform duration-200 group-open/section:rotate-90" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+              <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+            </svg>
+            <span className="font-serif text-lg text-[#1c1c1a]">{s.title}</span>
+            <span className="rounded-full bg-[#0f3d34]/[0.07] px-2 py-0.5 text-[11px] font-medium tabular-nums text-[#0f3d34]">{s.rows.length}</span>
+            <span className="ml-auto">
+              <SectionSummary rows={s.rows} />
+            </span>
           </summary>
-          <AddAssetForm kind={s.kind} existingIds={s.ids} />
-          <table className="mt-3 w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-[#6b6a63]">
-                <th className="py-1 font-normal">Asset</th>
-                <th className="py-1 font-normal">Counted</th>
-                <th className="py-1 font-normal">Used since</th>
-                <th className="py-1 font-normal">Remaining</th>
-                <th className="py-1 font-normal">Status</th>
-                <th className="py-1 font-normal">Change stock</th>
-              </tr>
-            </thead>
-            <tbody>
-              {s.rows.map((r) => (
-                <Row key={r.key} row={r} />
-              ))}
-            </tbody>
-          </table>
+          <div className="border-t border-[#e6e0d2]/80">
+            <PricingPanel pricing={s.pricing} enabled={pricesEditable} />
+            <div className="px-5 pt-3">
+              <AddAssetForm kind={s.kind} group={s.group} existingIds={s.ids} />
+            </div>
+            <div className="mt-2 overflow-x-auto">
+              <table className="w-full min-w-[880px] text-sm">
+                <thead>
+                  <tr className="bg-[#0f3d34]/[0.035]">
+                    <th className={`${TH} pl-5`}>Asset</th>
+                    <th className={TH} title="Preview. Prices are edited in the Pricing panel above.">
+                      Price <span className="font-normal normal-case tracking-normal text-[#a8a498]">· preview</span>
+                    </th>
+                    <th className={TH}>Counted</th>
+                    <th className={TH}>Used since</th>
+                    <th className={TH}>Remaining</th>
+                    <th className={TH}>Status</th>
+                    <th className={`${TH} pr-5`}>Change stock</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {s.rows.map((r) => (
+                    <Row key={r.key} row={r} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </details>
       ))}
     </div>

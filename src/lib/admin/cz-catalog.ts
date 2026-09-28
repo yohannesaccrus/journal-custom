@@ -16,6 +16,12 @@ export interface CzAsset {
   match: string;
   /** Theme image file (relative to the theme's assets folder) for a thumbnail, if any. */
   image?: string;
+  /**
+   * Thumbnail served by this app (public/), for assets the theme has no image of. Strings come
+   * from JOURNAL-GUIDE-NO-PENHOLDER/INDIVIDUAL_ITEMS/Strings; the colours missing there (yellow,
+   * lilac, grey, white) are that same drawing recoloured with the catalogue's hex.
+   */
+  localImage?: string;
   group?: string;
 }
 
@@ -67,7 +73,7 @@ export const CZ_ASSETS: CzAsset[] = [
   ...COVERS.map(([id, label, family]) =>
     a("cover", id, label, { image: `cz-cover-${id}-face.webp`, group: family === "classic" ? "Classic leather" : "Animal print" })
   ),
-  ...STRINGS.map(([id, label]) => a("string", id, label)),
+  ...STRINGS.map(([id, label]) => a("string", id, label, { localImage: `/cz-admin/strings/${id}.png` })),
   ...Array.from({ length: 88 }, (_, i) => {
     const n = i + 1;
     const size = charmSize(n);
