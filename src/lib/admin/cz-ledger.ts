@@ -1,6 +1,6 @@
 import "server-only";
 import { shopifyAdmin } from "@/lib/admin/shopify-admin-data";
-import { CZ_ASSETS } from "@/lib/admin/cz-catalog";
+import { readAllAssets } from "@/lib/admin/cz-catalog-store";
 import { fetchCzUses } from "@/lib/admin/cz-usage";
 
 /**
@@ -45,9 +45,14 @@ async function writeCzLedger(ledger: CzLedger): Promise<void> {
   }
 }
 
+/** The built-in catalogue plus assets added from the admin can all be counted. */
+async function assertKnownAsset(key: string) {
+  if (!(await readAllAssets()).some((x) => x.key === key)) throw new Error(`Unknown asset ${key}`);
+}
+
 /** Records a recount: "there are `qty` of this asset right now". */
 export async function setCzAssetStock(key: string, qty: number): Promise<CzLedger> {
-  if (!CZ_ASSETS.some((x) => x.key === key)) throw new Error(`Unknown asset ${key}`);
+  await assertKnownAsset(key);
   if (!Number.isInteger(qty) || qty < 0) throw new Error("Stock must be a whole number, 0 or more");
   const ledger = await readCzLedger();
   ledger[key] = { qty, asOf: new Date().toISOString() };
@@ -60,7 +65,7 @@ export async function setCzAssetStock(key: string, qty: number): Promise<CzLedge
  * the last count), then records that as a fresh count. Needs an earlier count to start from.
  */
 export async function adjustCzAssetStock(key: string, delta: number): Promise<CzLedger> {
-  if (!CZ_ASSETS.some((x) => x.key === key)) throw new Error(`Unknown asset ${key}`);
+  await assertKnownAsset(key);
   if (!Number.isInteger(delta) || delta === 0) throw new Error("Amount must be a whole number, not 0");
   const ledger = await readCzLedger();
   const entry = ledger[key];

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { adjustCzAssetStock, setCzAssetStock } from "@/lib/admin/cz-ledger";
+import { syncStorefrontStock } from "@/lib/admin/cz-storefront-stock";
 
 /**
  * Stock of one customizer asset (cover, string, charm...), kept in our own shop metafield.
@@ -14,7 +15,12 @@ export async function POST(request: NextRequest) {
   try {
     if (mode === "set") await setCzAssetStock(key, quantity);
     else await adjustCzAssetStock(key, mode === "add" ? quantity : -quantity);
-    return NextResponse.json({ ok: true });
+    // The count is saved; publishing it to the storefront failing shouldn't undo or hide that.
+    const published = await syncStorefrontStock().then(
+      () => true,
+      (err: unknown) => (console.error("Storefront stock sync failed:", err), false)
+    );
+    return NextResponse.json({ ok: true, published });
   } catch (err) {
     return NextResponse.json({ error: String(err instanceof Error ? err.message : err) }, { status: 400 });
   }

@@ -8,6 +8,12 @@ embedded = false
 [webhooks]
 api_version = "2026-07"
 
+  # Rebuilds the storefront's customizer stock (shop metafield sanaya.cz_stock_public) whenever an
+  # order uses assets or gives them back. See src/app/api/webhooks/orders/route.ts.
+  [[webhooks.subscriptions]]
+  topics = [ "orders/create", "orders/cancelled" ]
+  uri = "https://journal-custom.vercel.app/api/webhooks/orders"
+
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
 scopes = "read_customers,write_draft_orders,write_files,write_inventory,read_inventory,read_markets,write_markets,read_orders,read_products,write_products"
