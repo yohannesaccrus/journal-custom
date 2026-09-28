@@ -9,7 +9,7 @@ import { PriceTile } from "./PricingPanel";
 import { ShopPrice } from "./ShopPrice";
 import { assetStatus } from "./status";
 import { CARD, TD, TH } from "./styles";
-import { Notice, Pill, Toaster } from "./ui";
+import { ChangeStockHelp, Notice, Pill, Toaster } from "./ui";
 
 const LOW_STOCK_THRESHOLD = 10;
 
@@ -34,11 +34,14 @@ export async function StockPage({
   sections: wanted,
   intro = ASSETS_INTRO,
   withProducts = false,
+  open,
 }: {
   title: string;
   sections: CzSectionId[];
   intro?: ReactNode;
   withProducts?: boolean;
+  /** Sections open on load; all of them when left out. */
+  open?: CzSectionId[];
 }) {
   const [assets, rows, priceList] = await Promise.all([
     loadAssets(),
@@ -91,7 +94,7 @@ export async function StockPage({
           ) : (
             <>
               {assets.warning && <Notice tone="warning">{assets.warning}</Notice>}
-              <CzAssetStock sections={sections} pricesEditable={pricesEditable} />
+              <CzAssetStock sections={sections} pricesEditable={pricesEditable} open={open} />
             </>
           )}
         </div>
@@ -163,7 +166,10 @@ export async function StockPage({
                             <th className={TH}>Stock</th>
                             <th className={TH}>Storefront</th>
                             <th className={TH}>Used by customizer</th>
-                            <th className={`${TH} pr-5`}>Change stock</th>
+                            <th className={`${TH} pr-5`}>
+                              Change stock
+                              <ChangeStockHelp kind="product" />
+                            </th>
                           </tr>
                         </thead>
                         <tbody>

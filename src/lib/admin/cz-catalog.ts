@@ -19,7 +19,8 @@ export interface CzAsset {
   /**
    * Thumbnail served by this app (public/), for assets the theme has no image of. Strings come
    * from JOURNAL-GUIDE-NO-PENHOLDER/INDIVIDUAL_ITEMS/Strings; the colours missing there (yellow,
-   * lilac, grey, white) are that same drawing recoloured with the catalogue's hex.
+   * lilac, grey, white) are that same drawing recoloured with the catalogue's hex. Corners are
+   * product photos, cropped square.
    */
   localImage?: string;
   group?: string;
@@ -81,8 +82,8 @@ export const CZ_ASSETS: CzAsset[] = [
   }),
   ...PATCHES.map(([id, label]) => a("patch", id, label, { image: `cz-patch-${id}.webp` })),
   ...NOTEBOOKS.map(([id, label, ci]) => a("notebook", id, label, { match: ci, image: `cz-notebook-${id}.webp` })),
-  a("corner", "gold", "Gold"),
-  a("corner", "silver", "Silver"),
+  a("corner", "gold", "Gold", { localImage: "/cz-admin/corners/gold.jpg" }),
+  a("corner", "silver", "Silver", { localImage: "/cz-admin/corners/silver.jpg" }),
   a("pen", "black", "Black"),
   a("pen", "brown", "Brown"),
 ];

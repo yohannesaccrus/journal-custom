@@ -6,5 +6,5 @@ export const dynamic = "force-dynamic";
 const page = czPage("contents");
 
 export default function Page() {
-  return <StockPage title={page.title} sections={[...page.sections]} withProducts={page.withProducts} />;
+  return <StockPage title={page.title} sections={[...page.sections]} withProducts={page.withProducts} open={"open" in page ? [...page.open] : undefined} />;
 }

@@ -7,9 +7,17 @@ import type { CzSectionId } from "./data";
  */
 export const CZ_PAGES = [
   { slug: "covers", title: "Covers, Strings & Patches", sections: ["cover", "string", "patch"], withProducts: false },
-  { slug: "charms", title: "Charms", sections: ["charm-S", "charm-M", "charm-L"], withProducts: false },
+  // 88 charms: only the first size starts open, so the page doesn't open on three long tables.
+  { slug: "charms", title: "Charms", sections: ["charm-S", "charm-M", "charm-L"], withProducts: false, open: ["charm-S"] },
   { slug: "contents", title: "Contents & Accessories", sections: ["notebook", "corner", "pen"], withProducts: true },
-] as const satisfies readonly { slug: string; title: string; sections: readonly CzSectionId[]; withProducts: boolean }[];
+] as const satisfies readonly {
+  slug: string;
+  title: string;
+  sections: readonly CzSectionId[];
+  withProducts: boolean;
+  /** Sections open on load; all of them when left out. */
+  open?: readonly CzSectionId[];
+}[];
 
 export type CzPage = (typeof CZ_PAGES)[number];
 export const czPageHref = (slug: string) => `${CZ_STOCK_PATH}/${slug}`;

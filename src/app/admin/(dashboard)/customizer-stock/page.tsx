@@ -80,7 +80,7 @@ export default async function CustomizerStockOverview() {
 
       <section className="mb-12">
         <SectionHeading title="Categories">
-          Each category has its own page for <strong>counting stock</strong> and <strong>editing prices</strong>.
+          Each category has its own page for <strong>counting stock</strong>{" "}and <strong>editing prices</strong>.
         </SectionHeading>
         <div className="grid gap-4 md:grid-cols-3">
           {CZ_PAGES.map((page) => {
@@ -119,7 +119,7 @@ export default async function CustomizerStockOverview() {
 
       <section className="mb-12">
         <SectionHeading title="Needs attention">
-          Assets that are <strong>sold out</strong> or <strong>low</strong> (5 or fewer left), and tracked Shopify products
+          Assets that are <strong>sold out</strong>{" "}or <strong>low</strong>{" "}(5 or fewer left), and tracked Shopify products
           with 10 or fewer. Click one to restock it on its page.
         </SectionHeading>
         {attention.length === 0 && productAttention.length === 0 ? (

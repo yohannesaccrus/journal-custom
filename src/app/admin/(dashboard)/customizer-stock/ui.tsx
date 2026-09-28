@@ -205,3 +205,161 @@ export function Toaster() {
     </div>
   );
 }
+
+// ---------- Info popover ----------
+
+/**
+ * A small "i" button that explains something: opens on hover (mouse) or click (touch, keyboard),
+ * closes on click outside or Esc. Portalled to <body> with fixed positioning so a scrolling table or
+ * a frosted card can't clip or trap it.
+ */
+export function InfoPopover({ label, children }: { label: string; children: ReactNode }) {
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [pinned, setPinned] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const place = useCallback(() => {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const width = 320;
+    setPos({ top: r.bottom + 8, left: Math.max(12, Math.min(r.left + r.width / 2 - width / 2, window.innerWidth - width - 12)) });
+  }, []);
+  const show = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    place();
+  };
+  const hideSoon = () => {
+    if (pinned) return;
+    closeTimer.current = setTimeout(() => setPos(null), 120);
+  };
+  const close = useCallback(() => {
+    setPinned(false);
+    setPos(null);
+  }, []);
+
+  useEffect(() => {
+    if (!pos) return;
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (!btnRef.current?.contains(t) && !popRef.current?.contains(t)) close();
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
+    // Follows the icon when the page or a table scrolls, instead of closing under the pointer.
+    const follow = () => place();
+    window.addEventListener("pointerdown", onDown);
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", follow, true);
+    window.addEventListener("resize", follow);
+    return () => {
+      window.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", follow, true);
+      window.removeEventListener("resize", follow);
+    };
+  }, [pos, close, place]);
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        aria-label={label}
+        aria-expanded={!!pos}
+        onMouseEnter={show}
+        onMouseLeave={hideSoon}
+        onClick={() => (pinned ? close() : (setPinned(true), place()))}
+        className={`ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full align-[-3px] text-[10px] font-bold normal-case tracking-normal transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#e0a870]/60 ${
+          pos ? "bg-[#b1632f] text-white" : "bg-[#0f3d34]/10 text-[#0f3d34] hover:bg-[#b1632f] hover:text-white"
+        }`}
+      >
+        i
+      </button>
+      {pos &&
+        createPortal(
+          <div
+            ref={popRef}
+            role="tooltip"
+            onMouseEnter={show}
+            onMouseLeave={hideSoon}
+            style={{ top: pos.top, left: pos.left, width: 320 }}
+            className="fixed z-[65] animate-[czPop_0.15s_ease-out] overflow-hidden rounded-xl bg-[#faf8f3] text-left text-xs normal-case leading-relaxed tracking-normal text-[#3d3c37] shadow-[0_20px_50px_-15px_rgba(10,43,37,0.55)] ring-1 ring-black/5"
+          >
+            <div className="bg-gradient-to-br from-[#154a3f] via-[#0f3d34] to-[#0a2b25] px-4 py-2.5 font-serif text-sm text-[#f2ece1]">{label}</div>
+            <div className="px-4 py-3">{children}</div>
+            <style>{`@keyframes czPop { from { opacity: 0; transform: translateY(4px) scale(0.98); } to { opacity: 1; transform: none; } }`}</style>
+          </div>,
+          document.body
+        )}
+    </>
+  );
+}
+
+function HelpRow({ tag, tone, children }: { tag: string; tone: string; children: ReactNode }) {
+  return (
+    <div className="flex gap-2.5 py-1.5">
+      <span className={`mt-px h-fit shrink-0 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[10.5px] font-medium ${tone}`}>{tag}</span>
+      <p className="min-w-0 [&_strong]:font-semibold [&_strong]:text-[#1c1c1a]">{children}</p>
+    </div>
+  );
+}
+
+const TAG = {
+  qty: "border border-[#d9d2c1] bg-white text-[#6b6a63]",
+  add: "bg-[#2f7a63]/12 text-[#22604d]",
+  remove: "bg-[#b1632f]/12 text-[#8a4a22]",
+  set: "bg-[#0f3d34] text-[#f2ece1]",
+};
+
+/** What the Change stock controls do: asset tables (our own count) or the two Shopify products. */
+export function ChangeStockHelp({ kind }: { kind: "asset" | "product" }) {
+  return (
+    <InfoPopover label="How to change stock">
+      <div className="divide-y divide-[#e6e0d2]">
+        <HelpRow tag="Qty" tone={TAG.qty}>
+          The number the buttons use. <strong>Whole numbers only</strong>; type it first, then pick an action.
+        </HelpRow>
+        {kind === "asset" ? (
+          <>
+            <HelpRow tag="+ Add" tone={TAG.add}>
+              Adds Qty to <strong>what&apos;s left now</strong>, e.g. a new delivery. Needs a count first.
+            </HelpRow>
+            <HelpRow tag="− Remove" tone={TAG.remove}>
+              Takes Qty off what&apos;s left, e.g. damaged or lost. Can&apos;t go below 0.
+            </HelpRow>
+            <HelpRow tag="Set count" tone={TAG.set}>
+              <strong>Replaces</strong>{" "}the count with Qty. Use it after counting what&apos;s physically on hand; orders
+              placed after that are subtracted automatically.
+            </HelpRow>
+          </>
+        ) : (
+          <>
+            <HelpRow tag="+ Add" tone={TAG.add}>
+              Adds Qty to the <strong>Shopify inventory</strong>. Only once the variant is tracked.
+            </HelpRow>
+            <HelpRow tag="− Remove" tone={TAG.remove}>
+              Takes Qty off the Shopify inventory. Can&apos;t go below 0.
+            </HelpRow>
+            <HelpRow tag="Set" tone={TAG.set}>
+              <strong>Replaces</strong>{" "}the Shopify inventory with Qty. &ldquo;Track &amp; set&rdquo; also turns on tracking the
+              first time, so it shows as sold out at 0.
+            </HelpRow>
+          </>
+        )}
+      </div>
+      <p className="mt-2 rounded-lg bg-[#b5342c]/[0.06] px-3 py-2 text-[#8f2a23]">
+        {kind === "asset" ? (
+          <>
+            <strong className="text-[#8f2a23]">0 = sold out.</strong>{" "}A cover, string, charm or patch at 0 can&apos;t be picked
+            in the customizer (after the page reloads). Notebooks, corners and pen holders stay on offer.
+          </>
+        ) : (
+          <>
+            <strong className="text-[#8f2a23]">0 = sold out</strong>{" "}on the storefront once the variant is tracked.
+          </>
+        )}
+      </p>
+    </InfoPopover>
+  );
+}

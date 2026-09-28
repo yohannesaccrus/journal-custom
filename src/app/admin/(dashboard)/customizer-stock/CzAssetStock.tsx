@@ -1,11 +1,13 @@
 "use client";
 
+import { useEffect } from "react";
+
 import { StockEditor } from "./StockEditor";
 import { AddAssetForm } from "./AddAssetForm";
 import { PricingPanel, type CzPricing } from "./PricingPanel";
 import { ShopPrice } from "./ShopPrice";
 import { assetStatus } from "./status";
-import { Pill } from "./ui";
+import { ChangeStockHelp, Pill } from "./ui";
 import { CARD, TD, TH } from "./styles";
 import type { CzPrice } from "@/lib/admin/cz-stock";
 
@@ -87,11 +89,25 @@ function SectionSummary({ rows }: { rows: CzAssetRow[] }) {
   );
 }
 
-export function CzAssetStock({ sections, pricesEditable }: { sections: CzAssetSection[]; pricesEditable: boolean }) {
+export function CzAssetStock({ sections, pricesEditable, open }: { sections: CzAssetSection[]; pricesEditable: boolean; open?: string[] }) {
+  // A jump link (#charm-M) to a closed section opens it, on load and on later clicks.
+  useEffect(() => {
+    const openTarget = () => {
+      const el = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+      if (el instanceof HTMLDetailsElement && !el.open) {
+        el.open = true;
+        el.scrollIntoView({ block: "start" });
+      }
+    };
+    openTarget();
+    window.addEventListener("hashchange", openTarget);
+    return () => window.removeEventListener("hashchange", openTarget);
+  }, []);
+
   return (
     <div className="space-y-4">
       {sections.map((s) => (
-        <details key={s.id} id={s.id} className={`group/section scroll-mt-6 overflow-hidden ${CARD}`} open>
+        <details key={s.id} id={s.id} className={`group/section scroll-mt-6 overflow-hidden ${CARD}`} open={!open || open.includes(s.id)}>
           <summary className="flex cursor-pointer list-none flex-wrap items-center gap-3 px-5 py-4 transition-colors hover:bg-white/40 [&::-webkit-details-marker]:hidden">
             <svg className="h-4 w-4 shrink-0 text-[#b1632f] transition-transform duration-200 group-open/section:rotate-90" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
               <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
@@ -119,7 +135,10 @@ export function CzAssetStock({ sections, pricesEditable }: { sections: CzAssetSe
                     <th className={TH}>Used since</th>
                     <th className={TH}>Remaining</th>
                     <th className={TH}>Status</th>
-                    <th className={`${TH} pr-5`}>Change stock</th>
+                    <th className={`${TH} pr-5`}>
+                      Change stock
+                      <ChangeStockHelp kind="asset" />
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
