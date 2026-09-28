@@ -18,8 +18,9 @@ export const ASSETS_INTRO = (
   <>
     These are <strong>not Shopify products</strong>, so Shopify keeps no stock for them. <strong>This page does.</strong>{" "}
     Enter the <strong>physical count</strong>{" "}you have on hand with Set count; every order placed after that is{" "}
-    <strong>subtracted automatically</strong>{" "}to give what&apos;s remaining. Note: the storefront{" "}
-    <strong>won&apos;t hide a sold-out asset yet</strong>, which needs the theme to read this stock.
+    <strong>subtracted automatically</strong>{" "}to give what&apos;s remaining. When a <strong>cover, string, charm or patch</strong>{" "}
+    reaches 0, the customizer <strong>stops offering it</strong>. Notebooks, metal corners and pen holders are tracked here
+    but <strong>stay on offer</strong>{" "}when they run out. Assets with no count yet are not tracked and stay on offer.
   </>
 );
 
