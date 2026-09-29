@@ -1,8 +1,8 @@
 import "server-only";
 import { fetchCzPrices, type CzMoney, type CzPrice, type CzPriceKey } from "@/lib/admin/cz-stock";
 import { CZ_MARKETS } from "@/lib/markets";
-import { CZ_KIND_LABEL, CZ_KIND_ORDER, type CzAsset, type CzKind } from "@/lib/admin/cz-catalog";
-import { readAllAssets } from "@/lib/admin/cz-catalog-store";
+import { CZ_ASSETS, CZ_KIND_LABEL, CZ_KIND_ORDER, type CzAsset, type CzKind } from "@/lib/admin/cz-catalog";
+import { CZ_STOREFRONT_KINDS, readAllAssets } from "@/lib/admin/cz-catalog-store";
 import { readCzLedger } from "@/lib/admin/cz-ledger";
 import { fetchCzUses } from "@/lib/admin/cz-usage";
 import type { CzAssetSection } from "./CzAssetStock";
@@ -143,7 +143,21 @@ export async function loadAssets(): Promise<{ sections: CzAssetSection[]; warnin
         key: a.key,
         label: a.label,
         group: a.group ?? null,
-        imageUrl: a.localImage ?? (a.image ? `${imageBase}${a.image}?width=80` : null),
+        imageUrl: a.custom?.image
+          ? `${a.custom.image.url}${a.custom.image.url.includes("?") ? "&" : "?"}width=80`
+          : (a.localImage ?? (a.image ? `${imageBase}${a.image}?width=80` : null)),
+        edit: a.custom
+          ? {
+              id: a.id,
+              label: a.label,
+              group: a.group ?? "",
+              hex: a.custom.hex ?? "",
+              ci: a.custom.ci ?? "",
+              positionedLike: a.custom.positionedLike ?? "",
+              image: a.custom.image ?? null,
+              spine: a.custom.spine ?? null,
+            }
+          : null,
         counted: entry?.qty ?? null,
         asOf: entry?.asOf ?? null,
         used: uses.filter((u) => u.key === a.key && u.at > since).length,
@@ -152,6 +166,13 @@ export async function loadAssets(): Promise<{ sections: CzAssetSection[]; warnin
     }),
     pricing: pricingOf(kind, size, assets, prices),
     ids: allAssets.filter((a) => a.kind === kind).map((a) => a.id),
+    form: {
+      kind,
+      group: size ? `Size ${size}` : null,
+      storefront: CZ_STOREFRONT_KINDS.includes(kind),
+      coverOptions: kind === "cover" ? CZ_ASSETS.filter((a) => a.kind === "cover").map((a) => ({ id: a.id, label: a.label })) : [],
+      nextId: kind === "charm" ? String(Math.max(0, ...allAssets.filter((a) => a.kind === "charm").map((a) => Number(a.id) || 0)) + 1) : "",
+    },
   });
 
   const sections = CZ_KIND_ORDER.flatMap((kind) => {

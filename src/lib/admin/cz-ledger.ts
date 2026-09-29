@@ -45,6 +45,14 @@ async function writeCzLedger(ledger: CzLedger): Promise<void> {
   }
 }
 
+/** Forgets an asset's count (it goes back to "not counted"), e.g. when the asset is deleted. */
+export async function clearCzAssetStock(key: string): Promise<void> {
+  const ledger = await readCzLedger();
+  if (!(key in ledger)) return;
+  delete ledger[key];
+  await writeCzLedger(ledger);
+}
+
 /** The built-in catalogue plus assets added from the admin can all be counted. */
 async function assertKnownAsset(key: string) {
   if (!(await readAllAssets()).some((x) => x.key === key)) throw new Error(`Unknown asset ${key}`);

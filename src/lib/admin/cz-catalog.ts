@@ -24,6 +24,23 @@ export interface CzAsset {
    */
   localImage?: string;
   group?: string;
+  /** Set on assets added from the admin (they can be edited and deleted; built-in ones can't). */
+  custom?: CzCustomFields;
+}
+
+/** What an asset added from the admin carries so the storefront customizer can offer it. */
+export interface CzCustomFields {
+  /** Image in Shopify Files: a cover's front, a charm, a patch, a string's admin thumbnail. */
+  image?: { fileId: string; url: string; width: number; height: number };
+  /** A cover's spine photo. */
+  spine?: { fileId: string; url: string; width: number; height: number };
+  /** A string's colour. */
+  hex?: string;
+  /** A cover: the built-in cover whose string/charm positions it borrows. */
+  positionedLike?: string;
+  /** A cover: its name on the order ("Black crocodile"); defaults to the label. */
+  ci?: string;
+  createdAt: string;
 }
 
 const a = (kind: CzKind, id: string, label: string, extra: Partial<CzAsset> = {}): CzAsset => ({

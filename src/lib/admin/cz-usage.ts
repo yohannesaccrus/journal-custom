@@ -1,6 +1,7 @@
 import "server-only";
 import { shopifyAdmin } from "@/lib/admin/shopify-admin-data";
-import { CZ_ASSETS, CZ_JOURNAL_PRODUCT_ID, CZ_ORDER_SOURCE, type CzKind } from "@/lib/admin/cz-catalog";
+import { CZ_JOURNAL_PRODUCT_ID, CZ_ORDER_SOURCE, type CzAsset, type CzKind } from "@/lib/admin/cz-catalog";
+import { readAllAssets } from "@/lib/admin/cz-catalog-store";
 
 /**
  * How many times each asset was used by the new customizer, read from the choices it stores as
@@ -35,34 +36,37 @@ interface Resp {
   };
 }
 
-const byMatch = (kind: CzKind) => new Map(CZ_ASSETS.filter((x) => x.kind === kind).map((x) => [x.match, x.key]));
-const COVER = byMatch("cover"), STRING = byMatch("string"), NOTEBOOK = byMatch("notebook");
-const PATCH = byMatch("patch"), CORNER = byMatch("corner"), PEN = byMatch("pen");
-const CHARM = new Set(CZ_ASSETS.filter((x) => x.kind === "charm").map((x) => x.id));
-
-function keysOf(attrs: Record<string, string>): string[] {
-  const out: string[] = [];
-  const push = (k: string | undefined) => k && out.push(k);
-  push(COVER.get(attrs["Cover"]));
-  push(STRING.get(attrs["String"]));
-  for (const n of ["first notebook (1/3)", "second notebook (2/3)", "third notebook (3/3)"]) {
-    push(NOTEBOOK.get(attrs[`_Choose your ${n}`]));
-  }
-  push(NOTEBOOK.get(attrs["_Extra Notebooks"]));
-  push(PATCH.get(attrs["_Patch"]));
-  push(CORNER.get(attrs["_Corner Protectors"]));
-  push(PEN.get(attrs["_Pen Holder"]));
-  for (let i = 1; i <= 11; i++) {
-    const c = attrs[`_Charm ${i}`];
-    if (c && CHARM.has(c)) out.push(`charm:${c}`);
-  }
-  return out;
+/** Reads an order line's properties back into asset keys, for the built-in assets plus those added from the admin. */
+function matcher(assets: CzAsset[]) {
+  const byMatch = (kind: CzKind) => new Map(assets.filter((x) => x.kind === kind).map((x) => [x.match, x.key]));
+  const COVER = byMatch("cover"), STRING = byMatch("string"), NOTEBOOK = byMatch("notebook");
+  const PATCH = byMatch("patch"), CORNER = byMatch("corner"), PEN = byMatch("pen");
+  const CHARM = new Set(assets.filter((x) => x.kind === "charm").map((x) => x.id));
+  return (attrs: Record<string, string>): string[] => {
+    const out: string[] = [];
+    const push = (k: string | undefined) => k && out.push(k);
+    push(COVER.get(attrs["Cover"]));
+    push(STRING.get(attrs["String"]));
+    for (const n of ["first notebook (1/3)", "second notebook (2/3)", "third notebook (3/3)"]) {
+      push(NOTEBOOK.get(attrs[`_Choose your ${n}`]));
+    }
+    push(NOTEBOOK.get(attrs["_Extra Notebooks"]));
+    push(PATCH.get(attrs["_Patch"]));
+    push(CORNER.get(attrs["_Corner Protectors"]));
+    push(PEN.get(attrs["_Pen Holder"]));
+    for (let i = 1; i <= 11; i++) {
+      const c = attrs[`_Charm ${i}`];
+      if (c && CHARM.has(c)) out.push(`charm:${c}`);
+    }
+    return out;
+  };
 }
 
 /** Every use since `since` (ISO), newest orders first, capped so a huge history can't stall the page. */
 export async function fetchCzUses(since: string | null): Promise<{ uses: CzUse[]; truncated: boolean }> {
   const q = [`product_id:${CZ_JOURNAL_PRODUCT_ID}`, since ? `created_at:>=${since}` : ""].filter(Boolean).join(" ");
   const uses: CzUse[] = [];
+  const keysOf = matcher(await readAllAssets());
   let cursor: string | null = null;
   for (let page = 0; page < 10; page++) {
     const data: Resp = await shopifyAdmin<Resp>(QUERY, { cursor, q });

@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 
 import { StockEditor } from "./StockEditor";
-import { AddAssetForm } from "./AddAssetForm";
+import { AssetActions, AddAssetButton, type CzAssetFormConfig, type CzAssetValues } from "./AssetDialog";
 import { PricingPanel, type CzPricing } from "./PricingPanel";
 import { ShopPrice } from "./ShopPrice";
 import { assetStatus } from "./status";
@@ -25,6 +25,8 @@ export interface CzAssetRow {
   price: CzPrice | null;
   /** Which price group it comes from, e.g. "Size S price". */
   priceNote: string | null;
+  /** Its current values when it was added from the admin (so it can be edited or deleted); null for built-in ones. */
+  edit: CzAssetValues | null;
 }
 export interface CzAssetSection {
   /** Unique per section: the kind, or "charm-S" / "charm-M" / "charm-L" for charms split by size. */
@@ -37,9 +39,11 @@ export interface CzAssetSection {
   ids: string[];
   /** The category's editable prices, shown above its table. */
   pricing: CzPricing;
+  /** How new assets are added to this section. */
+  form: CzAssetFormConfig;
 }
 
-function Row({ row }: { row: CzAssetRow }) {
+function Row({ row, form }: { row: CzAssetRow; form: CzAssetFormConfig }) {
   const s = assetStatus(row.counted, row.used);
   return (
     <tr className="border-t border-[#e6e0d2]/80 transition-colors hover:bg-white/60">
@@ -51,7 +55,10 @@ function Row({ row }: { row: CzAssetRow }) {
               <img src={row.imageUrl} alt="" loading="lazy" className="h-full w-full object-cover" onError={(e) => (e.currentTarget.style.display = "none")} />
             )}
           </div>
-          <span className="font-medium text-[#1c1c1a]">{row.label}</span>
+          <div className="min-w-0">
+            <span className="font-medium text-[#1c1c1a]">{row.label}</span>
+            {row.edit && <AssetActions form={form} assetKey={row.key} values={row.edit} />}
+          </div>
         </div>
       </td>
       <td className={`${TD} tabular-nums`}>
@@ -121,7 +128,7 @@ export function CzAssetStock({ sections, pricesEditable, open }: { sections: CzA
           <div className="border-t border-[#e6e0d2]/80">
             <PricingPanel pricing={s.pricing} enabled={pricesEditable} />
             <div className="px-5 pt-3">
-              <AddAssetForm kind={s.kind} group={s.group} existingIds={s.ids} />
+              <AddAssetButton form={s.form} existingIds={s.ids} />
             </div>
             <div className="mt-2 overflow-x-auto">
               <table className="w-full min-w-[880px] text-sm">
@@ -143,7 +150,7 @@ export function CzAssetStock({ sections, pricesEditable, open }: { sections: CzA
                 </thead>
                 <tbody>
                   {s.rows.map((r) => (
-                    <Row key={r.key} row={r} />
+                    <Row key={r.key} row={r} form={s.form} />
                   ))}
                 </tbody>
               </table>
